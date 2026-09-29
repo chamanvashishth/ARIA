@@ -27,6 +27,31 @@ def test_embedding_lookup() -> None:
     assert output.to_list() == [[4.0, 5.0], [0.0, 1.0]]
 
 
+def test_linear_backpropagates_to_parameters() -> None:
+    layer = Linear(2, 1)
+    layer.weight = Parameter([[2.0], [3.0]])
+    layer.bias = Parameter([1.0])
+
+    loss = layer.forward(Tensor.from_list([[4.0, 5.0]])).sum()
+    loss.backward()
+
+    assert layer.weight.grad is not None
+    assert layer.bias.grad is not None
+    assert layer.weight.grad.to_list() == [[4.0], [5.0]]
+    assert layer.bias.grad.to_list() == [1.0]
+
+
+def test_embedding_backpropagates_to_used_rows() -> None:
+    layer = Embedding(3, 2)
+    layer.weight = Parameter([[0.0, 0.0], [1.0, 2.0], [3.0, 4.0]])
+
+    loss = layer.forward([2, 0, 2]).sum()
+    loss.backward()
+
+    assert layer.weight.grad is not None
+    assert layer.weight.grad.to_list() == [[1.0, 1.0], [0.0, 0.0], [2.0, 2.0]]
+
+
 def test_embedding_rejects_invalid_token() -> None:
     with pytest.raises(IndexError):
         Embedding(2, 3).forward([2])
