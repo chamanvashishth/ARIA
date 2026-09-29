@@ -20,6 +20,8 @@ ARIA is a software-only, local-first AI system being built block-by-block around
 
 **Block 5 — Decoder Transformer SLM Foundation: EXPERIMENTAL**
 
+**Block 6 — Training Engine Foundation: IMPLEMENTED**
+
 This block establishes the real project skeleton and development boundary. It does **not** claim that the neural brain, tokenizer, training engine, inference engine, RAG, agent, or runtime are implemented.
 
 ### Implemented in Block 0
@@ -39,7 +41,7 @@ This block establishes the real project skeleton and development boundary. It do
 - neural tensor/model backend — **IMPLEMENTED (Block 1 foundation)**
 - ARIA tokenizer — **IMPLEMENTED (deterministic byte-level foundation)**
 - trainable SLM
-- training engine
+- training engine — **IMPLEMENTED foundation: token windows, training steps, SGD updates, loss history, metadata checkpoints**
 - inference engine
 - AI runtime
 - virtual compute
@@ -156,7 +158,7 @@ A class, mock, prompt, button, or API wrapper is not treated as intelligence.
 5. **Block 4 — Tokenizer expansion** — ARIA-owned tokenizer for natural language, Hindi/Hinglish, code, mathematics, and technical text.
 5. **Block 4 — Trainable language-model core** — token embeddings, vocabulary logits, next-token cross-entropy, backpropagation, and local SGD. **IMPLEMENTED**
 6. **Block 5 — Decoder Transformer SLM foundation** — causal self-attention, RMSNorm, positional embeddings, residual MLP blocks, and vocabulary head. **EXPERIMENTAL** — evolve the model into an efficient decoder-only language model.
-7. **Block 6 — Training engine** — reproducible local pretraining/instruction-training pipeline.
+7. **Block 6 — Training engine** — deterministic token-window dataset, local training loop, loss history, and experiment metadata checkpoints. **IMPLEMENTED foundation** — reproducible local pretraining/instruction-training pipeline.
 8. **Block 7 — Inference engine** — autoregressive generation, sampling, streaming, and caching.
 9. **Block 8 — AI runtime** — model loading, execution, scheduling, and runtime state.
 10. **Block 9 — Context & memory** — inspectable local working, conversational, semantic, and episodic memory.
