@@ -1,5 +1,6 @@
-"""Small Language Model configuration primitives."""
+"""Small Language Model building blocks."""
 
 from .config import SLMConfig
+from .tokenizer import Tokenizer
 
-__all__ = ["SLMConfig"]
+__all__ = ["SLMConfig", "Tokenizer"]
