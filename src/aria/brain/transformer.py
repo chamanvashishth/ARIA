@@ -82,9 +82,12 @@ class CausalSelfAttention(Module):
         if len(x.shape) != 2:
             raise ValueError("attention expects [time, hidden]")
         time, hidden = x.shape
-        q = self.query.forward(x)._values
-        k = self.key.forward(x)._values
-        v = self.value.forward(x)._values
+        q_tensor = self.query.forward(x)
+        k_tensor = self.key.forward(x)
+        v_tensor = self.value.forward(x)
+        q = q_tensor._values
+        k = k_tensor._values
+        v = v_tensor._values
         outputs = [0.0] * (time * hidden)
         cache: list[tuple[list[float], list[float], list[float], list[float]]] = []
 
@@ -103,10 +106,6 @@ class CausalSelfAttention(Module):
             cache.append((probs, q[i * hidden:(i + 1) * hidden], k[:time * hidden], v[:time * hidden]))
 
         # Rebuild the gradient path through q/k/v with a custom backward.
-        q_tensor = self.query.forward(x)
-        k_tensor = self.key.forward(x)
-        v_tensor = self.value.forward(x)
-
         def backward(result: Tensor) -> None:
             grad_out = result.grad._values
             dq = [0.0] * len(q)
@@ -129,9 +128,9 @@ class CausalSelfAttention(Module):
                         dk[j * hidden + d] += dsj * q[i * hidden + d] * self.scale
 
             # Push q/k/v gradients through their Linear layers.
-            self.query.forward(x)._accumulate(dq)
-            self.key.forward(x)._accumulate(dk)
-            self.value.forward(x)._accumulate(dv)
+            q_tensor._accumulate(dq)
+            k_tensor._accumulate(dk)
+            v_tensor._accumulate(dv)
 
         return Tensor.operation(_reshape(outputs, x.shape), parents=(q_tensor, k_tensor, v_tensor), backward=backward)
 
