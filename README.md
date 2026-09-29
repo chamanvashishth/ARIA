@@ -10,6 +10,8 @@ ARIA is a software-only, local-first AI system being built block-by-block around
 
 **Block 0 — Repository & Engineering Foundation: IMPLEMENTED**
 
+**Block 1 — Neural Tensor/Model Foundation: IMPLEMENTED**
+
 This block establishes the real project skeleton and development boundary. It does **not** claim that the neural brain, tokenizer, training engine, inference engine, RAG, agent, or runtime are implemented.
 
 ### Implemented in Block 0
@@ -26,7 +28,7 @@ This block establishes the real project skeleton and development boundary. It do
 
 ### Not implemented yet
 
-- neural tensor/model backend
+- neural tensor/model backend — **IMPLEMENTED (Block 1 foundation)**
 - ARIA tokenizer
 - trainable SLM
 - training engine
@@ -71,6 +73,8 @@ ARIA/
 └── tests/
     └── test_foundation.py
 ```
+
+Block 1 currently provides a dependency-free correctness-first tensor primitive with shape tracking, elementwise addition/multiplication, scalar reduction, reverse-mode autodiff, gradient accumulation, trainable parameters, and recursive parameter discovery. It is intentionally not a high-performance tensor backend and is not yet the ARIA SLM.
 
 The package boundaries are intentionally lightweight. A directory does not count as an implemented subsystem until it contains real behavior and tests.
 
@@ -138,7 +142,7 @@ A class, mock, prompt, button, or API wrapper is not treated as intelligence.
 ## Development sequence
 
 1. **Block 0 — Repository & engineering foundation** — package, configuration, logging, tests. **IMPLEMENTED**
-2. **Block 1 — Neural tensor/model foundation** — real local numerical and trainable-model primitives.
+2. **Block 1 — Neural tensor/model foundation** — real local numerical and trainable-model primitives. **IMPLEMENTED**
 3. **Block 2 — Tokenizer** — ARIA-owned tokenizer for natural language, Hindi/Hinglish, code, mathematics, and technical text.
 4. **Block 3 — Transformer SLM** — evolve the model into an efficient decoder-only language model.
 5. **Block 4 — Training engine** — reproducible local pretraining/instruction-training pipeline.
