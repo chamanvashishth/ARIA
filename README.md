@@ -1,172 +1,303 @@
+<div align="center">
+
 # ARIA
 
-**ARIA** is a local-first, modular AI assistant engineered as a production-quality Python system. Its architecture separates assistant orchestration from model providers, memory, persistence, configuration, and user interfaces so each subsystem can evolve independently.
+### **Adaptive • Reasoning • Intelligent Assistant**
 
-> **Status:** Foundation and assistant orchestration are implemented. The SLM, training pipeline, persistent memory, and interactive assistant experience are planned and will be introduced incrementally.
+*A local-first AI assistant engineered for modular intelligence, private execution, and extensible capabilities.*
 
-## What ARIA Is
+[![CI](https://github.com/chamanvashishth/ARIA/actions/workflows/ci.yml/badge.svg)](https://github.com/chamanvashishth/ARIA/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
+![Architecture](https://img.shields.io/badge/Architecture-Modular-6f42c1)
+![Execution](https://img.shields.io/badge/Execution-Local--First-2ea44f)
+![License](https://img.shields.io/badge/License-TBD-lightgrey)
 
-ARIA is being built as a real software system rather than a single AI script. The project prioritizes:
+**A production-oriented foundation for building a private, extensible AI assistant and its own SLM.**
 
-- clear interfaces between subsystems
-- local development and execution
-- provider-independent assistant logic
-- deterministic application behavior around model output
-- testable components
-- explicit configuration and security boundaries
-- incremental implementation with CI validation
+</div>
 
-The long-term system is intended to support conversational interaction, a locally runnable SLM, persistent conversation history, memory, configurable behavior, CLI interaction, and extensible assistant capabilities.
+---
 
-Only implemented functionality is described as complete in this document.
+## Product Vision
 
-## Current Capabilities
+ARIA is designed as a complete assistant platform rather than a single chatbot script.
 
-### Implemented
+The system separates **conversation, orchestration, intelligence, memory, storage, configuration, and user interaction** so each part can be developed, tested, replaced, and improved independently.
 
-- Python package structure using a src layout
-- project metadata and development dependencies
-- package entry point and version metadata
-- conversational Message contract
-- Assistant orchestration contract
-- provider/responder decoupling
-- unit tests
-- CLI smoke test
-- Ruff formatting and linting
-- GitHub Actions CI for Python 3.11, 3.12, and 3.13
+The long-term architecture is centered around a locally runnable **Small Language Model (SLM)**, surrounded by a reliable application layer.
 
-### Not implemented yet
+<div align="center">
 
-- SLM architecture and weights
-- tokenizer and vocabulary pipeline
-- training dataset pipeline
-- model training
-- inference engine
-- checkpoint management
-- persistent memory
-- conversation storage
-- retrieval/context system
-- production model-provider adapters
-- interactive CLI
-- tool execution
-- observability and telemetry
+### ARIA at a glance
 
-This distinction is deliberate: the README is maintained as an accurate description of repository state.
+| Layer | Responsibility |
+|:---:|---|
+| **UI** | Conversation and user interaction |
+| **Core** | Assistant orchestration and application rules |
+| **SLM** | Local language understanding and generation |
+| **Memory** | Context and long-term assistant state |
+| **Storage** | Durable application data |
+| **Infrastructure** | Configuration, logging, errors, utilities |
 
-## Architecture
+</div>
 
-ARIA uses a layered design:
+---
+
+# System Architecture
+
+<div align="center">
 
 ```text
-                         User Interface
-                              |
-                              v
-                      Application Layer
-                       orchestration/state
-                              |
-                              v
-                         ARIA Core
-                    assistant coordination
-                         /          \
-                        /            \
-                       v              v
-                Model Boundary    Memory/Storage
-                 SLM/providers     persistence
-                       \            /
-                        \          /
-                         v        v
-                       Infrastructure
-                  config/logging/utilities
+                         ┌──────────────────────┐
+                         │        ARIA UI       │
+                         │   CLI / Interfaces   │
+                         └──────────┬───────────┘
+                                    │
+                                    ▼
+                    ┌──────────────────────────────┐
+                    │       Application Core       │
+                    │ orchestration • policies     │
+                    │ state • request lifecycle    │
+                    └──────────────┬───────────────┘
+                                   │
+                     ┌─────────────┴─────────────┐
+                     │                           │
+                     ▼                           ▼
+            ┌─────────────────┐         ┌─────────────────┐
+            │  Intelligence   │         │     Memory      │
+            │                 │         │                 │
+            │   ARIA SLM      │         │ context/history │
+            │   providers     │         │ retrieval       │
+            └────────┬────────┘         └────────┬────────┘
+                     │                           │
+                     └─────────────┬─────────────┘
+                                   │
+                                   ▼
+                         ┌──────────────────────┐
+                         │     Persistence      │
+                         │ storage / state      │
+                         └──────────┬───────────┘
+                                    │
+                                    ▼
+                         ┌──────────────────────┐
+                         │   Infrastructure     │
+                         │ config • logging     │
+                         │ errors • utilities   │
+                         └──────────────────────┘
 ```
 
-The core assistant does not depend on a specific model implementation. A responder boundary allows the future ARIA SLM, another provider adapter, or a test double to be substituted without rewriting application orchestration.
+</div>
 
-## Core Contracts
+### Architectural principle
 
-The current conversational contract is:
-
-```python
-Message(role="user", content="Hello")
-```
-
-The assistant delegates response generation to a responder:
+ARIA Core never needs to know how intelligence is implemented.
 
 ```text
-User Message
-     |
-     v
- Assistant
-     |
-     v
- Responder
-     |
-     v
-Assistant Message
+                     ARIA Core
+                         │
+                         ▼
+                ┌─────────────────┐
+                │ Responder       │
+                │ Contract        │
+                └────────┬────────┘
+                         │
+              ┌──────────┼──────────┐
+              ▼          ▼          ▼
+           ARIA SLM   Provider   Test Double
 ```
 
-This boundary is the foundation for integrating the SLM later without coupling model implementation to the application layer.
+This boundary makes the application testable without a trained model and allows the intelligence layer to evolve independently.
 
-## Repository Layout
+---
+
+# Core Capabilities
+
+<div align="center">
+
+| Capability | Purpose | State |
+|:---|:---|:---:|
+| **Conversational Core** | Message and response orchestration | Ready |
+| **Modular Architecture** | Independent subsystem boundaries | Ready |
+| **Local Execution** | Development without mandatory hosted infrastructure | Ready |
+| **Provider Boundary** | Replaceable model/responder integration | Ready |
+| **Automated Validation** | Tests, linting, formatting and CI | Ready |
+| **SLM Layer** | Native model intelligence | Building |
+| **Memory System** | Persistent context and memory | Building |
+| **Interactive CLI** | Full conversational experience | Building |
+| **Production Hardening** | Security, performance and reliability | Building |
+
+</div>
+
+> **Important:** “Building” describes planned product layers, not missing documentation. The repository is intentionally developed checkpoint-by-checkpoint so every layer can be validated before the next one is added.
+
+---
+
+# Intelligence Architecture
+
+ARIA is being designed around its own SLM rather than permanently coupling the assistant to one external model vendor.
+
+<div align="center">
+
+```text
+                    User Request
+                         │
+                         ▼
+                ┌─────────────────┐
+                │  ARIA Assistant │
+                └────────┬────────┘
+                         │
+                         ▼
+                 Responder Contract
+                         │
+            ┌────────────┴────────────┐
+            │                         │
+            ▼                         ▼
+       Local ARIA SLM          External Adapter
+            │
+            ▼
+       ┌─────────────┐
+       │ Tokenizer   │
+       ├─────────────┤
+       │ Embeddings  │
+       ├─────────────┤
+       │ Transformer │
+       ├─────────────┤
+       │ Decoder     │
+       └──────┬──────┘
+              │
+              ▼
+         Generated Text
+```
+
+</div>
+
+The model subsystem will be independently testable and will not be required for basic application tests.
+
+---
+
+# Conversation Flow
+
+<div align="center">
+
+```text
+┌──────────┐
+│   User   │
+└────┬─────┘
+     │ message
+     ▼
+┌──────────────┐
+│ ARIA UI      │
+└────┬─────────┘
+     │
+     ▼
+┌──────────────┐
+│ ARIA Core    │
+└────┬─────────┘
+     │
+     ├──────────────► Memory / Context
+     │
+     ▼
+┌──────────────┐
+│ Responder    │
+└────┬─────────┘
+     │
+     ▼
+┌──────────────┐
+│ SLM / Model  │
+└────┬─────────┘
+     │ response
+     ▼
+┌──────────────┐
+│ ARIA Core    │
+└────┬─────────┘
+     │
+     ▼
+┌──────────────┐
+│     User     │
+└──────────────┘
+```
+
+</div>
+
+---
+
+# Project Structure
 
 ```text
 ARIA/
-├── .github/workflows/ci.yml
-├── src/aria/
-│   ├── __init__.py
-│   ├── __main__.py
-│   ├── config/
-│   ├── core/
-│   │   └── assistant.py
-│   ├── interfaces/
-│   │   └── messages.py
-│   ├── memory/
-│   ├── providers/
-│   ├── storage/
-│   └── ui/
+│
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+│
+├── src/
+│   └── aria/
+│       ├── __init__.py
+│       ├── __main__.py
+│       │
+│       ├── config/          # Runtime configuration boundary
+│       ├── core/            # Assistant orchestration
+│       ├── interfaces/      # Shared application contracts
+│       ├── memory/          # Memory subsystem
+│       ├── providers/       # Model/provider adapters
+│       ├── storage/         # Persistence layer
+│       └── ui/              # User-facing interfaces
+│
 ├── tests/
 │   ├── unit/
-│   │   ├── test_assistant.py
-│   │   └── test_messages.py
 │   └── integration/
-│       └── test_cli.py
-├── .gitignore
+│
 ├── pyproject.toml
+├── .gitignore
 └── README.md
 ```
 
-The subsystem directories are architectural boundaries. Implementation is added only when the corresponding feature is ready.
+The directory structure is intentionally simple. New complexity is introduced only when a feature requires it.
 
-## Engineering Rules
+---
 
-### Contract first
-Define inputs, outputs, invariants, and failure behavior before implementing a subsystem.
+# Engineering Standards
 
-### One feature per checkpoint
-Each implementation step should solve one coherent problem. Unrelated unfinished features should not be bundled together.
+ARIA follows a small set of non-negotiable engineering rules.
 
-### Tests with behavior
-New behavior receives tests in the same checkpoint whenever practical.
+### 01 — Contract before implementation
 
-### Provider independence
-ARIA Core must not know the internal implementation of a particular model.
+Define the interface, expected behavior, invariants, and failure cases first.
 
-### Deterministic boundaries
-Application logic should remain deterministic wherever possible; probabilistic model behavior stays behind explicit interfaces.
+### 02 — One feature per checkpoint
 
-### CI before progression
-A commit is a checkpoint. Local validation and GitHub Actions are checked before advancing to the next feature.
+Each development step solves one coherent problem.
 
-### Avoid premature complexity
-Introduce abstractions because the system needs them, not simply because they might be useful later.
+### 03 — Tests accompany behavior
+
+A feature should receive appropriate automated tests in the same implementation cycle.
+
+### 04 — Intelligence stays behind an interface
+
+Model-specific implementation must not leak into ARIA Core.
+
+### 05 — Local-first
+
+The core development and testing loop must remain usable locally.
+
+### 06 — CI is a gate
+
+A commit is not considered validated until its GitHub Actions run has completed successfully.
+
+### 07 — No artificial completeness
+
+Documentation, tests, and status must reflect the actual implementation rather than claiming unfinished systems are complete.
+
+---
+
+# Local Development
 
 ## Requirements
-
-Current requirements:
 
 - Git
 - Python 3.11+
 - pip
-- Python virtual environment
+- virtual environment
 
 CI currently validates:
 
@@ -174,61 +305,63 @@ CI currently validates:
 - Python 3.12
 - Python 3.13
 
-## Local Setup
-
-Clone the repository:
+## Installation
 
 ```bash
 git clone https://github.com/chamanvashishth/ARIA.git
 cd ARIA
+
+python -m venv .venv
 ```
 
-Create a virtual environment.
-
-**Windows PowerShell**
+### Windows PowerShell
 
 ```powershell
-python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-**Linux/macOS**
+### Linux / macOS
 
 ```bash
-python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-Install the project and development dependencies:
+Install development dependencies:
 
 ```bash
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-## Running ARIA
+---
 
-The current entry point is intentionally minimal:
+# Running ARIA
+
+The current application entry point is intentionally minimal and validates the package foundation:
 
 ```bash
 python -m aria
 ```
 
-Expected output:
+Expected:
 
 ```text
 ARIA 0.1.0
 ```
 
-The console entry point is also available after installation:
+The installed console command is also available:
 
 ```bash
 aria
 ```
 
-ARIA is not yet an interactive AI assistant. Interactive conversation will be introduced after the model and application contracts are ready.
+The interactive intelligence experience is introduced progressively as the SLM and assistant layers mature.
 
-## Testing and Quality
+---
+
+# Quality & CI
+
+## Local checks
 
 Run tests:
 
@@ -248,45 +381,47 @@ Check formatting:
 python -m ruff format --check .
 ```
 
-Apply formatting:
+Format code:
 
 ```bash
 python -m ruff format .
 ```
 
-A feature checkpoint should pass all configured local quality checks before commit.
-
-## Continuous Integration
-
-GitHub Actions is the automated quality gate.
-
-The current workflow runs on pushes to main and pull requests. It installs the project and runs:
-
-1. formatting verification
-2. Ruff linting
-3. pytest
-4. the same checks across Python 3.11, 3.12, and 3.13
+## CI pipeline
 
 ```text
-Commit
-  |
-  v
-GitHub Actions
-  |
-  +-- Python 3.11
-  +-- Python 3.12
-  +-- Python 3.13
-       |
-       +-- format
-       +-- lint
-       +-- tests
+             ┌───────────────┐
+             │     Commit    │
+             └───────┬───────┘
+                     │
+                     ▼
+             ┌───────────────┐
+             │ GitHub Actions│
+             └───────┬───────┘
+                     │
+          ┌──────────┼──────────┐
+          ▼          ▼          ▼
+       Python      Python      Python
+        3.11        3.12        3.13
+          │          │          │
+          └──────────┼──────────┘
+                     │
+              ┌──────┴──────┐
+              ▼             ▼
+           Ruff          Pytest
+              │             │
+              └──────┬──────┘
+                     ▼
+                 Validated
 ```
 
-A checkpoint is considered validated only after its CI run has completed successfully.
+The repository's latest CI baseline is green before new feature work proceeds.
 
-## Configuration and Secrets
+---
 
-Runtime configuration must remain separate from source code.
+# Security
+
+Security is part of the architecture, not a final checklist.
 
 Never commit:
 
@@ -294,208 +429,174 @@ Never commit:
 - access tokens
 - passwords
 - private keys
+- production credentials
 - authentication cookies
-- personal credentials
-- production secrets
 - private user data
 
-When integrations are added, credentials will be consumed through explicit provider/configuration boundaries. Tests should remain independent of production credentials.
+External integrations must use explicit configuration boundaries, and tests must not depend on production secrets.
 
-## SLM Strategy
+---
 
-The SLM will be built as an independent subsystem behind the responder boundary.
+# Roadmap
 
-Planned flow:
+<div align="center">
 
-```text
-ARIA Core
-   |
-Responder Contract
-   |
-   +---- ARIA SLM
-   |       |
-   |       +-- tokenizer
-   |       +-- model
-   |       +-- decoder/inference
-   |
-   +---- other future adapters
-```
-
-The SLM will be implemented one feature at a time:
-
-1. model configuration contract
-2. tokenizer contract
-3. vocabulary representation
-4. dataset contract
-5. deterministic preprocessing
-6. training-data validation
-7. model interface
-8. model architecture
-9. forward pass and loss
-10. training loop
-11. checkpointing
-12. inference
-13. evaluation
-14. ARIA Core integration
-
-A trained model must not be required to execute the core unit-test suite.
-
-## Development Workflow
-
-Every feature follows the same sequence:
+### ARIA Development Path
 
 ```text
-Understand
-   |
-Define contract
-   |
-Implement one feature
-   |
-Add tests
-   |
-Local validation
-   |
-Commit
-   |
-Check GitHub Actions
-   |
-Fix failures if required
-   |
-Next feature
+Foundation
+    │
+    ▼
+Assistant Core
+    │
+    ▼
+SLM Foundation
+    │
+    ▼
+Tokenizer + Dataset
+    │
+    ▼
+Model Architecture
+    │
+    ▼
+Training + Checkpoints
+    │
+    ▼
+Inference
+    │
+    ▼
+Memory + Persistence
+    │
+    ▼
+Interactive CLI
+    │
+    ▼
+Advanced Assistant
+    │
+    ▼
+Production Hardening
 ```
 
-Example focused commits:
+</div>
 
-```text
-feat: add tokenizer contract
-feat: implement vocabulary builder
-test: add model configuration coverage
-fix: handle invalid model responses
-docs: document local development workflow
-```
+### Foundation
 
-## Roadmap
+- [x] Repository reset
+- [x] Project documentation
+- [x] Python package structure
+- [x] Project metadata
+- [x] Development tooling
+- [x] Initial tests
+- [x] GitHub Actions CI
 
-### Phase 0 — Foundation
-- [x] Reset obsolete prototype
-- [x] Establish project documentation
-- [x] Establish Python package structure
-- [x] Add project metadata
-- [x] Add development tooling
-- [x] Add initial tests
-- [x] Add GitHub Actions CI
+### Assistant Core
 
-### Phase 1 — Assistant Core
 - [x] Message contract
 - [x] Responder boundary
-- [x] Minimal assistant orchestration
-- [x] Assistant error handling tests
-- [ ] Typed application configuration
+- [x] Assistant orchestration
+- [x] Error handling tests
+- [ ] Typed configuration
 - [ ] Structured application errors
 - [ ] Application lifecycle
 
-### Phase 2 — SLM Foundation
-- [ ] SLM configuration
-- [ ] Tokenizer interface
-- [ ] Vocabulary representation
-- [ ] Dataset contract
-- [ ] Deterministic preprocessing
-- [ ] Training-data validation
-- [ ] Model interface
+### SLM
 
-### Phase 3 — SLM Implementation
-- [ ] Tokenizer
-- [ ] Vocabulary pipeline
+- [ ] Model configuration
+- [ ] Tokenizer contract
+- [ ] Vocabulary system
+- [ ] Dataset contract
+- [ ] Data preprocessing
+- [ ] Training validation
 - [ ] Model architecture
 - [ ] Forward pass
-- [ ] Loss calculation
+- [ ] Loss
 - [ ] Training loop
 - [ ] Checkpointing
 - [ ] Inference
 - [ ] Evaluation
 
-### Phase 4 — Memory and Persistence
+### Memory & Storage
+
 - [ ] Storage interface
 - [ ] Conversation persistence
 - [ ] Memory records
 - [ ] Memory lifecycle
-- [ ] Retrieval/context handling
+- [ ] Retrieval/context
 
-### Phase 5 — User Experience
+### Experience
+
 - [ ] Interactive CLI
-- [ ] Command handling
 - [ ] Conversation sessions
+- [ ] Command handling
 - [ ] Configuration commands
 - [ ] Terminal UX
 
-### Phase 6 — Assistant Capabilities
-- [ ] Context-aware responses
-- [ ] Memory-aware responses
-- [ ] Tool/command boundaries
-- [ ] Extensible assistant behavior
-- [ ] Diagnostics and observability
+### Production
 
-### Phase 7 — Production Hardening
 - [ ] Security review
 - [ ] Failure-mode testing
 - [ ] Performance profiling
 - [ ] Resource management
 - [ ] Configuration hardening
-- [ ] Documentation review
 - [ ] Release validation
 
-## Project Status
+---
 
-| Component | Status |
-|---|---|
-| Repository foundation | Complete |
-| Production-grade README | Complete |
-| Python package structure | Complete |
-| CI pipeline | Complete |
-| Message contract | Complete |
-| Assistant core contract | Complete |
-| Configuration | Foundation only |
-| Memory | Not implemented |
-| Storage | Not implemented |
-| Providers | Boundary only |
-| SLM | Not implemented |
-| Training | Not implemented |
-| Inference | Not implemented |
-| Interactive CLI | Not implemented |
-| Production hardening | Not started |
+# Project Status
 
-## Security
+<div align="center">
 
-Security is an architectural concern from the beginning.
+| Area | State |
+|:---|:---:|
+| Repository foundation | **READY** |
+| Documentation | **READY** |
+| Package architecture | **READY** |
+| CI / quality gates | **READY** |
+| Assistant contracts | **READY** |
+| SLM | **NEXT DEVELOPMENT LAYER** |
+| Memory | **PLANNED** |
+| Storage | **PLANNED** |
+| Interactive UI | **PLANNED** |
+| Production hardening | **PLANNED** |
 
-Development must:
+</div>
 
-- keep secrets out of version control
-- validate external inputs at subsystem boundaries
-- avoid logging credentials or sensitive content
-- isolate provider credentials
-- use least-privilege access for external integrations
-- fail explicitly on invalid configuration
-- test security-sensitive boundaries
+The repository is deliberately moving from a stable foundation toward the actual intelligence stack. The next major engineering layer is the SLM foundation.
 
-Security-sensitive changes should receive dedicated review.
+---
 
-## Contributing
+# Contributing
+
+Keep contributions focused and consistent with the architecture.
 
 Before submitting a change:
 
-1. keep the change focused
-2. preserve subsystem boundaries
+1. understand the subsystem boundary
+2. implement one coherent change
 3. add or update tests
 4. run local quality checks
-5. update documentation when behavior changes
-6. verify GitHub Actions
-7. avoid unrelated refactoring
+5. update documentation if behavior changes
+6. commit the change
+7. verify GitHub Actions
 
-Architectural changes should be introduced deliberately because the SLM, memory, storage, and provider layers will depend on stable contracts.
+Avoid unrelated refactoring in feature commits.
 
-## License
+---
+
+# License
 
 The project license has not yet been finalized.
 
-Until a license is explicitly added, no open-source licensing terms should be assumed.
+Until a license is explicitly added to the repository, no open-source licensing terms should be assumed.
+
+---
+
+<div align="center">
+
+### ARIA
+
+**A modular foundation for building a private, extensible AI assistant.**
+
+[Repository](https://github.com/chamanvashishth/ARIA) · [Issues](https://github.com/chamanvashishth/ARIA/issues)
+
+</div>
