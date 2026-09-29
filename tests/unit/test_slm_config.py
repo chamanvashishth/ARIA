@@ -20,13 +20,16 @@ def test_valid_config_is_immutable() -> None:
         config.embedding_dim = 1024
 
 
-@pytest.mark.parametrize("field", [
-    "vocab_size",
-    "context_length",
-    "embedding_dim",
-    "num_layers",
-    "num_heads",
-])
+@pytest.mark.parametrize(
+    "field",
+    [
+        "vocab_size",
+        "context_length",
+        "embedding_dim",
+        "num_layers",
+        "num_heads",
+    ],
+)
 def test_integer_dimensions_must_be_positive(field: str) -> None:
     values = {
         "vocab_size": 32_000,
