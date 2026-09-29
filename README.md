@@ -8,7 +8,7 @@ ARIA is a self-contained, local-first AI system designed to build its own intell
 > The goal is an independently engineered AI system whose core intelligence comes from a trainable neural network and supporting software built and evaluated inside this repository.
 
 ![ARIA](https://img.shields.io/badge/ARIA-self--contained%20local%20AI-111827?style=for-the-badge)
-![Status](https://img.shields.io/badge/status-neural%20brain%20foundation-7c3aed?style=for-the-badge)
+![Status](https://img.shields.io/badge/status-clean%20foundation-7c3aed?style=for-the-badge)
 ![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/license-Apache--2.0-2ea44f?style=for-the-badge)
 
@@ -144,47 +144,34 @@ Unimplemented work is marked **NOT IMPLEMENTED**. Experimental work is marked **
 
 ## Current status
 
-**Neural brain foundation + virtual compute.**
+**Clean repository — ready for Block 0.**
+
+The repository has intentionally been reset before implementation begins.
 
 ### Implemented
 
-- clean project architecture
-- explicit core contracts
-- ARIA-owned Virtual CPU
-- ARIA-owned Virtual GPU
-- ARIA-owned Virtual NPU
-- compute task typing and dispatch
-- deterministic compute tests
-- local trainable neural language-model foundation
-- embeddings and vocabulary projection
-- softmax cross-entropy loss
-- backpropagation and parameter updates
-- autoregressive next-token generation
-- local JSON checkpoint save/load
-- deterministic neural-model tests
-- project documentation and roadmap
-- packaging configuration
+- project specification in this README
 
-### Not implemented yet
+### Not implemented
 
-- full tokenizer training/BPE
-- full decoder-only Transformer SLM
-- attention/RoPE/RMSNorm/SwiGLU
-- large-scale pretraining
-- instruction tuning
-- KV cache
-- quantization
-- production inference runtime
-- persistent memory
-- local embeddings/index
-- RAG
-- agent execution
+- repository/package foundation
+- neural tensor backend
+- tokenizer
+- neural SLM
+- training engine
+- inference engine
+- runtime
+- memory
+- local RAG
+- agent/tools
+- verification
 - local API
 - UI
-- evaluation suite
-- offline/network isolation test
+- evaluation
+- security testing
+- offline/network-isolation testing
 
-That distinction is intentional. The current neural model is real but intentionally tiny.
+This is intentional. No prototype implementation is being treated as production ARIA.
 
 ## Architecture map
 
@@ -225,31 +212,10 @@ AI Orchestrator
 
 ```text
 ARIA/
-├── docs/
-│   ├── architecture.svg
-│   └── ROADMAP.md
-├── src/
-│   └── aria/
-│       ├── core/
-│       │   └── contracts.py
-│       ├── compute/
-│       │   ├── engine.py
-│       │   └── types.py
-│       ├── model/
-│       │   ├── __init__.py
-│       │   └── neural.py
-│       ├── runtime/
-│       │   └── dispatcher.py
-│       ├── __init__.py
-│       └── __main__.py
-├── tests/
-│   ├── test_compute.py
-│   ├── test_foundation.py
-│   └── test_neural.py
-├── .gitignore
-├── pyproject.toml
 └── README.md
 ```
+
+The first implementation block will establish the engineering foundation without importing assumptions from the removed prototypes.
 
 ## Development sequence
 
@@ -271,8 +237,6 @@ ARIA is being built block-by-block:
 14. **Evaluation** — quality, correctness, performance, and regression tests.
 15. **Security & privacy** — audit tools, files, commands, paths, resources, and network behavior.
 16. **Optimization & research** — quantization, pruning, distillation, LoRA/QLoRA, speculative decoding, sparse attention, MoE, multimodality, and controlled continual learning.
-
-See [docs/ROADMAP.md](docs/ROADMAP.md) for acceptance criteria.
 
 ## Design principles
 
@@ -314,7 +278,7 @@ Stable interfaces should allow future model and runtime work without rewriting t
 
 ## Technology direction
 
-The initial neural foundation is dependency-light and uses the Python standard library so the learning mechanics remain inspectable.
+The initial implementation will be dependency-light and selected only after the numerical and model requirements are established. Dependencies must be justified by measurable engineering needs.
 
 As the model grows, ARIA may add a local tensor backend for efficient training and inference. Any dependency must serve an identified performance or research need; it must not introduce a hosted AI dependency.
 
