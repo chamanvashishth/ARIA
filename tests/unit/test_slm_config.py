@@ -44,6 +44,17 @@ def test_integer_dimensions_must_be_positive(field: str) -> None:
         SLMConfig(**values)
 
 
+def test_integer_dimensions_reject_boolean_values() -> None:
+    with pytest.raises(TypeError, match="num_layers must be an integer"):
+        SLMConfig(
+            vocab_size=32_000,
+            context_length=2_048,
+            embedding_dim=512,
+            num_layers=True,
+            num_heads=8,
+        )
+
+
 def test_embedding_dimension_must_match_attention_heads() -> None:
     with pytest.raises(ValueError, match="divisible by num_heads"):
         SLMConfig(
