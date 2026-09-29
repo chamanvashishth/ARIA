@@ -1,201 +1,466 @@
 # ARIA
 
-**ARIA — Autonomous Research & Intelligence Architecture**
+<p align="center">
+  <strong>Autonomous Research & Intelligence Architecture</strong>
+</p>
 
-ARIA is a software-only, local-first AI system being built block-by-block around an ARIA-owned trainable neural brain. The project is intentionally separated into model, tokenizer, training, inference, runtime, memory, retrieval, tools, verification, API, UI, evaluation, and security layers.
+<p align="center">
+  A software-only, local-first AI system built from first principles around an ARIA-owned neural brain.
+</p>
 
-> ARIA is not a chatbot wrapper. External hosted AI/model APIs are not part of normal runtime operation.
+<p align="center">
+  <img src="https://img.shields.io/badge/status-active%20development-0f766e?style=for-the-badge" alt="Active development">
+  <img src="https://img.shields.io/badge/python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11+">
+  <img src="https://img.shields.io/badge/inference-local-first-111827?style=for-the-badge" alt="Local first">
+  <img src="https://img.shields.io/badge/external%20AI%20APIs-not%20required-7c3aed?style=for-the-badge" alt="No external AI APIs required">
+</p>
 
-## Current status
+---
 
-**Block 0 — Repository & Engineering Foundation: IMPLEMENTED**
+## What is ARIA?
 
-**Block 1 — Neural Tensor/Model Foundation: IMPLEMENTED**
+ARIA is being engineered as an **independent local AI stack**, rather than a wrapper around an existing hosted model.
 
-**Block 2 — Neural Layer Foundation: IMPLEMENTED**
+The project is deliberately built in small, inspectable blocks:
 
-**Block 3 — Tokenizer Foundation: IMPLEMENTED**
+**tensor engine → neural layers → tokenizer → trainable language model → Transformer SLM → training → inference → runtime → memory → RAG → tools → verification → API → UI → evaluation → security**
 
-**Block 4 — Trainable Language-Model Core: IMPLEMENTED**
+> **If a capability is not implemented, tested, and measurable, ARIA does not claim to have it.**
 
-**Block 5 — Decoder Transformer SLM Foundation: EXPERIMENTAL**
+ARIA's normal runtime is designed to work without OpenAI, Anthropic, Gemini, hosted inference, hosted embeddings, or a hosted vector database.
 
-**Block 6 — Training Engine Foundation: IMPLEMENTED**
+---
 
-This block establishes the real project skeleton and development boundary. It does **not** claim that the neural brain, tokenizer, training engine, inference engine, RAG, agent, or runtime are implemented.
+## Project at a glance
 
-### Implemented in Block 0
+| Area | Current state |
+|---|---|
+| Python package foundation | **Implemented** |
+| Tensor + reverse-mode autodiff | **Implemented** |
+| Trainable neural layers | **Implemented** |
+| Deterministic byte tokenizer | **Implemented** |
+| Trainable language-model core | **Implemented** |
+| Decoder Transformer SLM | **Experimental** |
+| Local training engine | **Implemented — foundation** |
+| Autoregressive inference | Planned |
+| AI runtime | Planned |
+| Local memory | Planned |
+| Local RAG | Planned |
+| Agent / tools | Planned |
+| Verification | Planned |
+| Local API | Planned |
+| UI | Planned |
+| Evaluation & security suite | Planned |
 
-- Python 3.11+ package foundation
-- reproducible package metadata in `pyproject.toml`
-- explicit ARIA versioning
-- local configuration boundary
-- application logging boundary
-- CLI entry point
-- package boundaries for future ARIA subsystems
-- pytest foundation with initial tests
-- basic local-data isolation via `.gitignore`
+### Capability states
 
-### Not implemented yet
+- **Implemented** — working behavior with relevant tests.
+- **Experimental** — implemented, but not yet sufficiently validated.
+- **Planned** — architecture/dependency exists, implementation has not started.
+- **Validated** — reserved for capabilities backed by reproducible evidence.
 
-- neural tensor/model backend — **IMPLEMENTED (Block 1 foundation)**
-- ARIA tokenizer — **IMPLEMENTED (deterministic byte-level foundation)**
-- trainable SLM
-- training engine — **IMPLEMENTED foundation: token windows, training steps, SGD updates, loss history, metadata checkpoints**
-- inference engine
-- AI runtime
-- virtual compute
-- memory
-- local RAG
-- agent/tools
-- verification
-- local API
-- UI
-- evaluation suite
-- security testing
-- network-isolation validation
+---
 
-These will be implemented in later blocks only after their dependencies are established.
+## Architecture
+
+### Target system
+
+~~~mermaid
+flowchart TD
+    U[User] --> UI[ARIA UI]
+    UI --> API[Local API]
+    API --> ORCH[AI Orchestrator]
+
+    ORCH --> MEM[Local Memory]
+    ORCH --> RAG[Local RAG]
+    ORCH --> AGENT[Agent & Tools]
+    ORCH --> VERIFY[Verification]
+
+    ORCH --> RUNTIME[ARIA Runtime]
+    RUNTIME --> INF[Inference Engine]
+    INF --> BRAIN[ARIA Neural Brain]
+    BRAIN --> SLM[Own Trainable SLM]
+~~~
+
+### Current neural pipeline
+
+~~~mermaid
+flowchart LR
+    TEXT[Training Text] --> TOK[Byte Tokenizer]
+    TOK --> DATA[Token Windows]
+    DATA --> EMB[Token Embeddings]
+    EMB --> TR[Transformer Blocks]
+    TR --> HEAD[Vocabulary Head]
+    HEAD --> LOSS[Next-Token Loss]
+    LOSS --> BACK[Backpropagation]
+    BACK --> OPT[SGD]
+    OPT --> PARAMS[Updated Parameters]
+~~~
+
+The diagrams above show the **architecture direction** and the **currently implemented training path**. Components such as inference, memory, RAG, agent orchestration, verification, API, and UI are not represented as completed just because they appear in the target architecture.
+
+---
+
+## Neural brain
+
+The current brain is intentionally small and inspectable rather than optimized prematurely.
+
+### Implemented foundations
+
+- Tensor
+  - shape tracking
+  - rectangular validation
+  - elementwise operations
+  - reductions
+  - reverse-mode autodiff
+  - gradient accumulation
+- Parameter
+  - trainable model values
+- Module
+  - recursive parameter discovery
+  - gradient reset
+- Linear
+- ReLU
+- Embedding
+- Sequential
+- RMSNorm
+- causal self-attention
+- feed-forward blocks
+- residual Transformer blocks
+- vocabulary projection
+- next-token cross-entropy
+- local SGD
+
+### Transformer status
+
+The current Transformer is intentionally marked **EXPERIMENTAL**.
+
+It currently provides:
+
+- decoder-style causal attention
+- single-head attention
+- Q/K/V projections
+- causal masking
+- learned positional embeddings
+- RMS normalization
+- residual feed-forward blocks
+- configurable depth and hidden/intermediate sizes
+- vocabulary output
+
+It is **not yet claimed** to be production-ready, performant, or language-quality validated.
+
+---
+
+## Tokenizer
+
+ARIA currently uses a deterministic UTF-8 byte-level tokenizer.
+
+### Vocabulary
+
+| ID range | Meaning |
+|---:|---|
+| 0–255 | Raw UTF-8 byte values |
+| 256 | PAD |
+| 257 | BOS |
+| 258 | EOS |
+| 259 | UNK |
+
+**Vocabulary size: 260**
+
+This foundation works across English, Unicode text, Hindi/Hinglish, source code, symbols, and technical content without depending on an external tokenizer service.
+
+The tokenizer is intentionally simple at this stage. More advanced tokenization can be introduced later when training and evaluation data justify it.
+
+---
+
+## Training engine
+
+Block 6 establishes the first complete local training path around the Transformer foundation:
+
+~~~text
+Text
+ ↓
+Tokenization
+ ↓
+Sequence windows
+ ↓
+Input / next-token targets
+ ↓
+Transformer forward pass
+ ↓
+Cross-entropy loss
+ ↓
+Backpropagation
+ ↓
+SGD parameter update
+ ↓
+Loss history
+ ↓
+Training metadata checkpoint
+~~~
+
+### Current capabilities
+
+- deterministic token-window datasets
+- configurable sequence length
+- configurable stride
+- next-token target generation
+- training step tracking
+- gradient reset
+- forward/backward training
+- SGD parameter updates
+- loss history
+- experiment configuration metadata
+- JSON checkpoint metadata
+
+The current checkpoint layer records the training experiment and observed losses. **Full model-weight serialization and resume-from-weight-checkpoint support are still future work.**
+
+---
 
 ## Repository structure
 
-```text
+~~~text
 ARIA/
 ├── pyproject.toml
 ├── .python-version
 ├── .gitignore
 ├── README.md
+│
 ├── src/
 │   └── aria/
 │       ├── __init__.py
 │       ├── cli.py
 │       ├── config.py
 │       ├── logging.py
+│       │
 │       ├── brain/
+│       │   ├── tensor.py
+│       │   ├── parameter.py
+│       │   ├── module.py
+│       │   ├── layers.py
+│       │   ├── optim.py
+│       │   ├── language_model.py
+│       │   └── transformer.py
+│       │
 │       ├── tokenizer/
+│       │   └── core.py
+│       │
 │       ├── training/
+│       │   ├── dataset.py
+│       │   ├── trainer.py
+│       │   └── checkpoint.py
+│       │
 │       ├── inference/
 │       ├── runtime/
 │       ├── memory/
 │       ├── rag/
 │       ├── agent/
 │       └── verification/
+│
 └── tests/
-    └── test_foundation.py
-```
+    ├── test_foundation.py
+    ├── test_tensor.py
+    ├── test_layers.py
+    ├── test_tokenizer.py
+    ├── test_language_model.py
+    ├── test_transformer.py
+    ├── test_training.py
+    └── test_checkpoint.py
+~~~
 
-Block 1 currently provides a dependency-free correctness-first tensor primitive with shape tracking, elementwise addition/multiplication, scalar reduction, reverse-mode autodiff, gradient accumulation, trainable parameters, and recursive parameter discovery. It is intentionally not a high-performance tensor backend and is not yet the ARIA SLM.
+Empty subsystem directories are architectural boundaries, **not completed features**.
 
-The package boundaries are intentionally lightweight. A directory does not count as an implemented subsystem until it contains real behavior and tests.
+---
 
-## Architecture direction
+## Engineering principles
 
-```text
-User
- │
- ▼
-UI
- │
- ▼
-Local API
- │
- ▼
-AI Orchestrator
- ├──────────────► Context / Memory
- ├──────────────► Local RAG
- ├──────────────► Agent / Tools
- └──────────────► Verification
-                    │
-                    ▼
-              ARIA AI Runtime
-                    │
-                    ▼
-              Inference Engine
-                    │
-                    ▼
-              ARIA Neural Brain
-                    │
-                    ▼
-               Own Trainable SLM
-```
+### 1. Build from the foundation upward
 
-The neural brain is intended to contain real learned parameters and real computation: embeddings, Transformer layers, attention, normalization, feed-forward blocks, vocabulary output, loss, backpropagation, parameter updates, checkpointing, and local inference.
+Every major subsystem depends on verified lower-level behavior.
 
-The first Transformer is deliberately small enough to inspect and train locally. It currently uses a correctness-first single-head causal attention implementation and is **EXPERIMENTAL** until numerical, training, performance, and language-quality evaluation are established. More advanced architecture and optimization will be added only when implemented and measured.
+### 2. Local-first by design
+
+Normal operation should not depend on a hosted AI provider.
+
+### 3. No fake intelligence
+
+A prompt wrapper, mock response, API proxy, UI button, or placeholder class is not treated as an AI capability.
+
+### 4. Measure before optimizing
+
+Performance work comes after correctness, reproducibility, and evaluation.
+
+### 5. Keep boundaries explicit
+
+The model, tokenizer, training system, inference engine, runtime, memory, RAG, tools, verification, API, and UI are separate engineering concerns.
+
+### 6. Reproducibility matters
+
+Training configuration, deterministic datasets, loss history, and experiment metadata should remain inspectable.
+
+---
 
 ## Independence requirements
 
-Normal ARIA operation must not require:
+ARIA's intended normal runtime must not require:
 
-- OpenAI, Anthropic, Gemini, or other hosted model APIs
+- OpenAI or other hosted model APIs
 - cloud inference
 - cloud embeddings
 - hosted vector databases
 - remote agent services
 - hidden model calls
-- required internet access
-- required physical GPU/NPU hardware
+- mandatory internet access
+- mandatory GPU/NPU hardware
 
-Development internet access may be used for dependencies, datasets, documentation, or optional artifacts. The finished system must eventually pass an explicit network-isolation test.
+Internet access may still be useful during development for package installation, documentation, datasets, or optional artifacts.
 
-## Engineering truth
+The finished system will require an explicit **network-isolation validation** before offline operation can be claimed.
 
-ARIA uses explicit capability states:
+---
 
-- **NOT IMPLEMENTED** — planned but absent
-- **EXPERIMENTAL** — implemented but not sufficiently validated
-- **IMPLEMENTED** — working behavior with relevant tests
-- **VALIDATED** — working behavior supported by reproducible evidence
+## Development roadmap
 
-A class, mock, prompt, button, or API wrapper is not treated as intelligence.
+~~~mermaid
+timeline
+    title ARIA Development Roadmap
+    Block 0 : Engineering foundation : Implemented
+    Block 1 : Tensor and autodiff : Implemented
+    Block 2 : Neural layers : Implemented
+    Block 3 : Tokenizer foundation : Implemented
+    Block 4 : Trainable LM core : Implemented
+    Block 5 : Transformer SLM : Experimental
+    Block 6 : Training engine : Implemented foundation
+    Block 7 : Inference engine : Planned
+    Block 8 : AI runtime : Planned
+    Block 9 : Memory : Planned
+    Block 10 : Local RAG : Planned
+    Block 11 : Agent and tools : Planned
+    Block 12 : Verification : Planned
+    Block 13 : Local API : Planned
+    Block 14 : UI : Planned
+    Block 15 : Evaluation and security : Planned
+    Block 16 : Research and optimization : Planned
+~~~
 
-## Development sequence
+### Block workflow
 
-1. **Block 0 — Repository & engineering foundation** — package, configuration, logging, tests. **IMPLEMENTED**
-2. **Block 1 — Neural tensor/model foundation** — real local numerical and trainable-model primitives. **IMPLEMENTED**
-3. **Block 2 — Neural layer foundation** — trainable Linear, ReLU, Embedding, and Sequential components with gradient propagation. **IMPLEMENTED**
-4. **Block 3 — Tokenizer foundation** — deterministic UTF-8 byte tokenizer with special tokens and round-trip tests. **IMPLEMENTED**
-5. **Block 4 — Tokenizer expansion** — ARIA-owned tokenizer for natural language, Hindi/Hinglish, code, mathematics, and technical text.
-5. **Block 4 — Trainable language-model core** — token embeddings, vocabulary logits, next-token cross-entropy, backpropagation, and local SGD. **IMPLEMENTED**
-6. **Block 5 — Decoder Transformer SLM foundation** — causal self-attention, RMSNorm, positional embeddings, residual MLP blocks, and vocabulary head. **EXPERIMENTAL** — evolve the model into an efficient decoder-only language model.
-7. **Block 6 — Training engine** — deterministic token-window dataset, local training loop, loss history, and experiment metadata checkpoints. **IMPLEMENTED foundation** — reproducible local pretraining/instruction-training pipeline.
-8. **Block 7 — Inference engine** — autoregressive generation, sampling, streaming, and caching.
-9. **Block 8 — AI runtime** — model loading, execution, scheduling, and runtime state.
-10. **Block 9 — Context & memory** — inspectable local working, conversational, semantic, and episodic memory.
-11. **Block 10 — Local RAG** — document parsing, chunking, local indexing, retrieval, and context selection.
-12. **Block 11 — Agent & tools** — validated schemas, permissions, sandboxing, limits, and audit logs.
-13. **Block 12 — Verification** — deterministic checks for math, code, retrieval, structured data, and tool results.
-14. **Block 13 — Local API** — stable local boundary between UI and intelligence.
-15. **Block 14 — UI** — interaction and runtime transparency.
-16. **Block 15 — Evaluation & security** — quality, correctness, performance, regression, injection, filesystem, command, and resource tests.
-17. **Block 16 — Research & optimization** — only after evidence supports the optimization.
+~~~mermaid
+flowchart LR
+    A[Inspect] --> B[Acceptance Criteria]
+    B --> C[Implement]
+    C --> D[Test]
+    D --> E[Review]
+    E --> F[Update Docs]
+    F --> G[Commit]
+    G --> H[Next Block]
+~~~
 
-## Block workflow
+Every block should leave the repository in a more usable and more measurable state.
 
-Every block follows:
+---
 
-```text
-Inspect
-  ↓
-Define acceptance criteria
-  ↓
-Implement the smallest correct change
-  ↓
-Test
-  ↓
-Review
-  ↓
-Update documentation/status
-  ↓
-Commit
-  ↓
-Next block
-```
+## Quick start
 
-No large subsystem should be built on an unverified foundation.
+### Requirements
 
-## Long-term target
+- Python 3.11+
+- Git
+- No external AI API key required
 
-ARIA is intended to become a locally executable AI system capable of natural conversation, coding, mathematics, technical explanation, local document understanding, persistent local memory, local retrieval, controlled tool use, verification, measurable model improvement, model versioning, efficient local inference, and offline operation.
+### Clone
 
-**Build the brain. Build the runtime. Measure both. Keep the boundaries honest.**
+~~~bash
+git clone https://github.com/chamanvashishth/ARIA.git
+cd ARIA
+~~~
+
+### Create an environment
+
+Windows:
+
+~~~powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+~~~
+
+Linux/macOS:
+
+~~~bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+~~~
+
+### Install
+
+~~~bash
+python -m pip install -e .
+python -m pip install pytest
+~~~
+
+### Run tests
+
+~~~bash
+pytest
+~~~
+
+The repository's test suite is intended to protect the low-level neural, tokenizer, Transformer, and training foundations as ARIA grows.
+
+---
+
+## What ARIA is — and is not
+
+### ARIA is
+
+- a from-scratch AI engineering project
+- local-first
+- designed around its own trainable neural brain
+- modular
+- inspectable
+- test-driven
+- built incrementally
+- intended to support offline operation
+
+### ARIA is not yet
+
+- a finished general-purpose AI assistant
+- a production-grade SLM
+- a validated autonomous agent
+- a complete RAG system
+- a complete persistent-memory system
+- a production inference runtime
+- a production UI
+- a benchmark-proven replacement for established language models
+
+Those claims require implementation and evidence.
+
+---
+
+## Contributing
+
+ARIA is being built block-by-block so contributors can understand the system before changing it.
+
+A useful contribution should:
+
+1. preserve subsystem boundaries;
+2. include tests for new behavior;
+3. avoid unnecessary external AI dependencies;
+4. document meaningful architectural changes;
+5. avoid claiming capabilities that are not actually implemented;
+6. keep the smallest correct implementation first.
+
+For larger changes, explain the problem, proposed boundary, acceptance criteria, and validation approach before expanding the subsystem.
+
+---
+
+## Project philosophy
+
+> **Build the brain. Build the runtime. Measure both. Keep the boundaries honest.**
+
+ARIA is a long-term engineering project. The goal is not to make a convincing demo first; the goal is to build an AI system whose important behavior can be inspected, tested, measured, and improved.
+
+---
+
+<p align="center">
+  <strong>ARIA — building intelligence from the foundation up.</strong>
+</p>
