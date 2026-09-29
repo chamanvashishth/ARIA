@@ -1,8 +1,4 @@
-"""Small, deterministic software execution engines.
-
-These engines are ARIA components. They do not require physical accelerator
-hardware. Host acceleration can be added later without changing their API.
-"""
+"""ARIA-owned software execution engines."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -11,17 +7,30 @@ from typing import TypeVar
 T = TypeVar("T", int, float)
 
 
-@dataclass(frozen=True)
+def _matrix_shape(matrix: Sequence[Sequence[T]], name: str) -> tuple[int, int]:
+    if not matrix:
+        raise ValueError(f"{name} must not be empty")
+
+    width = len(matrix[0])
+    if width == 0 or any(len(row) != width for row in matrix):
+        raise ValueError(f"{name} must be rectangular")
+
+    return len(matrix), width
+
+
+@dataclass(frozen=True, slots=True)
 class VirtualCPU:
-    """General-purpose scalar and vector execution."""
+    """General-purpose software execution."""
 
     name: str = "ARIA Virtual CPU"
 
     def map(self, values: Sequence[T], operation) -> list[T]:
+        if not callable(operation):
+            raise TypeError("operation must be callable")
         return [operation(value) for value in values]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class VirtualGPU:
     """Parallel-style matrix execution implemented in software."""
 
@@ -32,16 +41,8 @@ class VirtualGPU:
         left: Sequence[Sequence[T]],
         right: Sequence[Sequence[T]],
     ) -> list[list[T]]:
-        if not left or not right:
-            raise ValueError("matrices must not be empty")
-
-        left_width = len(left[0])
-        if left_width == 0 or any(len(row) != left_width for row in left):
-            raise ValueError("left matrix must be rectangular")
-
-        right_width = len(right[0])
-        if right_width == 0 or any(len(row) != right_width for row in right):
-            raise ValueError("right matrix must be rectangular")
+        _, left_width = _matrix_shape(left, "left matrix")
+        _, right_width = _matrix_shape(right, "right matrix")
 
         if len(right) != left_width:
             raise ValueError("matrix dimensions do not align")
@@ -55,9 +56,9 @@ class VirtualGPU:
         ]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class VirtualNPU:
-    """Neural-network-oriented matrix execution implemented in software."""
+    """Neural-network-oriented software execution."""
 
     name: str = "ARIA Virtual NPU"
 
@@ -72,6 +73,8 @@ class VirtualNPU:
         if bias is None:
             return result
 
+        if not result:
+            raise ValueError("dense input must not be empty")
         if len(result[0]) != len(bias):
             raise ValueError("bias width does not match dense output")
 

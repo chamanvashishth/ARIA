@@ -1,1 +1,5 @@
-"""Hardware-aware AI runtime boundaries."""
+"""ARIA runtime package."""
+
+from .dispatcher import ComputeDispatcher
+
+__all__ = ["ComputeDispatcher"]
