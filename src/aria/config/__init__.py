@@ -1,1 +1,0 @@
-"""Configuration boundaries for ARIA."""
