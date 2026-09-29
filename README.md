@@ -14,6 +14,8 @@ ARIA is a software-only, local-first AI system being built block-by-block around
 
 **Block 2 — Neural Layer Foundation: IMPLEMENTED**
 
+**Block 3 — Tokenizer Foundation: IMPLEMENTED**
+
 This block establishes the real project skeleton and development boundary. It does **not** claim that the neural brain, tokenizer, training engine, inference engine, RAG, agent, or runtime are implemented.
 
 ### Implemented in Block 0
@@ -31,7 +33,7 @@ This block establishes the real project skeleton and development boundary. It do
 ### Not implemented yet
 
 - neural tensor/model backend — **IMPLEMENTED (Block 1 foundation)**
-- ARIA tokenizer
+- ARIA tokenizer — **IMPLEMENTED (deterministic byte-level foundation)**
 - trainable SLM
 - training engine
 - inference engine
@@ -146,7 +148,8 @@ A class, mock, prompt, button, or API wrapper is not treated as intelligence.
 1. **Block 0 — Repository & engineering foundation** — package, configuration, logging, tests. **IMPLEMENTED**
 2. **Block 1 — Neural tensor/model foundation** — real local numerical and trainable-model primitives. **IMPLEMENTED**
 3. **Block 2 — Neural layer foundation** — trainable Linear, ReLU, Embedding, and Sequential components with gradient propagation. **IMPLEMENTED**
-4. **Block 3 — Tokenizer** — ARIA-owned tokenizer for natural language, Hindi/Hinglish, code, mathematics, and technical text.
+4. **Block 3 — Tokenizer foundation** — deterministic UTF-8 byte tokenizer with special tokens and round-trip tests. **IMPLEMENTED**
+5. **Block 4 — Tokenizer expansion** — ARIA-owned tokenizer for natural language, Hindi/Hinglish, code, mathematics, and technical text.
 5. **Block 4 — Transformer SLM** — evolve the model into an efficient decoder-only language model.
 6. **Block 5 — Training engine** — reproducible local pretraining/instruction-training pipeline.
 7. **Block 6 — Inference engine** — autoregressive generation, sampling, streaming, and caching.
