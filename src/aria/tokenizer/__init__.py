@@ -1,3 +1,5 @@
-"""Tokenizer boundary.
+"""ARIA tokenizer interfaces and implementations."""
 
-The ARIA-owned tokenizer is introduced in a later block.
+from aria.tokenizer.core import ByteTokenizer
+
+__all__ = ["ByteTokenizer"]
