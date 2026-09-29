@@ -1,7 +1,7 @@
 """Smoke test for the ARIA CLI entry point."""
 
-from subprocess import run
 import sys
+from subprocess import run
 
 
 def test_cli_starts() -> None:
