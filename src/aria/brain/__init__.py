@@ -3,6 +3,7 @@
 from aria.brain.layers import Embedding, Linear, ReLU, Sequential
 from aria.brain.language_model import TinyLanguageModel
 from aria.brain.module import Module
+from aria.brain.optim import SGD
 from aria.brain.parameter import Parameter
 from aria.brain.tensor import Tensor
 
@@ -12,6 +13,7 @@ __all__ = [
     "Module",
     "Parameter",
     "ReLU",
+    "SGD",
     "Sequential",
     "Tensor",
     "TinyLanguageModel",
