@@ -32,3 +32,15 @@ def test_special_tokens_are_stable() -> None:
 def test_invalid_token_is_rejected() -> None:
     with pytest.raises(ValueError):
         ByteTokenizer().decode([999])
+
+
+def test_empty_text_round_trip() -> None:
+    tokenizer = ByteTokenizer()
+    assert tokenizer.encode("") == []
+    assert tokenizer.decode([]) == ""
+
+
+def test_tokenization_is_deterministic() -> None:
+    tokenizer = ByteTokenizer()
+    text = "Hinglish: quantum kya hai?"
+    assert tokenizer.encode(text) == tokenizer.encode(text)
