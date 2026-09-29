@@ -2,35 +2,34 @@
 
 This roadmap converts the project specification into implementation blocks. A milestone is complete only when its acceptance criteria are met.
 
-## Phase 0 — Hardware and feasibility
+## Phase 0 — Software feasibility and architecture
 
-**Goal:** establish what the actual machine can support.
-
-Acceptance criteria:
-
-- CPU architecture, cores, threads, instruction sets recorded
-- RAM recorded
-- GPU availability, backend, VRAM, and capabilities recorded
-- NPU availability and runtime investigated
-- available ML runtimes/toolchains recorded
-- realistic SLM configurations estimated
-- training/inference feasibility documented
-- machine-readable hardware profile produced
-
-**Status:** NOT IMPLEMENTED
-
-## Phase 1 — Architecture
-
-**Goal:** establish stable boundaries between model, runtime, memory, agent, API, and UI.
+**Goal:** establish the software boundaries and constraints ARIA must satisfy.
 
 Acceptance criteria:
 
-- contracts exist for major subsystem boundaries
-- responsibilities do not overlap unnecessarily
+- major subsystem responsibilities are defined
+- normal runtime has no external model/API dependency
+- virtual compute is defined as an ARIA-owned software layer
 - unsupported capabilities are explicit
-- architecture decisions have measurable reasons
+- first implementation can run with the Python standard library
 
-**Status:** FOUNDATION STARTED
+**Status:** COMPLETE
+
+## Phase 1 — ARIA virtual compute
+
+**Goal:** build ARIA's own software-defined execution engines.
+
+Acceptance criteria:
+
+- Virtual CPU has executable general-purpose operations
+- Virtual GPU has executable parallel-style tensor/matrix operations
+- Virtual NPU has executable neural-network-oriented operations
+- engines have deterministic tests
+- compute types are explicit
+- physical CPU/GPU/NPU are not required
+
+**Status:** IN PROGRESS
 
 ## Phase 2 — Tokenizer
 
@@ -95,20 +94,19 @@ Acceptance criteria:
 
 **Status:** NOT IMPLEMENTED
 
-## Phase 6 — Hardware runtime
+## Phase 6 — Runtime orchestration
 
-**Goal:** select execution hardware based on measured capability.
+**Goal:** route workloads through ARIA's virtual compute engines.
 
 Acceptance criteria:
 
-- hardware detector
-- capability analyzer
+- compute capability registry
 - workload classification
-- device scheduler
-- memory checks
-- transfer-cost awareness
-- CPU/GPU/NPU benchmarks
+- scheduler
+- execution dispatch
+- memory accounting
 - fallback paths
+- reproducible benchmarks
 
 **Status:** NOT IMPLEMENTED
 
@@ -153,11 +151,10 @@ Acceptance criteria:
 Acceptance criteria:
 
 - local health endpoint
-- model/hardware/metrics endpoints
+- model/runtime/metrics endpoints
 - chat/generation streaming
 - memory and document operations
 - polished local UI
-- transparent runtime metrics
 - no model execution logic in the frontend
 
 **Status:** NOT IMPLEMENTED
@@ -173,7 +170,7 @@ Acceptance criteria:
 - math exact-answer tests
 - code execution tests
 - conversation-quality tests
-- hardware benchmarks
+- compute benchmarks
 - security audit
 - offline/network-isolation test
 
