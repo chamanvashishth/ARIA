@@ -12,6 +12,8 @@ ARIA is a software-only, local-first AI system being built block-by-block around
 
 **Block 1 — Neural Tensor/Model Foundation: IMPLEMENTED**
 
+**Block 2 — Neural Layer Foundation: IMPLEMENTED**
+
 This block establishes the real project skeleton and development boundary. It does **not** claim that the neural brain, tokenizer, training engine, inference engine, RAG, agent, or runtime are implemented.
 
 ### Implemented in Block 0
@@ -143,19 +145,20 @@ A class, mock, prompt, button, or API wrapper is not treated as intelligence.
 
 1. **Block 0 — Repository & engineering foundation** — package, configuration, logging, tests. **IMPLEMENTED**
 2. **Block 1 — Neural tensor/model foundation** — real local numerical and trainable-model primitives. **IMPLEMENTED**
-3. **Block 2 — Tokenizer** — ARIA-owned tokenizer for natural language, Hindi/Hinglish, code, mathematics, and technical text.
-4. **Block 3 — Transformer SLM** — evolve the model into an efficient decoder-only language model.
-5. **Block 4 — Training engine** — reproducible local pretraining/instruction-training pipeline.
-6. **Block 5 — Inference engine** — autoregressive generation, sampling, streaming, and caching.
-7. **Block 6 — AI runtime** — model loading, execution, scheduling, and runtime state.
-8. **Block 7 — Context & memory** — inspectable local working, conversational, semantic, and episodic memory.
-9. **Block 8 — Local RAG** — document parsing, chunking, local indexing, retrieval, and context selection.
-10. **Block 9 — Agent & tools** — validated schemas, permissions, sandboxing, limits, and audit logs.
-11. **Block 10 — Verification** — deterministic checks for math, code, retrieval, structured data, and tool results.
-12. **Block 11 — Local API** — stable local boundary between UI and intelligence.
-13. **Block 12 — UI** — interaction and runtime transparency.
-14. **Block 13 — Evaluation & security** — quality, correctness, performance, regression, injection, filesystem, command, and resource tests.
-15. **Block 14 — Research & optimization** — only after evidence supports the optimization.
+3. **Block 2 — Neural layer foundation** — trainable Linear, ReLU, Embedding, and Sequential components with gradient propagation. **IMPLEMENTED**
+4. **Block 3 — Tokenizer** — ARIA-owned tokenizer for natural language, Hindi/Hinglish, code, mathematics, and technical text.
+5. **Block 4 — Transformer SLM** — evolve the model into an efficient decoder-only language model.
+6. **Block 5 — Training engine** — reproducible local pretraining/instruction-training pipeline.
+7. **Block 6 — Inference engine** — autoregressive generation, sampling, streaming, and caching.
+8. **Block 7 — AI runtime** — model loading, execution, scheduling, and runtime state.
+9. **Block 8 — Context & memory** — inspectable local working, conversational, semantic, and episodic memory.
+10. **Block 9 — Local RAG** — document parsing, chunking, local indexing, retrieval, and context selection.
+11. **Block 10 — Agent & tools** — validated schemas, permissions, sandboxing, limits, and audit logs.
+12. **Block 11 — Verification** — deterministic checks for math, code, retrieval, structured data, and tool results.
+13. **Block 12 — Local API** — stable local boundary between UI and intelligence.
+14. **Block 13 — UI** — interaction and runtime transparency.
+15. **Block 14 — Evaluation & security** — quality, correctness, performance, regression, injection, filesystem, command, and resource tests.
+16. **Block 15 — Research & optimization** — only after evidence supports the optimization.
 
 ## Block workflow
 
