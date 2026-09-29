@@ -63,6 +63,18 @@ class Tensor:
         return cls(float(value), requires_grad=requires_grad)
 
     @classmethod
+    def operation(
+        cls,
+        values: object,
+        *,
+        parents: tuple[Tensor, ...],
+        backward: Callable[[Tensor], None],
+    ) -> Tensor:
+        out = cls(values, requires_grad=any(p.requires_grad for p in parents), _parents=parents)
+        out._backward = lambda: backward(out)
+        return out
+
+    @classmethod
     def zeros(cls, shape: Shape, requires_grad: bool = False) -> Tensor:
         if any(dim < 0 for dim in shape):
             raise ValueError("tensor dimensions must be non-negative")
