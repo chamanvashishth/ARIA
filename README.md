@@ -1,35 +1,42 @@
 # ARIA
 
-ARIA is a lightweight Python command-line assistant scaffold. It includes separate files for the application entry point, response logic, configuration, persistent memory, and chat history.
+ARIA is being rebuilt as a local-first, modular AI assistant.
 
-## Project Structure
+This repository is intentionally being reconstructed from a clean baseline. The implementation will be developed incrementally, with each stage validated locally and through GitHub Actions before the next stage is added.
 
-```text
-ARIA/
-│── main.py
-│── responses.py
-│── memory.json
-│── chat_history.txt
-│── config.json
-│── README.md
-│── .gitignore
-```
+## Development principles
 
-## Files
+- Local-first development and execution
+- Small, testable, maintainable components
+- Explicit configuration and clear boundaries
+- Automated validation through GitHub Actions
+- Incremental implementation with a passing baseline at every stage
+- No deployment platform is required for the core project
 
-- `main.py` starts the command-line assistant, loads configuration and memory, and records chat history.
-- `responses.py` contains response-generation helpers.
-- `memory.json` stores basic assistant memory such as interaction counts and notes.
-- `chat_history.txt` stores conversation history written by the application.
-- `config.json` stores assistant configuration values.
-- `.gitignore` excludes common generated Python files and local environment artifacts.
+## Current status
 
-## Getting Started
+The repository has been reset to a clean documentation baseline. The project skeleton and implementation will be introduced in subsequent stages.
 
-Run ARIA with Python 3.10 or newer:
+## Planned direction
 
-```bash
-python main.py
-```
+The architecture will be established around clearly separated concerns such as:
 
-Type `exit` or `quit` to end the session.
+- application/runtime entry point
+- configuration
+- assistant/core orchestration
+- model/provider integration
+- memory and persistence
+- conversation/history handling
+- CLI/user interface
+- tests
+- CI and developer tooling
+
+Exact components and interfaces will be finalized against the project specification before implementation.
+
+## Local development
+
+The project is designed to be developed and tested locally. Installation, testing, linting, type checking, and other validation commands will be documented here as the corresponding tooling is introduced.
+
+## License
+
+License and contribution guidance will be added with the project foundation.
