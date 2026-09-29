@@ -2,13 +2,13 @@
 
 **ARIA — Autonomous Research & Intelligence Architecture**
 
-ARIA is a self-contained, local-first AI system designed to build its own software intelligence stack: its own tokenizer, trainable SLM, inference engine, memory, local RAG, agent runtime, evaluation system, and **ARIA-owned virtual compute layer**.
+ARIA is a self-contained, local-first AI system designed to build its own intelligence stack: its own neural language model, tokenizer, training pipeline, inference engine, memory, local RAG, agent runtime, evaluation system, and **ARIA-owned virtual compute layer**.
 
 > **ARIA is not a chatbot wrapper.**
-> The goal is an independently engineered AI system whose core capabilities come from software built and evaluated inside this repository.
+> The goal is an independently engineered AI system whose core intelligence comes from a trainable neural network and supporting software built and evaluated inside this repository.
 
 ![ARIA](https://img.shields.io/badge/ARIA-self--contained%20local%20AI-111827?style=for-the-badge)
-![Status](https://img.shields.io/badge/status-foundation%20%2B%20virtual%20compute-7c3aed?style=for-the-badge)
+![Status](https://img.shields.io/badge/status-neural%20brain%20foundation-7c3aed?style=for-the-badge)
 ![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/license-Apache--2.0-2ea44f?style=for-the-badge)
 
@@ -16,7 +16,7 @@ ARIA is a self-contained, local-first AI system designed to build its own softwa
 
 ## What ARIA is building
 
-ARIA separates intelligence, execution, knowledge, action, and interaction into explicit software layers.
+ARIA separates **learned intelligence**, execution, knowledge, action, and interaction into explicit software layers.
 
 ```mermaid
 flowchart TD
@@ -31,27 +31,78 @@ flowchart TD
     COMPUTE --> VCPU["Virtual CPU"]
     COMPUTE --> VGPU["Virtual GPU"]
     COMPUTE --> VNPU["Virtual NPU"]
-    RT --> INF["Inference Engine"]
-    INF --> SLM["Own SLM"]
+    RT --> INF["ARIA Inference Engine"]
+    INF --> BRAIN["ARIA Neural Brain"]
+    BRAIN --> TOK["Own Tokenizer"]
+    BRAIN --> SLM["Own Trainable SLM"]
+    SLM --> TRAIN["Local Training"]
 ```
 
-### The important architecture decision
+## The ARIA neural brain
+
+The neural network is not a service ARIA calls. **It is a component ARIA owns and trains.**
+
+The intended intelligence path is:
+
+```text
+Text
+  ↓
+ARIA Tokenizer
+  ↓
+Token IDs
+  ↓
+ARIA Neural Network / SLM
+  ├── Embeddings
+  ├── Transformer layers
+  ├── Attention
+  ├── Feed-forward blocks
+  ├── Normalization
+  └── Vocabulary head
+  ↓
+Next-token probabilities
+  ↓
+ARIA Inference Engine
+  ↓
+Generated text
+```
+
+The current model implementation is deliberately small: a trainable embedding + vocabulary projection language model with real forward computation, softmax loss, backpropagation, parameter updates, generation, and local checkpointing. It is the first **brain foundation**, not the final SLM.
+
+The final ARIA SLM will grow from this foundation toward an efficient decoder-only Transformer. Architectural additions such as RoPE, RMSNorm, SwiGLU, GQA/MQA, KV caching, quantization, and other optimizations will be introduced only when they are implemented and measured.
+
+### What makes this different from an API wrapper
+
+ARIA's normal runtime does **not** depend on:
+
+- OpenAI, Anthropic, Gemini, or another hosted model API
+- cloud inference
+- cloud embeddings
+- hosted vector databases
+- remote agent services
+- hidden model calls
+
+The neural model, tokenizer, training loop, inference logic, memory, retrieval, tool orchestration, and runtime boundaries are intended to be local ARIA components.
+
+---
+
+## ARIA virtual compute
 
 **ARIA's CPU, GPU, and NPU are software-defined compute engines owned by ARIA.**
 
 They are not physical devices that ARIA must provide, detect, or depend on.
 
-The host computer is simply the environment that runs ARIA. The ARIA runtime owns the execution abstraction and can later add optional host acceleration without changing the core architecture.
+The host computer is simply the environment that runs ARIA. Optional host acceleration can be added later without making physical GPU/NPU hardware a core requirement.
 
 | Layer | Responsibility |
 |---|---|
+| **Neural Brain / SLM** | Learned language intelligence |
+| **Tokenizer** | Converts local language, code, mathematics, and technical text into model tokens |
+| **Inference Engine** | Executes the model and generates tokens |
+| **Training Engine** | Learns model parameters from local training data |
 | **Virtual CPU** | General-purpose software execution |
 | **Virtual GPU** | Parallel-style tensor/matrix execution in software |
 | **Virtual NPU** | Neural-network-oriented execution in software |
 | **AI Runtime** | Model loading, execution, scheduling, memory, and runtime state |
-| **SLM** | Learned language intelligence |
-| **Tokenizer** | Converts local language, code, and technical text into model tokens |
-| **Inference engine** | Autoregressive generation and model execution |
 | **Memory** | Local working, conversational, semantic, and episodic state |
 | **RAG** | Local document retrieval and context selection |
 | **Agent** | Controlled planning and tool execution |
@@ -64,7 +115,7 @@ The host computer is simply the environment that runs ARIA. The ARIA runtime own
 
 Normal operation is intended to work without:
 
-- OpenAI, Anthropic, Gemini, or other model APIs
+- external AI/model APIs
 - cloud inference
 - cloud embeddings
 - hosted vector databases
@@ -75,7 +126,7 @@ Normal operation is intended to work without:
 
 Development-time internet access may be used when explicitly needed for dependencies, datasets, documentation, or optional artifacts. The finished system must have an explicit network-isolation test.
 
-This is an engineering requirement, not a marketing claim.
+This is an engineering requirement, not a claim that every planned subsystem is already complete.
 
 ## Engineering truth
 
@@ -84,8 +135,7 @@ ARIA will not claim a capability because a button, class, or mock exists.
 If the system says it is:
 
 - **trained** → training configuration, data version, loss, evaluation, and model version must exist
-- **running on its virtual GPU** → a real software execution path and tests must exist
-- **using its virtual NPU** → actual neural-network-oriented kernels must be demonstrated
+- **a neural model** → real parameters, forward computation, loss, backpropagation, and parameter updates must exist
 - **offline** → the system must pass a network-isolation test
 - **faster** → a reproducible benchmark must show the improvement
 - **human-like** → conversational quality must be evaluated against a defined test set
@@ -94,33 +144,37 @@ Unimplemented work is marked **NOT IMPLEMENTED**. Experimental work is marked **
 
 ## Current status
 
-**Foundation + virtual compute block.**
-
-The repository has been reset into a clean architecture and now contains the first real software execution layer.
+**Neural brain foundation + virtual compute.**
 
 ### Implemented
 
-- clean project structure
+- clean project architecture
 - explicit core contracts
 - ARIA-owned Virtual CPU
 - ARIA-owned Virtual GPU
 - ARIA-owned Virtual NPU
-- basic software matrix/vector kernels
-- compute task typing
+- compute task typing and dispatch
 - deterministic compute tests
+- local trainable neural language-model foundation
+- embeddings and vocabulary projection
+- softmax cross-entropy loss
+- backpropagation and parameter updates
+- autoregressive next-token generation
+- local JSON checkpoint save/load
+- deterministic neural-model tests
 - project documentation and roadmap
 - packaging configuration
-- repository hygiene
 
 ### Not implemented yet
 
-- tokenizer
-- SLM architecture
-- training
-- inference engine
+- full tokenizer training/BPE
+- full decoder-only Transformer SLM
+- attention/RoPE/RMSNorm/SwiGLU
+- large-scale pretraining
+- instruction tuning
 - KV cache
 - quantization
-- runtime scheduler
+- production inference runtime
 - persistent memory
 - local embeddings/index
 - RAG
@@ -130,7 +184,7 @@ The repository has been reset into a clean architecture and now contains the fir
 - evaluation suite
 - offline/network isolation test
 
-That distinction is intentional.
+That distinction is intentional. The current neural model is real but intentionally tiny.
 
 ## Architecture map
 
@@ -144,7 +198,7 @@ UI
 Local API
  │
  ▼
-Orchestrator
+AI Orchestrator
  ├──────────────► Context / Memory
  ├──────────────► Local RAG
  ├──────────────► Agent / Tools
@@ -153,16 +207,19 @@ Orchestrator
                     ▼
               ARIA AI Runtime
                     │
-             Virtual Compute
-          ┌─────────┼─────────┐
-          ▼         ▼         ▼
-        VCPU       VGPU       VNPU
-          └─────────┬─────────┘
-                    ▼
-                   SLM
+          ┌─────────┴─────────┐
+          ▼                   ▼
+   Virtual Compute       Inference Engine
+          │                   │
+     ┌────┼────┐              ▼
+     ▼    ▼    ▼        ARIA Neural Brain
+   VCPU VGPU VNPU              │
+                               ▼
+                         Own Trainable SLM
+                               │
+                               ▼
+                         Local Parameters
 ```
-
-A larger local visual is maintained at [docs/architecture.svg](docs/architecture.svg).
 
 ## Repository structure
 
@@ -179,90 +236,97 @@ ARIA/
 │       │   ├── engine.py
 │       │   └── types.py
 │       ├── model/
+│       │   ├── __init__.py
+│       │   └── neural.py
 │       ├── runtime/
+│       │   └── dispatcher.py
 │       ├── __init__.py
 │       └── __main__.py
 ├── tests/
 │   ├── test_compute.py
-│   └── test_foundation.py
+│   ├── test_foundation.py
+│   └── test_neural.py
 ├── .gitignore
 ├── pyproject.toml
 └── README.md
 ```
 
-The structure grows only when a real implementation requires it.
-
 ## Development sequence
 
 ARIA is being built block-by-block:
 
-1. **Software feasibility & architecture** — define realistic boundaries and execution contracts.
-2. **ARIA virtual compute** — build VCPU, VGPU, VNPU and their software kernels.
-3. **Tokenizer** — local tokenizer for English, Hindi, Hinglish, programming, mathematics, and technical language.
-4. **SLM** — real decoder-only model with forward pass, loss, backpropagation, checkpoints, and generation.
-5. **Training** — reproducible pretraining and instruction-training pipelines.
-6. **Inference runtime** — streaming generation, KV cache, sampling, and justified quantization.
-7. **Runtime orchestration** — route workloads across ARIA's virtual compute engines.
-8. **Memory** — persistent, searchable, inspectable, editable local memory.
-9. **RAG** — local document parsing, indexing, retrieval, reranking, and context selection.
-10. **Agent** — sandboxed tools, permissions, validation, and audit logging.
-11. **API** — stable local system boundary.
-12. **UI** — interaction layer built on real backend capabilities.
-13. **Evaluation** — quality, correctness, performance, and regression tests.
-14. **Security & privacy** — audit tools, files, commands, paths, resources, and network behavior.
-15. **Optimization & research** — quantization, pruning, distillation, LoRA/QLoRA, speculative decoding, sparse attention, MoE, multimodality, and controlled continual learning.
+1. **Software feasibility & architecture** — define realistic boundaries and execution contracts. **COMPLETE**
+2. **ARIA virtual compute** — build VCPU, VGPU, VNPU and software kernels. **IN PROGRESS**
+3. **Neural brain foundation** — establish a real trainable local language-model core. **IN PROGRESS**
+4. **Tokenizer** — local tokenizer for English, Hindi, Hinglish, programming, mathematics, and technical language.
+5. **Full SLM** — evolve the neural core into a decoder-only Transformer.
+6. **Training** — reproducible pretraining and instruction-training pipelines.
+7. **Inference runtime** — streaming generation, KV cache, sampling, and justified quantization.
+8. **Runtime orchestration** — route workloads across ARIA's virtual compute engines.
+9. **Memory** — persistent, searchable, inspectable, editable local memory.
+10. **RAG** — local document parsing, indexing, retrieval, reranking, and context selection.
+11. **Agent** — sandboxed tools, permissions, validation, and audit logging.
+12. **API** — stable local system boundary.
+13. **UI** — interaction layer built on real backend capabilities.
+14. **Evaluation** — quality, correctness, performance, and regression tests.
+15. **Security & privacy** — audit tools, files, commands, paths, resources, and network behavior.
+16. **Optimization & research** — quantization, pruning, distillation, LoRA/QLoRA, speculative decoding, sparse attention, MoE, multimodality, and controlled continual learning.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) for acceptance criteria.
 
 ## Design principles
 
-### 1. Self-contained software
+### 1. Own the brain
 
-ARIA owns its core execution and intelligence stack. External services are not part of normal operation.
+ARIA's learned intelligence must come from ARIA-owned model parameters and training code. External model APIs are not substitutes for the neural network.
 
-### 2. Virtual compute is real software
+### 2. Separate brain from runtime
+
+The neural model learns language. The runtime executes it. Memory supplies context. RAG supplies local knowledge. Tools perform controlled actions. The UI only provides interaction.
+
+### 3. Virtual compute is real software
 
 VCPU, VGPU, and VNPU are implementation targets, not labels for physical hardware. Each engine must have executable logic, tests, and measurable behavior.
 
-### 3. Measurable over impressive
+### 4. Measurable over impressive
 
 A feature is complete when it works and can be tested, benchmarked, or inspected.
 
-### 4. Small first
+### 5. Small first
 
 The first SLM should be small enough to train, debug, evaluate, and understand locally. Scaling comes after evidence.
 
-### 5. No fake intelligence
+### 6. No fake intelligence
 
 Prompts, templates, hard-coded answers, or API wrappers are not substitutes for learned model capability.
 
-### 6. Controlled agency
+### 7. Controlled agency
 
 Tools receive explicit schemas, validation, permissions, sandboxing, timeouts, and resource limits.
 
-### 7. Privacy by default
+### 8. Privacy by default
 
 Local storage, no automatic uploads, no hidden telemetry, and inspectable memory are the default direction.
 
-### 8. Research-friendly boundaries
+### 9. Research-friendly boundaries
 
-Stable interfaces should allow future work without rewriting the entire system.
+Stable interfaces should allow future model and runtime work without rewriting the entire system.
 
 ## Technology direction
 
-The initial implementation is intentionally dependency-light. The stack will be selected from measured requirements.
+The initial neural foundation is dependency-light and uses the Python standard library so the learning mechanics remain inspectable.
+
+As the model grows, ARIA may add a local tensor backend for efficient training and inference. Any dependency must serve an identified performance or research need; it must not introduce a hosted AI dependency.
 
 Possible future components include:
 
 - Python for system and research code
-- PyTorch or a lower-level local tensor stack for model development
+- a local tensor backend for model training/inference
 - a custom/local tokenizer
 - SQLite for local structured state
 - a local vector/retrieval index
 - a local API layer
 - a web UI
-
-The final stack is a consequence of implementation evidence, not a starting assumption.
 
 ## Versioning
 
@@ -270,6 +334,7 @@ ARIA versions major system layers independently:
 
 ```text
 Compute  → Compute-0.x
+Brain    → Brain-0.x
 SLM      → SLM-0.x
 Runtime  → Runtime-0.x
 Agent    → Agent-0.x
@@ -325,4 +390,4 @@ ARIA is intended to become a locally executable AI system capable of:
 
 The target is not to reproduce the appearance of a hosted AI product.
 
-> **Build the capability. Measure it. Keep the boundaries honest.**
+> **Build the brain. Build the runtime. Measure both. Keep the boundaries honest.**

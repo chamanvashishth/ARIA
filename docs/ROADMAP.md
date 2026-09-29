@@ -6,14 +6,6 @@ This roadmap converts the project specification into implementation blocks. A mi
 
 **Goal:** establish the software boundaries and constraints ARIA must satisfy.
 
-Acceptance criteria:
-
-- major subsystem responsibilities are defined
-- normal runtime has no external model/API dependency
-- virtual compute is defined as an ARIA-owned software layer
-- unsupported capabilities are explicit
-- first implementation can run with the Python standard library
-
 **Status:** COMPLETE
 
 ## Phase 1 — ARIA virtual compute
@@ -23,15 +15,34 @@ Acceptance criteria:
 Acceptance criteria:
 
 - Virtual CPU has executable general-purpose operations
-- Virtual GPU has executable parallel-style tensor/matrix operations
-- Virtual NPU has executable neural-network-oriented operations
+- Virtual GPU has executable matrix operations
+- Virtual NPU has executable neural-network operations
 - engines have deterministic tests
-- compute types are explicit
+- compute types and dispatch are explicit
 - physical CPU/GPU/NPU are not required
 
 **Status:** IN PROGRESS
 
-## Phase 2 — Tokenizer
+## Phase 2 — Neural brain foundation
+
+**Goal:** establish the first genuinely trainable neural language model owned by ARIA.
+
+Acceptance criteria:
+
+- model has learned parameters
+- forward computation produces token logits
+- softmax language-model loss is implemented
+- backpropagation computes parameter updates
+- training changes model parameters
+- autoregressive next-token generation exists
+- checkpoints save/load locally
+- deterministic tests prove the learning loop
+
+**Status:** FOUNDATION IMPLEMENTED**
+
+Current implementation is intentionally tiny: token embedding + vocabulary projection. It is a real neural learning core, but it is not yet the final ARIA SLM.
+
+## Phase 3 — Tokenizer
 
 **Goal:** create a local tokenizer suitable for English, Hindi, Hinglish, programming, mathematics, and technical language.
 
@@ -44,23 +55,27 @@ Acceptance criteria:
 
 **Status:** NOT IMPLEMENTED
 
-## Phase 3 — SLM
+## Phase 4 — Full SLM
 
-**Goal:** implement a real decoder-only language model.
+**Goal:** evolve the neural foundation into an efficient decoder-only Transformer.
 
 Acceptance criteria:
 
+- Transformer blocks
+- attention
+- positional encoding such as RoPE
+- normalization
+- feed-forward network
 - forward propagation
 - loss calculation
 - backpropagation
-- parameter updates
 - checkpoint save/load
 - autoregressive generation
 - deterministic smoke tests
 
 **Status:** NOT IMPLEMENTED
 
-## Phase 4 — Training
+## Phase 5 — Training
 
 **Goal:** reproducible local pretraining and instruction training.
 
@@ -79,7 +94,7 @@ Acceptance criteria:
 
 **Status:** NOT IMPLEMENTED
 
-## Phase 5 — Inference runtime
+## Phase 6 — Inference runtime
 
 **Goal:** make local generation practical.
 
@@ -94,9 +109,9 @@ Acceptance criteria:
 
 **Status:** NOT IMPLEMENTED
 
-## Phase 6 — Runtime orchestration
+## Phase 7 — Runtime orchestration
 
-**Goal:** route workloads through ARIA's virtual compute engines.
+**Goal:** route model workloads through ARIA's virtual compute engines.
 
 Acceptance criteria:
 
@@ -108,9 +123,9 @@ Acceptance criteria:
 - fallback paths
 - reproducible benchmarks
 
-**Status:** NOT IMPLEMENTED
+**Status:** FOUNDATION PARTIALLY IMPLEMENTED
 
-## Phase 7 — Memory and local knowledge
+## Phase 8 — Memory and local knowledge
 
 **Goal:** provide inspectable local state and retrieval.
 
@@ -126,7 +141,7 @@ Acceptance criteria:
 
 **Status:** NOT IMPLEMENTED
 
-## Phase 8 — Agent
+## Phase 9 — Agent
 
 **Goal:** allow controlled local actions.
 
@@ -144,7 +159,7 @@ Acceptance criteria:
 
 **Status:** NOT IMPLEMENTED
 
-## Phase 9 — API and UI
+## Phase 10 — API and UI
 
 **Goal:** expose the real local system through a usable interface.
 
@@ -159,7 +174,7 @@ Acceptance criteria:
 
 **Status:** NOT IMPLEMENTED
 
-## Phase 10 — Evaluation and security
+## Phase 11 — Evaluation and security
 
 **Goal:** make quality and safety measurable.
 
@@ -176,7 +191,7 @@ Acceptance criteria:
 
 **Status:** NOT IMPLEMENTED
 
-## Phase 11 — Optimization and research
+## Phase 12 — Optimization and research
 
 Only after the stable system is measurable:
 
