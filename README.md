@@ -1,548 +1,317 @@
 # ARIA
 
-<div align="center">
+**ARIA — Autonomous Research & Intelligence Architecture**
 
-# ARIA
+A clean-room, local-first AI system built around a trainable Small Language Model (SLM), a hardware-aware runtime, controlled tools, local memory/RAG, measurable evaluation, and an offline operating mode.
 
-**Adaptive • Reasoning • Intelligent Assistant**
+> **ARIA is not a chatbot wrapper.**
+> The long-term goal is a genuinely independent AI system whose intelligence comes from its own architecture, learned parameters, tokenizer, training pipeline, and inference stack.
 
-*A local-first AI assistant platform built around modular application architecture and an independently evolving small language model (SLM).*
-
-[![CI](https://github.com/chamanvashishth/ARIA/actions/workflows/ci.yml/badge.svg)](https://github.com/chamanvashishth/ARIA/actions/workflows/ci.yml)
-![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
-![Architecture](https://img.shields.io/badge/Architecture-Modular-6f42c1)
-![Execution](https://img.shields.io/badge/Execution-Local--First-2ea44f)
-![Status](https://img.shields.io/badge/Status-Active%20Development-orange)
-
-</div>
+![ARIA](https://img.shields.io/badge/ARIA-local%20AI%20system-111827?style=for-the-badge)
+![Status](https://img.shields.io/badge/status-foundation%20phase-7c3aed?style=for-the-badge)
+![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![License](https://img.shields.io/badge/license-Apache--2.0-2ea44f?style=for-the-badge)
 
 ---
 
-## 1. Project overview
+## What ARIA is building
 
-ARIA is being engineered as a **complete, local-first AI assistant foundation**, not as a single chatbot script.
+ARIA separates intelligence, execution, action, knowledge, and interaction into explicit layers:
 
-The project separates the assistant into independently testable boundaries:
-
-- **Application core** — orchestration and runtime rules
-- **Interfaces** — user-facing request/response contracts
-- **SLM** — model architecture, data preparation, tokenization, and inference primitives
-- **Providers** — replaceable intelligence backends
-- **Memory** — contextual and long-term assistant state
-- **Storage** — durable local persistence
-- **Configuration** — explicit runtime configuration
-- **UI** — interaction surfaces such as the CLI
-- **Tests and CI** — automated quality gates
-
-The repository is intentionally developed in small checkpoints. A new layer is not considered complete merely because its code exists; it must be validated locally and through GitHub Actions before the project moves forward.
-
-> **Current focus:** establishing a clean, testable SLM and assistant foundation.  
-> **Execution model:** local-first.  
-> **Deployment:** not required for the core project.
-
----
-
-## 2. Product vision
-
-ARIA is designed around a simple architectural principle:
-
-> **The assistant should not depend on one model provider, one interface, or one storage implementation.**
-
-The application layer should communicate through stable contracts. Intelligence can then evolve independently, from deterministic test doubles to a native SLM and, where explicitly required, additional provider adapters.
-
-Long term, the project is intended to support:
-
-- natural-language interaction,
-- local model inference,
-- contextual memory,
-- conversation history,
-- extensible tools,
-- deterministic testing,
-- configurable runtime behavior,
-- privacy-oriented local execution,
-- and a maintainable developer ecosystem.
-
-The repository is currently in the foundation stage, so planned capabilities must not be interpreted as already implemented.
-
----
-
-## 3. Architecture
-
-### High-level system
-
-```text
-                           ┌──────────────────────┐
-                           │       ARIA UI        │
-                           │   CLI / Interfaces   │
-                           └──────────┬───────────┘
-                                      │
-                                      ▼
-                    ┌──────────────────────────────┐
-                    │       Application Core       │
-                    │ lifecycle • orchestration    │
-                    │ policies • runtime state     │
-                    └──────────────┬───────────────┘
-                                   │
-              ┌────────────────────┼────────────────────┐
-              │                    │                    │
-              ▼                    ▼                    ▼
-       ┌─────────────┐      ┌─────────────┐      ┌─────────────┐
-       │     SLM     │      │   Memory    │      │   Storage   │
-       │ intelligence│      │  context    │      │ local state │
-       └──────┬──────┘      └──────┬──────┘      └──────┬──────┘
-              │                    │                    │
-              └────────────────────┼────────────────────┘
-                                   ▼
-                         ┌──────────────────────┐
-                         │   Infrastructure    │
-                         │ config • errors      │
-                         │ logging • utilities  │
-                         └──────────────────────┘
+```mermaid
+flowchart TD
+    UI["Local UI"] --> API["Local API"]
+    API --> ORCH["AI Orchestrator"]
+    ORCH --> CTX["Context + Memory"]
+    ORCH --> RAG["Local RAG"]
+    ORCH --> AGENT["Agent + Tools"]
+    ORCH --> VERIFY["Verification"]
+    ORCH --> RT["AI Runtime"]
+    RT --> SCHED["Hardware Scheduler"]
+    RT --> MEM["Runtime Memory"]
+    RT --> INF["Inference Engine"]
+    INF --> SLM["Own SLM"]
+    SCHED --> CPU["CPU"]
+    SCHED --> GPU["GPU"]
+    SCHED --> NPU["NPU"]
 ```
 
-### Intelligence boundary
+The responsibilities stay deliberately separate:
 
-The core application should depend on a contract rather than a concrete model implementation:
+| Layer | Responsibility |
+|---|---|
+| **SLM** | Learned language intelligence |
+| **Tokenizer** | Converts local text into model tokens |
+| **Inference engine** | Executes autoregressive generation |
+| **AI runtime** | Manages execution, memory, models, and performance |
+| **Hardware scheduler** | Selects CPU/GPU/NPU based on measured capability |
+| **Memory** | Local working, conversational, semantic, and episodic state |
+| **RAG** | Local document retrieval and context selection |
+| **Agent** | Controlled planning and tool execution |
+| **Verification** | Tests generated results instead of trusting them blindly |
+| **API** | Stable boundary between UI and local intelligence |
+| **UI** | Human interaction and runtime transparency |
+| **Evaluation** | Measures quality, latency, memory, and regressions |
+
+## Independence by design
+
+Normal operation is intended to work without:
+
+- OpenAI, Anthropic, Gemini, or other model APIs
+- cloud inference
+- cloud embeddings
+- hosted vector databases
+- remote agent services
+- hidden telemetry
+- required internet access
+
+Development-time internet access may be used when explicitly needed for dependencies, datasets, documentation, or optional model artifacts. The finished system must have an explicit **network-isolation test**.
+
+This requirement is part of the engineering contract, not a marketing claim.
+
+## Engineering truth
+
+ARIA will not claim a capability because a button, class, or mock exists.
+
+If the system says it is:
+
+- **trained** → training configuration, data version, loss, evaluation, and model version must exist
+- **GPU accelerated** → measured device execution and performance must be available
+- **NPU accelerated** → actual NPU execution and supported operators must be demonstrated
+- **offline** → the system must pass a network-isolation test
+- **faster** → a reproducible benchmark must show the improvement
+- **human-like** → conversational quality must be evaluated against a defined test set
+
+Unimplemented work is marked **NOT IMPLEMENTED**. Experimental work is marked **EXPERIMENTAL**.
+
+## Current status
+
+**Foundation phase — clean-room reset completed.**
+
+This repository currently contains architecture contracts and project boundaries only. It intentionally does **not** pretend to have a working SLM, hardware scheduler, RAG system, agent, or UI yet.
+
+### Implemented in this foundation
+
+- clean project structure
+- explicit package boundaries
+- core architecture contracts
+- hardware-profile data model
+- project documentation and roadmap
+- packaging configuration
+- repository hygiene
+
+### Not implemented yet
+
+- hardware discovery
+- SLM architecture
+- tokenizer
+- training
+- inference
+- KV cache
+- quantization
+- hardware scheduler
+- memory manager
+- local embeddings/index
+- RAG
+- agent execution
+- local API
+- UI
+- evaluation suite
+- offline/network isolation test
+
+That distinction is intentional.
+
+## Architecture map
+
+The repository is organized around the execution path rather than around a collection of unrelated features:
 
 ```text
-                       ┌─────────────────┐
-                       │   ARIA Core     │
-                       └────────┬────────┘
-                                │
-                                ▼
-                       ┌─────────────────┐
-                       │ Model Contract  │
-                       └────────┬────────┘
-                                │
-                 ┌──────────────┼──────────────┐
-                 ▼              ▼              ▼
-              ARIA SLM     Provider Adapter  Test Double
+User
+ │
+ ▼
+UI
+ │
+ ▼
+Local API
+ │
+ ▼
+Orchestrator
+ ├──────────────► Context / Memory
+ ├──────────────► Local RAG
+ ├──────────────► Agent / Tools
+ └──────────────► Verification
+                    │
+                    ▼
+               AI Runtime
+                    │
+        ┌───────────┼───────────┐
+        ▼           ▼           ▼
+      CPU          GPU         NPU
+                    │
+                    ▼
+                   SLM
 ```
 
-This boundary allows the model implementation to change without rewriting the assistant's orchestration layer.
+A larger visual version is maintained at [docs/architecture.svg](docs/architecture.svg).
 
----
-
-## 4. Current SLM foundation
-
-The repository currently contains the beginning of a dependency-light SLM layer.
-
-The SLM foundation includes contracts and primitives for:
-
-- model configuration,
-- model output representation,
-- training examples and datasets,
-- text preprocessing,
-- vocabulary management,
-- tokenization,
-- example validation,
-- model interfaces,
-- and a deterministic baseline forward-pass implementation.
-
-The current baseline model is intentionally small. It provides a real numerical forward pass behind the model contract while the project's final neural architecture is established.
-
-It is **not** presented as the final ARIA language model.
-
-### Current SLM flow
-
-```text
-Raw text
-   │
-   ▼
-Preprocessing
-   │
-   ▼
-Vocabulary / Tokenizer
-   │
-   ▼
-Token IDs
-   │
-   ▼
-SLM Model Contract
-   │
-   ▼
-Baseline / Future Neural Architecture
-   │
-   ▼
-Vocabulary Logits
-```
-
-The model layer is being developed independently from the assistant runtime so that training and inference work can evolve without coupling the entire application to one implementation.
-
----
-
-## 5. Repository structure
-
-The intended structure is:
+## Repository structure
 
 ```text
 ARIA/
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-│
+├── docs/
+│   ├── architecture.svg
+│   └── ROADMAP.md
 ├── src/
 │   └── aria/
-│       ├── __init__.py
-│       ├── __main__.py
-│       │
-│       ├── config/
-│       │   └── ...
-│       │
 │       ├── core/
-│       │   └── ...
-│       │
-│       ├── interfaces/
-│       │   └── ...
-│       │
-│       ├── memory/
-│       │   └── ...
-│       │
-│       ├── providers/
-│       │   └── ...
-│       │
-│       ├── slm/
-│       │   ├── config.py
-│       │   ├── dataset.py
-│       │   ├── model.py
-│       │   ├── model_impl.py
-│       │   ├── preprocessing.py
-│       │   ├── tokenizer.py
-│       │   ├── validation.py
-│       │   └── vocabulary.py
-│       │
-│       ├── storage/
-│       │   └── ...
-│       │
-│       └── ui/
-│           └── ...
-│
+│       │   └── contracts.py
+│       ├── hardware/
+│       │   └── models.py
+│       ├── model/
+│       ├── runtime/
+│       ├── __init__.py
+│       └── __main__.py
 ├── tests/
-│   ├── integration/
-│   └── unit/
-│
+├── .gitignore
 ├── pyproject.toml
-├── README.md
-└── .gitignore
+└── README.md
 ```
 
-Directories represent architectural boundaries. Empty or placeholder modules should not become permanent dumping grounds; functionality should be introduced when its responsibility and contract are clear.
+The structure will grow only when a real implementation requires it.
 
----
+## Development sequence
 
-## 6. Development philosophy
+ARIA follows a measurable build sequence:
 
-### Small checkpoints
+1. **Hardware & feasibility** — inspect the actual machine and establish realistic model/runtime limits.
+2. **Architecture** — freeze stable interfaces between model, runtime, memory, tools, API, and UI.
+3. **Tokenizer** — build and benchmark English, Hindi, Hinglish, code, math, and technical tokenization.
+4. **SLM** — implement a real decoder-only model with forward pass, loss, backpropagation, checkpoints, and generation.
+5. **Training** — build reproducible pretraining and instruction-training pipelines.
+6. **Inference** — add streaming generation, KV cache, efficient sampling, and quantization where justified.
+7. **Hardware runtime** — discover CPU/GPU/NPU capabilities and benchmark execution paths.
+8. **Memory** — implement local persistent, inspectable, editable memory.
+9. **RAG** — index and retrieve local documents without cloud embeddings.
+10. **Agent** — add sandboxed tools, permissions, validation, and audit logging.
+11. **API** — expose the local system through a stable interface.
+12. **UI** — build the interaction layer after the underlying system is real.
+13. **Evaluation** — establish quality and performance regression tests.
+14. **Optimization** — optimize only where benchmarks show a real bottleneck.
+15. **Security** — audit tools, files, commands, paths, and resource limits.
+16. **Offline production** — disable networking and verify the complete local operating mode.
 
-Every meaningful change should be independently understandable and testable.
+See [docs/ROADMAP.md](docs/ROADMAP.md) for milestone boundaries.
 
-### Contracts before complexity
+## Design principles
 
-Interfaces and data contracts should be stable before adding complex implementations.
+### 1. Local first
 
-### Dependency-light foundations
+The normal runtime should not need the internet.
 
-The core foundation should avoid unnecessary framework dependencies. A dependency should have a clear technical reason to exist.
+### 2. Measurable over impressive
 
-### Deterministic tests first
+A feature is complete when it works and can be tested, benchmarked, or inspected.
 
-Core behavior should be testable without a network connection, external model API, paid service, or secret credential.
+### 3. Hardware-aware
 
-### Explicit failure
+CPU, GPU, and NPU are execution resources—not badges. ARIA will benchmark before choosing heterogeneous execution.
 
-Invalid input and invalid configuration should fail clearly and close to the source of the problem.
+### 4. Small first
 
-### Local ownership
+The first SLM should be small enough to train, debug, evaluate, and understand locally. Scaling comes after evidence.
 
-The core project should remain useful without requiring a hosted runtime.
+### 5. No fake intelligence
 
----
+Prompts, templates, hard-coded answers, or API wrappers are not substitutes for learned model capability.
 
-## 7. Local development
+### 6. Controlled agency
 
-### Requirements
+Tools receive explicit schemas, validation, permissions, sandboxing, timeouts, and resource limits.
 
-The foundation targets:
+### 7. Research-friendly boundaries
 
-- Python **3.11 or newer**
-- Git
-- a local virtual environment
+Stable interfaces should make future work such as MoE, sparse attention, distillation, LoRA/QLoRA, speculative decoding, pruning, and multimodality possible without rewriting the entire system.
 
-Create a virtual environment:
+### 8. Privacy by default
 
-```bash
-python -m venv .venv
-```
+Local storage, no automatic uploads, no hidden telemetry, and inspectable memory are the default direction.
 
-Activate it on Windows PowerShell:
+## Technology direction
 
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
+The initial implementation will evaluate—not blindly assume—the following ecosystem:
 
-Activate it on macOS/Linux:
+- Python + PyTorch for model research and training
+- SentencePiece / Hugging Face Tokenizers / custom tokenizer where justified
+- FastAPI or an equivalent local API layer
+- SQLite for local structured state
+- FAISS or another local retrieval index
+- React / Next.js or equivalent for the UI
+- hardware-specific CPU/GPU/NPU backends selected after machine discovery
 
-```bash
-source .venv/bin/activate
-```
+The final stack is a consequence of measured constraints, not a starting assumption.
 
-Install the project with development dependencies:
+## Versioning
 
-```bash
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-```
-
----
-
-## 8. Quality gates
-
-Before a checkpoint is considered complete, run the applicable checks:
-
-```bash
-python -m ruff format --check .
-python -m ruff check .
-python -m pytest
-```
-
-If static type checking is enabled for a component, run the configured type checker as part of that component's checkpoint.
-
-The exact command set is intentionally defined by the project's `pyproject.toml` and CI workflow so local and CI validation remain aligned.
-
----
-
-## 9. Testing strategy
-
-ARIA uses multiple test layers.
-
-### Unit tests
-
-Unit tests validate isolated contracts and components:
-
-- configuration,
-- data models,
-- tokenization,
-- vocabulary behavior,
-- preprocessing,
-- model contracts,
-- deterministic model behavior,
-- core orchestration.
-
-### Integration tests
-
-Integration tests validate multiple project boundaries together, such as CLI/runtime behavior.
-
-### External integrations
-
-Network- or provider-dependent tests should not be part of the default deterministic suite unless explicitly required. When introduced, they should be clearly classified and documented.
-
-### Testing rule
-
-A feature is not considered stable until its expected behavior is represented by tests.
-
----
-
-## 10. Configuration and secrets
-
-Configuration must remain separate from implementation code.
-
-### Rules
-
-- Never commit API keys or credentials.
-- Never place secrets in `README.md`, tests, fixtures, or source files.
-- Prefer environment variables or local configuration for secrets.
-- Validate required configuration at startup.
-- Keep provider-specific configuration at the provider boundary.
-- Core imports and unit tests should not require live credentials.
-
-A local example configuration may be documented without containing real secrets.
-
----
-
-## 11. Security and privacy
-
-Because ARIA is intended for local assistant workloads, privacy is treated as an architectural concern.
-
-The project should:
-
-- avoid logging secrets,
-- avoid exposing credentials in exceptions,
-- validate external input,
-- keep filesystem access scoped,
-- treat conversation and memory data as potentially sensitive,
-- review dependencies before introducing them,
-- and keep provider credentials outside version control.
-
-Security-sensitive behavior should be covered by tests where practical.
-
----
-
-## 12. Continuous integration
-
-GitHub Actions is the project's automated quality gate.
-
-The CI workflow is intended to validate supported Python versions and run reproducible checks such as:
-
-- dependency installation,
-- formatting validation,
-- linting,
-- automated tests.
-
-The repository should not require a deployment platform for CI to be useful.
-
-A checkpoint should not be considered complete until the corresponding CI run is reviewed.
-
----
-
-## 13. Development workflow
-
-The project follows this sequence:
+ARIA versions its major system layers independently:
 
 ```text
-Requirement
-    │
-    ▼
-Define contract
-    │
-    ▼
-Implement smallest useful unit
-    │
-    ▼
-Add deterministic tests
-    │
-    ▼
-Run local quality checks
-    │
-    ▼
-Commit focused change
-    │
-    ▼
-Verify GitHub Actions
-    │
-    ▼
-Proceed to next layer
+SLM      → SLM-0.x
+Runtime  → Runtime-0.x
+Agent    → Agent-0.x
+UI       → UI-0.x
 ```
 
-This workflow makes regressions easier to locate and prevents unrelated changes from becoming one large debugging problem.
+Each model release will record architecture, parameter count, tokenizer version, dataset version, training configuration, evaluation results, hardware used, and known limitations.
 
----
+## Contribution workflow
 
-## 14. Roadmap
+Each development block should follow:
 
-### Phase 0 — Foundation
+```text
+Inspect
+  ↓
+Measure
+  ↓
+Design smallest correct change
+  ↓
+Implement
+  ↓
+Test
+  ↓
+Benchmark when relevant
+  ↓
+Review what changed
+  ↓
+Commit
+```
 
-- [x] Clean repository baseline
-- [x] Establish project documentation
-- [x] Establish Python package structure
-- [x] Establish initial SLM contracts
-- [x] Establish SLM data and preprocessing primitives
-- [x] Establish deterministic baseline model
-- [ ] Stabilize CI and developer tooling
+Do not build a large feature on top of an unverified foundation.
 
-### Phase 1 — Assistant core
+## The long-term target
 
-- [ ] Runtime lifecycle
-- [ ] Request/response orchestration
-- [ ] Assistant state
-- [ ] Error-handling strategy
-- [ ] Core integration tests
+The target is a locally executable system capable of:
 
-### Phase 2 — SLM development
+- natural conversation
+- contextual understanding
+- coding
+- mathematics
+- technical explanation
+- local document understanding
+- persistent local memory
+- local retrieval
+- controlled tool use
+- result verification
+- measurable model improvement
+- model versioning
+- hardware-aware execution
+- quantized inference
+- streaming generation
+- offline operation
 
-- [ ] Final model architecture
-- [ ] Training pipeline
-- [ ] Loss and optimization
-- [ ] Batching and data loading
-- [ ] Evaluation metrics
-- [ ] Checkpointing
-- [ ] Inference pipeline
-- [ ] Resource-aware local execution
+The target is **not** to reproduce the appearance of a hosted AI product.
 
-### Phase 3 — Memory and storage
+> **Build actual capability. Measure it. Keep the boundaries honest.**
 
-- [ ] Memory abstraction
-- [ ] Conversation history
-- [ ] Local persistence
-- [ ] Retrieval/context assembly
-- [ ] Data migration strategy
+## License
 
-### Phase 4 — User interface
-
-- [ ] Stable CLI
-- [ ] Command system
-- [ ] Interactive conversation loop
-- [ ] Human-readable errors
-- [ ] Configuration commands
-
-### Phase 5 — Extensibility
-
-- [ ] Tool contracts
-- [ ] Tool execution boundary
-- [ ] Additional provider adapters where required
-- [ ] Observability
-- [ ] Performance profiling
-
-### Phase 6 — Stabilization
-
-- [ ] Security review
-- [ ] Dependency review
-- [ ] Failure-mode testing
-- [ ] Documentation review
-- [ ] Performance review
-- [ ] Release-readiness checklist
-
-The roadmap is intentionally staged. Requirements may be refined when the authoritative project specification is incorporated.
-
----
-
-## 15. Contributing
-
-Contributions should preserve clear architectural boundaries.
-
-Before submitting a change:
-
-1. Keep the change focused.
-2. Define or preserve the relevant contract.
-3. Add tests for behavior that can regress.
-4. Run formatting, linting, and tests locally.
-5. Review the GitHub Actions result.
-6. Update documentation when behavior or architecture changes.
-
-Avoid committing generated files, local environments, credentials, or unrelated refactors.
-
----
-
-## 16. Project status
-
-ARIA is under active development.
-
-The repository is currently focused on establishing the engineering foundation required for a reliable local assistant and native SLM implementation.
-
-**Implemented foundation:**
-
-- modular Python package layout,
-- assistant/interface boundaries,
-- initial SLM contracts,
-- text preprocessing,
-- vocabulary/tokenization primitives,
-- training-data validation,
-- deterministic baseline model,
-- unit and integration test foundations.
-
-**Still under development:**
-
-- complete assistant runtime,
-- production-quality SLM architecture,
-- training and evaluation pipeline,
-- persistent memory,
-- full CLI experience,
-- tool ecosystem,
-- performance and security hardening.
-
----
-
-## 17. License
-
-No open-source license has been finalized for this repository yet.
-
-Until a license is explicitly added, repository contents should not be assumed to be licensed for unrestricted redistribution or reuse.
+Apache-2.0. See the repository license file when the licensing artifact is added to the project.

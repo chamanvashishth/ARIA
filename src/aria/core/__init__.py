@@ -1,1 +1,1 @@
-"""Core application logic for ARIA."""
+"""Core contracts shared across ARIA subsystems."""

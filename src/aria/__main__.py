@@ -1,11 +1,15 @@
-"""CLI entry point for ARIA."""
-
-from aria import __version__
+from aria.core.contracts import SystemStatus
 
 
 def main() -> None:
-    """Run the minimal ARIA entry point."""
-    print(f"ARIA {__version__}")
+    status = SystemStatus(
+        name="ARIA",
+        version="0.1.0",
+        phase="foundation",
+        implemented=False,
+    )
+    print(f"{status.name} {status.version} — {status.phase} phase")
+    print("Core AI capabilities are not implemented yet.")
 
 
 if __name__ == "__main__":

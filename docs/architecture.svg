@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="820" viewBox="0 0 1200 820">
+  <rect width="1200" height="820" fill="#0b1020"/>
+  <text x="60" y="70" fill="#ffffff" font-family="Arial,sans-serif" font-size="34" font-weight="700">ARIA — Local AI System Architecture</text>
+  <text x="60" y="105" fill="#a8b1c5" font-family="Arial,sans-serif" font-size="17">Intelligence, execution, action, knowledge and interaction stay separate.</text>
+
+  <g font-family="Arial,sans-serif" text-anchor="middle">
+    <rect x="430" y="145" width="340" height="70" rx="14" fill="#18233d" stroke="#7c3aed" stroke-width="2"/>
+    <text x="600" y="188" fill="#fff" font-size="22" font-weight="700">Local UI</text>
+
+    <rect x="430" y="255" width="340" height="70" rx="14" fill="#18233d" stroke="#7c3aed" stroke-width="2"/>
+    <text x="600" y="298" fill="#fff" font-size="22" font-weight="700">Local API</text>
+
+    <rect x="330" y="365" width="540" height="90" rx="14" fill="#172f2b" stroke="#10b981" stroke-width="2"/>
+    <text x="600" y="402" fill="#fff" font-size="22" font-weight="700">AI Orchestrator</text>
+    <text x="600" y="430" fill="#b7c7c1" font-size="15">context · memory · RAG · agent · verification</text>
+
+    <rect x="330" y="495" width="540" height="90" rx="14" fill="#30251a" stroke="#f59e0b" stroke-width="2"/>
+    <text x="600" y="532" fill="#fff" font-size="22" font-weight="700">AI Runtime</text>
+    <text x="600" y="560" fill="#d8c8ae" font-size="15">scheduler · memory · inference · model loading</text>
+
+    <rect x="430" y="625" width="340" height="70" rx="14" fill="#251c3b" stroke="#a78bfa" stroke-width="2"/>
+    <text x="600" y="668" fill="#fff" font-size="22" font-weight="700">Own SLM</text>
+
+    <rect x="90" y="625" width="190" height="70" rx="14" fill="#162436" stroke="#60a5fa" stroke-width="2"/>
+    <text x="185" y="668" fill="#fff" font-size="20" font-weight="700">CPU</text>
+
+    <rect x="875" y="625" width="190" height="70" rx="14" fill="#162436" stroke="#60a5fa" stroke-width="2"/>
+    <text x="970" y="668" fill="#fff" font-size="20" font-weight="700">GPU / NPU</text>
+
+    <text x="600" y="765" fill="#a8b1c5" font-size="15">Measured execution only — no fake acceleration or capability claims.</text>
+  </g>
+
+  <g stroke="#8b9bb7" stroke-width="3" fill="none" stroke-linecap="round">
+    <path d="M600 215 L600 255"/>
+    <path d="M600 325 L600 365"/>
+    <path d="M600 455 L600 495"/>
+    <path d="M600 585 L600 625"/>
+    <path d="M430 660 L280 660"/>
+    <path d="M770 660 L875 660"/>
+  </g>
+</svg>
