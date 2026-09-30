@@ -43,6 +43,7 @@ ARIA's normal runtime is designed to work without OpenAI, Anthropic, Gemini, hos
 | Decoder Transformer SLM | **Experimental** |
 | Local training engine | **Implemented — foundation** |
 | Local autoregressive inference | **Implemented — foundation** |
+| Local AI runtime | **Implemented — foundation** |
 | AI runtime | Planned |
 | Local memory | Planned |
 | Local RAG | Planned |
@@ -255,6 +256,37 @@ The inference layer is still a **foundation**: streaming, KV caching, efficient 
 
 ---
 
+## AI runtime
+
+Block 8 adds the first runtime boundary around ARIA's local model and inference stack.
+
+~~~text
+Application
+    ↓
+ARIA Runtime
+    ├── Model lifecycle
+    ├── Tokenizer
+    ├── Inference configuration
+    └── Generation metrics
+            ↓
+      Local Transformer
+~~~
+
+### Current capabilities
+
+- explicit runtime start/stop lifecycle
+- local model ownership
+- tokenizer ownership
+- text-to-token generation boundary
+- runtime generation configuration
+- generation timing metadata
+- structured generation results
+- no network dependency in the runtime path
+
+The runtime is deliberately small. Scheduling, model loading, persistent runtime state, batching, resource management, streaming, and production observability remain future work.
+
+---
+
 ## Repository structure
 
 ~~~text
@@ -370,7 +402,7 @@ timeline
     Block 5 : Transformer SLM : Experimental
     Block 6 : Training engine : Implemented foundation
     Block 7 : Inference engine : Implemented foundation
-    Block 8 : AI runtime : Planned
+    Block 8 : AI runtime : Implemented foundation
     Block 9 : Memory : Planned
     Block 10 : Local RAG : Planned
     Block 11 : Agent and tools : Planned
