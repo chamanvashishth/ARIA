@@ -43,7 +43,6 @@ ARIA's normal runtime is designed to work without OpenAI, Anthropic, Gemini, hos
 | Decoder Transformer SLM | **Experimental** |
 | Local training engine | **Implemented — foundation** |
 | Local autoregressive inference | **Implemented — foundation** |
-| Autoregressive inference | Planned |
 | AI runtime | Planned |
 | Local memory | Planned |
 | Local RAG | Planned |
