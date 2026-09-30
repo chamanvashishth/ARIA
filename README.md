@@ -42,6 +42,7 @@ ARIA's normal runtime is designed to work without OpenAI, Anthropic, Gemini, hos
 | Trainable language-model core | **Implemented** |
 | Decoder Transformer SLM | **Experimental** |
 | Local training engine | **Implemented — foundation** |
+| Local autoregressive inference | **Implemented — foundation** |
 | Autoregressive inference | Planned |
 | AI runtime | Planned |
 | Local memory | Planned |
@@ -217,6 +218,44 @@ The current checkpoint layer records the training experiment and observed losses
 
 ---
 
+## Inference engine
+
+Block 7 establishes the first local autoregressive generation path.
+
+~~~text
+Prompt tokens
+    ↓
+Model forward pass
+    ↓
+Last-position logits
+    ↓
+Temperature scaling
+    ↓
+Optional top-k filtering
+    ↓
+Token sampling
+    ↓
+Append token
+    ↓
+Repeat until limit / EOS
+~~~
+
+### Current capabilities
+
+- local autoregressive generation
+- context-window enforcement
+- temperature sampling
+- optional top-k sampling
+- deterministic generation with a seed
+- EOS-aware early stopping
+- reusable `generate()` and `sample_next_token()` APIs
+
+The generator operates directly on an ARIA-compatible local model interface. It does **not** call an external model provider.
+
+The inference layer is still a **foundation**: streaming, KV caching, efficient decoding, batching, advanced sampling, and production performance validation remain future work.
+
+---
+
 ## Repository structure
 
 ~~~text
@@ -331,7 +370,7 @@ timeline
     Block 4 : Trainable LM core : Implemented
     Block 5 : Transformer SLM : Experimental
     Block 6 : Training engine : Implemented foundation
-    Block 7 : Inference engine : Planned
+    Block 7 : Inference engine : Implemented foundation
     Block 8 : AI runtime : Planned
     Block 9 : Memory : Planned
     Block 10 : Local RAG : Planned
