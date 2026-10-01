@@ -1,6 +1,7 @@
 import pytest
 
 from aria.brain import TransformerLanguageModel
+from aria.memory import LocalMemoryStore
 from aria.runtime import AriaRuntime, RuntimeConfig
 
 
@@ -47,3 +48,13 @@ def test_runtime_rejects_empty_prompt() -> None:
     runtime.start()
     with pytest.raises(ValueError, match="non-empty"):
         runtime.generate("")
+
+
+def test_runtime_records_turn_when_memory_is_configured() -> None:
+    memory = LocalMemoryStore()
+    runtime = AriaRuntime(make_runtime().model, memory=memory)
+    runtime.start()
+    runtime.generate("hi", RuntimeConfig(max_new_tokens=1, top_k=1, seed=2))
+    entries = memory.recent()
+    assert [entry.role for entry in entries] == ["user", "assistant"]
+    assert entries[0].content == "hi"
