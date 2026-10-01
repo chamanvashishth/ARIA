@@ -47,7 +47,7 @@ ARIA's normal runtime is designed to work without OpenAI, Anthropic, Gemini, hos
 | Local conversation memory | **Implemented — foundation** |
 | AI runtime | Planned |
 | Local memory | Planned |
-| Local RAG | Planned |
+| Local RAG | **Implemented — foundation** |
 | Agent / tools | Planned |
 | Verification | Planned |
 | Local API | Planned |
@@ -318,6 +318,39 @@ print(memory.search("quantum"))
 
 ---
 
+## Local RAG
+
+Block 10 adds a local retrieval foundation for plain text supplied by the caller.
+
+### Current capabilities
+
+- deterministic character-window chunking with configurable overlap
+- stable chunk IDs for identical source/index/content input
+- source labels and caller-provided metadata carried into chunks
+- dependency-free BM25-style lexical ranking
+- top-k retrieval with deterministic tie ordering
+- context assembly with source/chunk labels and a character cap
+- no hosted embeddings, vector database, or model API dependency
+
+Example:
+
+~~~python
+from aria.rag import LocalRAGPipeline, TextDocument
+
+rag = LocalRAGPipeline(top_k=3)
+rag.add_document(
+    TextDocument(
+        source="notes/quantum.txt",
+        text="A qubit is the basic unit of quantum information.",
+    )
+)
+print(rag.build_context("qubit quantum information"))
+~~~
+
+**Important limitations:** this is lexical retrieval, not semantic or vector search. It ingests already-extracted text; it does not parse PDFs, crawl websites, create embeddings, generate answers, validate citations, or guarantee that a downstream model uses retrieved context. Context assembly is exposed explicitly rather than automatically inserted into runtime prompts, because model context limits and grounding behavior still need evaluation.
+
+---
+
 ## Repository structure
 
 ~~~text
@@ -435,7 +468,7 @@ timeline
     Block 7 : Inference engine : Implemented foundation
     Block 8 : AI runtime : Implemented foundation
     Block 9 : Context and memory : Implemented foundation
-    Block 10 : Local RAG : Planned
+    Block 10 : Local RAG : Implemented foundation
     Block 11 : Agent and tools : Planned
     Block 12 : Verification : Planned
     Block 13 : Local API : Planned
@@ -527,7 +560,7 @@ The repository's test suite is intended to protect the low-level neural, tokeniz
 - a finished general-purpose AI assistant
 - a production-grade SLM
 - a validated autonomous agent
-- a complete RAG system
+- a complete semantic or production-grade RAG system
 - a complete persistent-memory system
 - a production inference runtime
 - a production UI
