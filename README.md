@@ -45,8 +45,6 @@ ARIA's normal runtime is designed to work without OpenAI, Anthropic, Gemini, hos
 | Local autoregressive inference | **Implemented — foundation** |
 | Local AI runtime | **Implemented — foundation** |
 | Local conversation memory | **Implemented — foundation** |
-| AI runtime | Planned |
-| Local memory | Planned |
 | Local RAG | **Implemented — foundation** |
 | Agent / tools | Planned |
 | Verification | Planned |
@@ -388,6 +386,11 @@ ARIA/
 │       ├── runtime/
 │       ├── memory/
 │       ├── rag/
+│       │   ├── __init__.py
+│       │   ├── documents.py
+│       │   ├── chunker.py
+│       │   ├── retriever.py
+│       │   └── pipeline.py
 │       ├── agent/
 │       └── verification/
 │
@@ -399,7 +402,6 @@ ARIA/
     ├── test_language_model.py
     ├── test_transformer.py
     ├── test_training.py
-    └── test_checkpoint.py
 ~~~
 
 Empty subsystem directories are architectural boundaries, **not completed features**.
