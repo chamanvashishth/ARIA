@@ -44,6 +44,7 @@ ARIA's normal runtime is designed to work without OpenAI, Anthropic, Gemini, hos
 | Local training engine | **Implemented — foundation** |
 | Local autoregressive inference | **Implemented — foundation** |
 | Local AI runtime | **Implemented — foundation** |
+| Local conversation memory | **Implemented — foundation** |
 | AI runtime | Planned |
 | Local memory | Planned |
 | Local RAG | Planned |
@@ -287,6 +288,36 @@ The runtime is deliberately small. Scheduling, model loading, persistent runtime
 
 ---
 
+## Context & memory
+
+Block 9 adds an optional local conversation-memory store. It is deliberately separate from model weights and inference logic.
+
+### Current capabilities
+
+- append-only JSON Lines persistence
+- in-memory operation when no file path is configured
+- records for user, assistant, system, and tool roles
+- UTC timestamps and string metadata
+- recent-entry retrieval
+- case-insensitive literal substring search
+- explicit clear operation
+- optional runtime integration to record prompts and generated responses
+
+Example:
+
+~~~python
+from pathlib import Path
+from aria.memory import LocalMemoryStore
+
+memory = LocalMemoryStore(Path("data/conversations.jsonl"))
+memory.add("user", "I am studying quantum computing")
+print(memory.search("quantum"))
+~~~
+
+**Important limitation:** this is persistent conversation history, not semantic memory. Search is literal substring matching; it does not perform embeddings, semantic retrieval, summarization, automatic fact extraction, or long-term context injection into the model. Those capabilities require separate implementation and evaluation.
+
+---
+
 ## Repository structure
 
 ~~~text
@@ -403,7 +434,7 @@ timeline
     Block 6 : Training engine : Implemented foundation
     Block 7 : Inference engine : Implemented foundation
     Block 8 : AI runtime : Implemented foundation
-    Block 9 : Memory : Planned
+    Block 9 : Context and memory : Implemented foundation
     Block 10 : Local RAG : Planned
     Block 11 : Agent and tools : Planned
     Block 12 : Verification : Planned
