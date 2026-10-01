@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from time import perf_counter
 
 from aria.inference import generate
+from aria.memory import LocalMemoryStore
 from aria.tokenizer import ByteTokenizer
 
 
@@ -29,9 +30,15 @@ class GenerationResult:
 class AriaRuntime:
     """Own model lifecycle and connect text I/O to local inference."""
 
-    def __init__(self, model, tokenizer: ByteTokenizer | None = None) -> None:
+    def __init__(
+        self,
+        model,
+        tokenizer: ByteTokenizer | None = None,
+        memory: LocalMemoryStore | None = None,
+    ) -> None:
         self.model = model
         self.tokenizer = tokenizer or ByteTokenizer()
+        self.memory = memory
         self._started = False
 
     @property
@@ -66,10 +73,15 @@ class AriaRuntime:
         )
         elapsed = perf_counter() - started
         generated_tokens = token_ids[len(prompt_tokens):]
-        return GenerationResult(
+        result = GenerationResult(
             text=self.tokenizer.decode(token_ids),
             token_ids=token_ids,
             prompt_tokens=len(prompt_tokens),
             generated_tokens=len(generated_tokens),
             elapsed_seconds=elapsed,
         )
+        if self.memory is not None:
+            self.memory.add("user", prompt, metadata={"kind": "prompt"})
+            if generated_tokens:
+                self.memory.add("assistant", self.tokenizer.decode(generated_tokens), metadata={"kind": "generated_response"})
+        return result
