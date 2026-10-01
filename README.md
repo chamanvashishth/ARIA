@@ -402,6 +402,11 @@ ARIA/
     ├── test_language_model.py
     ├── test_transformer.py
     ├── test_training.py
+    ├── test_checkpoint.py
+    ├── test_inference.py
+    ├── test_runtime.py
+    ├── test_memory.py
+    └── test_rag.py
 ~~~
 
 Empty subsystem directories are architectural boundaries, **not completed features**.
