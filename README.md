@@ -47,7 +47,7 @@ ARIA's normal runtime is designed to work without OpenAI, Anthropic, Gemini, hos
 | Local conversation memory | **Implemented — foundation** |
 | Local RAG | **Implemented — foundation** |
 | Agent / tools | **Implemented — controlled tool registry** |
-| Verification | Planned |
+| Verification | **Implemented — structural checks foundation** |
 | Local API | Planned |
 | UI | Planned |
 | Evaluation & security suite | Planned |
@@ -97,7 +97,7 @@ flowchart LR
     OPT --> PARAMS[Updated Parameters]
 ~~~
 
-The diagrams above show the **architecture direction** and the **currently implemented training path**. Components such as inference, memory, RAG, agent orchestration, verification, API, and UI are not represented as completed just because they appear in the target architecture.
+The diagrams above show the **architecture direction** and the **currently implemented training path**. Components such as inference, memory, RAG, agent orchestration, API, and UI are not represented as completed just because they appear in the target architecture. Verification currently covers deterministic structural checks only.
 
 ---
 
@@ -395,6 +395,42 @@ else:
 
 ---
 
+## Verification
+
+Block 12 adds a dependency-free verification layer for checking output contracts and collecting named check results. It can validate a tool result's required fields, success/error consistency, optional output type, and application-defined checks.
+
+### Current capabilities
+
+- structured `CheckResult` and aggregate `VerificationReport`
+- aggregate pass/fail status, failed-check access, and concise summary
+- reusable checks for Python types, required mapping keys, and non-empty strings
+- `verify_tool_result()` for structural validation of tool invocation outcomes
+- `VerificationSuite` for named checks, including exception-to-failure conversion
+- tests covering passing checks, contract mismatches, malformed results, and failing checks
+
+Example:
+
+~~~python
+from aria.agent import ToolRegistry
+from aria.verification import verify_tool_result
+
+tools = ToolRegistry()
+tools.register("greet", "Return a greeting", lambda name: f"Hello, {name}")
+result = tools.invoke("greet", {"name": "ARIA"})
+report = verify_tool_result(result, expected_output_type=str)
+
+if report.passed:
+    print(result.output)
+else:
+    print(report.summary)
+    for failure in report.failed_checks:
+        print(failure.name, failure.message)
+~~~
+
+**Important limitation:** these checks validate structure and declared contracts, not whether a response is factually correct, complete, unbiased, safe, or grounded in source material. Custom predicates are only as reliable as their implementation. This is not a complete evaluation framework, a security guarantee, or a substitute for human review.
+
+---
+
 ## Repository structure
 
 ~~~text
@@ -438,7 +474,11 @@ ARIA/
 │       │   ├── retriever.py
 │       │   └── pipeline.py
 │       ├── agent/
+│       │   ├── __init__.py
+│       │   └── tools.py
 │       └── verification/
+│           ├── __init__.py
+│           └── core.py
 │
 └── tests/
     ├── test_foundation.py
@@ -452,7 +492,9 @@ ARIA/
     ├── test_inference.py
     ├── test_runtime.py
     ├── test_memory.py
-    └── test_rag.py
+    ├── test_rag.py
+    ├── test_agent.py
+    └── test_verification.py
 ~~~
 
 Empty subsystem directories are architectural boundaries, **not completed features**.
@@ -523,7 +565,7 @@ timeline
     Block 9 : Context and memory : Implemented foundation
     Block 10 : Local RAG : Implemented foundation
     Block 11 : Agent and tools : Implemented foundation
-    Block 12 : Verification : Planned
+    Block 12 : Verification : Implemented foundation
     Block 13 : Local API : Planned
     Block 14 : UI : Planned
     Block 15 : Evaluation and security : Planned
