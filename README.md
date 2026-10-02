@@ -46,7 +46,7 @@ ARIA's normal runtime is designed to work without OpenAI, Anthropic, Gemini, hos
 | Local AI runtime | **Implemented — foundation** |
 | Local conversation memory | **Implemented — foundation** |
 | Local RAG | **Implemented — foundation** |
-| Agent / tools | Planned |
+| Agent / tools | **Implemented — controlled tool registry** |
 | Verification | Planned |
 | Local API | Planned |
 | UI | Planned |
@@ -73,7 +73,7 @@ flowchart TD
 
     ORCH --> MEM[Local Memory]
     ORCH --> RAG[Local RAG]
-    ORCH --> AGENT[Agent & Tools]
+    ORCH --> AGENT[Controlled Tool Registry]
     ORCH --> VERIFY[Verification]
 
     ORCH --> RUNTIME[ARIA Runtime]
@@ -349,6 +349,52 @@ print(rag.build_context("qubit quantum information"))
 
 ---
 
+## Agent & tools
+
+Block 11 adds a controlled local tool registry. Tools are trusted callables registered explicitly by application code; ARIA does not dynamically import arbitrary functions, evaluate code, or run shell commands automatically.
+
+### Current capabilities
+
+- explicit tool registration with name and description
+- object-shaped input contracts with required fields
+- basic type checks and optional enum checks
+- rejection of unexpected arguments by default
+- deterministic tool listing
+- structured success and error results
+- handler exceptions converted to error results
+
+Example:
+
+~~~python
+from aria.agent import ToolRegistry
+
+tools = ToolRegistry()
+tools.register(
+    "add",
+    "Add two integers",
+    lambda left, right: left + right,
+    {
+        "type": "object",
+        "properties": {
+            "left": {"type": "integer"},
+            "right": {"type": "integer"},
+        },
+        "required": ["left", "right"],
+        "additionalProperties": False,
+    },
+)
+
+result = tools.invoke("add", {"left": 2, "right": 3})
+if result.success:
+    print(result.output)
+else:
+    print(result.error)
+~~~
+
+**Important limitation:** this is a tool execution boundary, not yet an autonomous agent or planner. It does not decide which tool to call, loop over tool results, ask for user approval, sandbox untrusted code, or provide OS-level permission controls. Register only handlers that the application explicitly trusts.
+
+---
+
 ## Repository structure
 
 ~~~text
@@ -476,7 +522,7 @@ timeline
     Block 8 : AI runtime : Implemented foundation
     Block 9 : Context and memory : Implemented foundation
     Block 10 : Local RAG : Implemented foundation
-    Block 11 : Agent and tools : Planned
+    Block 11 : Agent and tools : Implemented foundation
     Block 12 : Verification : Planned
     Block 13 : Local API : Planned
     Block 14 : UI : Planned
@@ -566,7 +612,7 @@ The repository's test suite is intended to protect the low-level neural, tokeniz
 
 - a finished general-purpose AI assistant
 - a production-grade SLM
-- a validated autonomous agent
+- an autonomous agent with planning, approvals, or sandboxed tool execution
 - a complete semantic or production-grade RAG system
 - a complete persistent-memory system
 - a production inference runtime
