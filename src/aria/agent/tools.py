@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
 
-JsonValue = None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
 ToolHandler = Callable[..., Any]
 
 
