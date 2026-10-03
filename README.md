@@ -48,7 +48,7 @@ ARIA's normal runtime is designed to work without OpenAI, Anthropic, Gemini, hos
 | Local RAG | **Implemented — foundation** |
 | Agent / tools | **Implemented — controlled tool registry** |
 | Verification | **Implemented — structural checks foundation** |
-| Local API | Planned |
+| Local API | **Implemented — loopback HTTP foundation** |
 | UI | Planned |
 | Evaluation & security suite | Planned |
 
@@ -431,6 +431,69 @@ else:
 
 ---
 
+## Local API
+
+Block 13 adds a dependency-free HTTP interface around an existing `AriaRuntime`. It uses Python's standard library and does not download a model, create one automatically, or call an external AI provider.
+
+### Endpoints
+
+| Method | Route | Behavior |
+|---|---|---|
+| `GET` | `/health` | Returns service and runtime state |
+| `POST` | `/generate` | Validates a prompt/config and returns local generation output |
+
+Example request:
+
+~~~http
+POST /generate HTTP/1.1
+Content-Type: application/json
+
+{
+  "prompt": "Explain a qubit in simple terms.",
+  "config": {
+    "max_new_tokens": 32,
+    "temperature": 0.8,
+    "top_k": 20,
+    "seed": 7
+  }
+}
+~~~
+
+### Start the server from Python
+
+Create and train/load your own compatible model first, then inject the runtime:
+
+~~~python
+from aria.api import create_api_server
+from aria.runtime import AriaRuntime
+
+# model must be an ARIA-compatible model instance
+runtime = AriaRuntime(model)
+runtime.start()
+
+server = create_api_server(runtime, host="127.0.0.1", port=8765)
+try:
+    server.serve_forever()
+finally:
+    server.server_close()
+    runtime.stop()
+~~~
+
+The server factory does not create or train a model for you. The caller owns the runtime lifecycle and should stop the server cleanly.
+
+### Request protections and limitations
+
+- loopback binding by default (`127.0.0.1`)
+- bounded request body (64 KiB by default)
+- JSON content-type and UTF-8 JSON validation
+- strict allowed fields and generation parameter checks
+- structured JSON errors and no prompt text in standard access logs
+- no CORS policy or authentication layer
+
+**Security note:** this is a local development API, not a production internet-facing service. Do not bind it to a public interface without adding authentication, authorization, rate limiting, transport security, resource quotas, and deployment-specific hardening. Generation remains limited by the current experimental model and inference engine.
+
+---
+
 ## Repository structure
 
 ~~~text
@@ -465,6 +528,9 @@ ARIA/
 │       │   └── checkpoint.py
 │       │
 │       ├── inference/
+│       ├── api/
+│       │   ├── __init__.py
+│       │   └── server.py
 │       ├── runtime/
 │       ├── memory/
 │       ├── rag/
@@ -566,7 +632,7 @@ timeline
     Block 10 : Local RAG : Implemented foundation
     Block 11 : Agent and tools : Implemented foundation
     Block 12 : Verification : Implemented foundation
-    Block 13 : Local API : Planned
+    Block 13 : Local API : Implemented foundation
     Block 14 : UI : Planned
     Block 15 : Evaluation and security : Planned
     Block 16 : Research and optimization : Planned
