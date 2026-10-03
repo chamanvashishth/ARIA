@@ -67,7 +67,7 @@ def test_health_endpoint_reports_runtime_state(api: str) -> None:
 def test_generate_endpoint_returns_structured_result(api: str) -> None:
     status, payload = post_json(
         f"{api}/generate",
-        {"prompt": "hi", "config": {"max_new_tokens": 2, "top_k": 2, "seed": 4}},
+        {"prompt": "hi", "config": {"max_new_tokens": 2, "top_k": 3, "seed": 4}},
     )
     assert status == 200
     assert payload["text"].startswith("hi")
