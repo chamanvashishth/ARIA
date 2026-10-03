@@ -36,8 +36,11 @@ def api():
 
 
 def get_json(url: str) -> tuple[int, dict]:
-    with urlopen(url, timeout=3) as response:
-        return response.status, json.loads(response.read().decode("utf-8"))
+    try:
+        with urlopen(url, timeout=3) as response:
+            return response.status, json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        return exc.code, json.loads(exc.read().decode("utf-8"))
 
 
 def post_json(url: str, payload: object, content_type: str = "application/json") -> tuple[int, dict]:
