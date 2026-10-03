@@ -542,9 +542,9 @@ ARIA/
 │       ├── agent/
 │       │   ├── __init__.py
 │       │   └── tools.py
-│       └── verification/
-│           ├── __init__.py
-│           └── core.py
+│       ├── verification/
+│       │   ├── __init__.py
+│       │   └── core.py
 │
 └── tests/
     ├── test_foundation.py
@@ -560,7 +560,8 @@ ARIA/
     ├── test_memory.py
     ├── test_rag.py
     ├── test_agent.py
-    └── test_verification.py
+    ├── test_verification.py
+    └── test_api.py
 ~~~
 
 Empty subsystem directories are architectural boundaries, **not completed features**.
