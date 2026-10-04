@@ -494,6 +494,26 @@ The server factory does not create or train a model for you. The caller owns the
 
 ---
 
+## Local browser UI
+
+Block 14 adds a lightweight chat interface served from the local API root. Open `http://127.0.0.1:8765/` after starting the API server to use it.
+
+### Included
+
+- responsive chat layout with user and assistant messages
+- connection status from `/health`
+- generation controls for maximum new tokens, temperature, and top-k
+- request/error states and generation timing/token metrics
+- sample prompts, clear-visible-conversation action, and keyboard-friendly composer
+- static HTML/CSS/JavaScript with no frontend build step or third-party browser dependencies
+- packaged UI asset included through setuptools package data
+
+The interface sends prompts to the same-origin `/generate` endpoint. It does not save chat history to disk, and clearing the visible conversation does not clear ARIA's optional memory store.
+
+**Current limitation:** this is a UI foundation, not a complete desktop application. It does not provide authentication, user profiles, streaming output, persistent conversation history, or model management. Response quality depends on the model injected into the runtime; an untrained or minimally trained model may return incoherent text.
+
+---
+
 ## Repository structure
 
 ~~~text
@@ -531,6 +551,8 @@ ARIA/
 │       ├── api/
 │       │   ├── __init__.py
 │       │   └── server.py
+│       ├── ui/
+│       │   └── index.html
 │       ├── runtime/
 │       ├── memory/
 │       ├── rag/
@@ -561,7 +583,8 @@ ARIA/
     ├── test_rag.py
     ├── test_agent.py
     ├── test_verification.py
-    └── test_api.py
+    ├── test_api.py
+    └── test_ui.py
 ~~~
 
 Empty subsystem directories are architectural boundaries, **not completed features**.
@@ -634,7 +657,7 @@ timeline
     Block 11 : Agent and tools : Implemented foundation
     Block 12 : Verification : Implemented foundation
     Block 13 : Local API : Implemented foundation
-    Block 14 : UI : Planned
+    Block 14 : UI : Implemented foundation
     Block 15 : Evaluation and security : Planned
     Block 16 : Research and optimization : Planned
 ~~~
