@@ -363,7 +363,7 @@ Block 11 adds a controlled local tool registry. Tools are trusted callables regi
 - deterministic tool listing
 - structured success and error results
 - handler exceptions converted to error results
-- registered input schemas copied at registration and copied when exposed through registry accessors, preventing callers from mutating the stored validation contract\n- registered input schemas copied at registration and copied when exposed through registry accessors, preventing callers from mutating the stored validation contract
+- registered input schemas copied at registration and copied when exposed through registry accessors, preventing callers from mutating the stored validation contract
 
 Example:
 
