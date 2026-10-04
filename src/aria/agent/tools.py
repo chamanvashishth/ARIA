@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
@@ -71,7 +72,7 @@ class ToolRegistry:
             raise ToolValidationError(f"tool already registered: {name}")
         if not callable(handler):
             raise ToolValidationError("tool handler must be callable")
-        schema = dict(input_schema or {"type": "object", "properties": {}})
+        schema = deepcopy(dict(input_schema or {"type": "object", "properties": {}}))
         if schema.get("type") != "object":
             raise ToolValidationError("tool input schema must have type 'object'")
         properties = schema.get("properties", {})
@@ -88,14 +89,14 @@ class ToolRegistry:
                 raise ToolValidationError(f"unsupported schema type: {rule['type']}")
         definition = ToolDefinition(name, description, handler, schema)
         self._tools[name] = definition
-        return definition
+        return deepcopy(definition)
 
     def list_tools(self) -> list[ToolDefinition]:
-        return [self._tools[name] for name in sorted(self._tools)]
+        return [deepcopy(self._tools[name]) for name in sorted(self._tools)]
 
     def get(self, name: str) -> ToolDefinition:
         try:
-            return self._tools[name]
+            return deepcopy(self._tools[name])
         except KeyError as exc:
             raise KeyError(f"unknown tool: {name}") from exc
 
