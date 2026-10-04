@@ -583,8 +583,7 @@ ARIA/
     ├── test_rag.py
     ├── test_agent.py
     ├── test_verification.py
-    ├── test_api.py
-    └── test_ui.py
+    └── test_api.py
 ~~~
 
 Empty subsystem directories are architectural boundaries, **not completed features**.
