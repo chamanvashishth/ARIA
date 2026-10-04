@@ -362,7 +362,8 @@ Block 11 adds a controlled local tool registry. Tools are trusted callables regi
 - rejection of unexpected arguments by default
 - deterministic tool listing
 - structured success and error results
-- handler exceptions converted to error results\n- registered input schemas copied at registration and copied when exposed through registry accessors, preventing callers from mutating the stored validation contract
+- handler exceptions converted to error results
+- registered input schemas copied at registration and copied when exposed through registry accessors, preventing callers from mutating the stored validation contract\n- registered input schemas copied at registration and copied when exposed through registry accessors, preventing callers from mutating the stored validation contract
 
 Example:
 
@@ -529,6 +530,9 @@ The server factory does not create or train a model for you. The caller owns the
 - bounded request body (64 KiB by default)
 - JSON content-type and UTF-8 JSON validation
 - strict allowed fields and generation parameter checks
+- bounded request body (64 KiB by default) and prompt length (16,384 characters)
+- duplicate JSON object keys and non-standard NaN/Infinity constants rejected
+- `nosniff`, frame-denial, referrer, and permissions response headers
 - structured JSON errors and no prompt text in standard access logs
 - no CORS policy or authentication layer
 
@@ -704,7 +708,7 @@ timeline
     Block 13 : Local API : Implemented foundation
     Block 14 : UI : Implemented foundation
     Block 15 : Evaluation metrics : Implemented foundation
-    Block 16 : Security hardening : Planned
+    Block 16 : Security hardening : Implemented foundation
     Block 17 : Research and optimization : Planned
 ~~~
 
