@@ -106,6 +106,55 @@ def test_generate_requires_json_content_type(api: str) -> None:
     assert payload["error"]["code"] == "unsupported_media_type"
 
 
+def test_rejects_duplicate_json_keys(api: str) -> None:
+    request = Request(
+        f"{api}/generate",
+        data=b'{"prompt":"first","prompt":"second"}',
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=5) as response:
+            status, payload = response.status, json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        status, payload = exc.code, json.loads(exc.read().decode("utf-8"))
+    assert status == 400
+    assert payload["error"]["code"] == "invalid_json"
+
+
+def test_rejects_non_standard_json_constants(api: str) -> None:
+    request = Request(
+        f"{api}/generate",
+        data=b'{"prompt":"hello","config":{"temperature":NaN}}',
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=5) as response:
+            status, payload = response.status, json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        status, payload = exc.code, json.loads(exc.read().decode("utf-8"))
+    assert status == 400
+    assert payload["error"]["code"] == "invalid_json"
+
+
+def test_rejects_oversized_prompt(api: str) -> None:
+    status, payload = post_json(f"{api}/generate", {"prompt": "x" * 16_385})
+    assert status == 400
+    assert "at most" in payload["error"]["message"]
+
+
+def test_security_headers_are_present(api: str) -> None:
+    with urlopen(f"{api}/health", timeout=3) as response:
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        assert response.headers["X-Frame-Options"] == "DENY"
+        assert response.headers["Referrer-Policy"] == "no-referrer"
+        assert "camera=()" in response.headers["Permissions-Policy"]
+    with urlopen(f"{api}/", timeout=3) as response:
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        assert response.headers["X-Frame-Options"] == "DENY"
+
+
 def test_server_factory_validates_limits() -> None:
     model = TransformerLanguageModel(
         vocab_size=260,
