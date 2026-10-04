@@ -67,3 +67,24 @@ def test_rejects_duplicate_names_and_invalid_schemas() -> None:
         registry.register("noop", "Duplicate", lambda: None)
     with pytest.raises(ToolValidationError, match="schema"):
         registry.register("bad", "Bad schema", lambda: None, {"type": "array"})
+
+
+
+def test_registered_schema_cannot_be_mutated_through_external_references() -> None:
+    registry = ToolRegistry()
+    schema = {
+        "type": "object",
+        "properties": {"name": {"type": "string"}},
+        "required": ["name"],
+        "additionalProperties": False,
+    }
+    returned = registry.register("greet", "Return a greeting", lambda name: name, schema)
+    schema["properties"]["name"]["type"] = "integer"
+    returned.input_schema["properties"]["name"]["type"] = "integer"
+    registry.get("greet").input_schema["properties"]["name"]["type"] = "integer"
+    registry.list_tools()[0].input_schema["properties"]["name"]["type"] = "integer"
+
+    assert registry.invoke("greet", {"name": "ARIA"}).success
+    result = registry.invoke("greet", {"name": 123})
+    assert not result.success
+    assert "must have type" in result.error
