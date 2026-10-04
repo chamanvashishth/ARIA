@@ -118,3 +118,14 @@ def test_server_factory_validates_limits() -> None:
     runtime = AriaRuntime(model)
     with pytest.raises(ValueError, match="max_body_bytes"):
         create_api_server(runtime, max_body_bytes=0)
+
+
+
+def test_root_serves_local_chat_ui(api: str) -> None:
+    with urlopen(f"{api}/", timeout=3) as response:
+        body = response.read().decode("utf-8")
+        assert response.status == 200
+        assert response.headers.get_content_type() == "text/html"
+    assert "ARIA — Local Intelligence" in body
+    assert 'fetch("/generate"' in body
+    assert "Generation settings" in body
