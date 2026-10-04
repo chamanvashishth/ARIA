@@ -527,10 +527,9 @@ The server factory does not create or train a model for you. The caller owns the
 ### Request protections and limitations
 
 - loopback binding by default (`127.0.0.1`)
-- bounded request body (64 KiB by default)
+- bounded request body (64 KiB by default) and prompt length (16,384 characters)
 - JSON content-type and UTF-8 JSON validation
 - strict allowed fields and generation parameter checks
-- bounded request body (64 KiB by default) and prompt length (16,384 characters)
 - duplicate JSON object keys and non-standard NaN/Infinity constants rejected
 - `nosniff`, frame-denial, referrer, and permissions response headers
 - structured JSON errors and no prompt text in standard access logs
