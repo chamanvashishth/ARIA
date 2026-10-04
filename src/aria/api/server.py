@@ -12,11 +12,25 @@ from aria.runtime import AriaRuntime, RuntimeConfig
 
 
 DEFAULT_MAX_BODY_BYTES = 64 * 1024
+DEFAULT_MAX_PROMPT_CHARS = 16_384
 _UI_FILE = Path(__file__).resolve().parents[1] / "ui" / "index.html"
 
 
 def _json_bytes(payload: dict[str, Any]) -> bytes:
     return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"non-standard JSON constant is not allowed: {value}")
+
+
+def _unique_object_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key: {key}")
+        result[key] = value
+    return result
 
 
 def _error(message: str, code: str) -> dict[str, str]:
@@ -33,6 +47,8 @@ def _validate_generation_request(payload: Any) -> tuple[str, RuntimeConfig]:
     prompt = payload.get("prompt")
     if not isinstance(prompt, str) or not prompt.strip():
         raise ValueError("'prompt' must be a non-empty string")
+    if len(prompt) > DEFAULT_MAX_PROMPT_CHARS:
+        raise ValueError(f"'prompt' must be at most {DEFAULT_MAX_PROMPT_CHARS} characters")
 
     raw_config = payload.get("config", {})
     if not isinstance(raw_config, dict):
@@ -103,6 +119,10 @@ def create_api_server(
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
             self.end_headers()
             self.wfile.write(body)
 
@@ -118,6 +138,10 @@ def create_api_server(
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
                 self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("X-Frame-Options", "DENY")
+                self.send_header("Referrer-Policy", "no-referrer")
+                self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
                 self.end_headers()
                 self.wfile.write(body)
                 return
@@ -155,8 +179,12 @@ def create_api_server(
 
             try:
                 raw_body = self.rfile.read(length)
-                payload = json.loads(raw_body.decode("utf-8"))
-            except (UnicodeDecodeError, json.JSONDecodeError):
+                payload = json.loads(
+                    raw_body.decode("utf-8"),
+                    object_pairs_hook=_unique_object_pairs,
+                    parse_constant=_reject_json_constant,
+                )
+            except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
                 self._send_json(400, _error("request body must contain valid UTF-8 JSON", "invalid_json"))
                 return
 
