@@ -51,7 +51,7 @@ ARIA's normal runtime is designed to work without OpenAI, Anthropic, Gemini, hos
 | Local API | **Implemented — loopback HTTP foundation** |
 | Local UI | **Implemented — browser interface foundation** |
 | Evaluation metrics | **Implemented — foundation** |
-| Security suite | Planned |
+| Security hardening | **Implemented — local foundation** |
 
 ### Capability states
 
@@ -362,7 +362,7 @@ Block 11 adds a controlled local tool registry. Tools are trusted callables regi
 - rejection of unexpected arguments by default
 - deterministic tool listing
 - structured success and error results
-- handler exceptions converted to error results
+- handler exceptions converted to error results\n- registered input schemas copied at registration and copied when exposed through registry accessors, preventing callers from mutating the stored validation contract
 
 Example:
 
@@ -532,7 +532,7 @@ The server factory does not create or train a model for you. The caller owns the
 - structured JSON errors and no prompt text in standard access logs
 - no CORS policy or authentication layer
 
-**Security note:** this is a local development API, not a production internet-facing service. Do not bind it to a public interface without adding authentication, authorization, rate limiting, transport security, resource quotas, and deployment-specific hardening. Generation remains limited by the current experimental model and inference engine.
+**Security note:** this remains a local development API, not a production internet-facing service. The request checks and browser headers reduce common input and browser risks but do not provide authentication, authorization, rate limiting, TLS, connection/thread quotas, or protection against all denial-of-service conditions. Do not bind it to a public interface without deployment-specific hardening. Generation remains limited by the current experimental model and inference engine.
 
 ---
 
