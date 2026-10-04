@@ -50,8 +50,8 @@ ARIA's normal runtime is designed to work without OpenAI, Anthropic, Gemini, hos
 | Verification | **Implemented — structural checks foundation** |
 | Local API | **Implemented — loopback HTTP foundation** |
 | Local UI | **Implemented — browser interface foundation** |
-| UI | Planned |
-| Evaluation & security suite | Planned |
+| Evaluation metrics | **Implemented — foundation** |
+| Security suite | Planned |
 
 ### Capability states
 
@@ -98,7 +98,7 @@ flowchart LR
     OPT --> PARAMS[Updated Parameters]
 ~~~
 
-The diagrams above show the **architecture direction** and the **currently implemented training path**. Components such as inference, memory, RAG, agent orchestration, API, and UI are not represented as completed just because they appear in the target architecture. Verification currently covers deterministic structural checks only.
+The diagrams above show the **architecture direction** and the **currently implemented training path**. Components such as inference, memory, RAG, agent orchestration, API, and UI are not represented as completed just because they appear in the target architecture. Verification currently covers deterministic structural checks only; evaluation metrics now include next-token loss, perplexity, accuracy, and finite-value audits.
 
 ---
 
