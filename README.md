@@ -49,6 +49,7 @@ ARIA's normal runtime is designed to work without OpenAI, Anthropic, Gemini, hos
 | Agent / tools | **Implemented — controlled tool registry** |
 | Verification | **Implemented — structural checks foundation** |
 | Local API | **Implemented — loopback HTTP foundation** |
+| Local UI | **Implemented — browser interface foundation** |
 | UI | Planned |
 | Evaluation & security suite | Planned |
 
