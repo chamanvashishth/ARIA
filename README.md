@@ -606,7 +606,10 @@ ARIA/
 │       ├── agent/
 │       │   ├── __init__.py
 │       │   └── tools.py
-│       ├── evaluation/\n│       │   ├── __init__.py\n│       │   └── core.py\n│       ├── verification/
+│       ├── evaluation/
+│       │   ├── __init__.py
+│       │   └── core.py
+│       ├── verification/
 │       │   ├── __init__.py
 │       │   └── core.py
 │
@@ -624,7 +627,8 @@ ARIA/
     ├── test_memory.py
     ├── test_rag.py
     ├── test_agent.py
-    ├── test_evaluation.py\n    ├── test_verification.py
+    ├── test_evaluation.py
+    ├── test_verification.py
     └── test_api.py
 ~~~
 
@@ -700,7 +704,8 @@ timeline
     Block 13 : Local API : Implemented foundation
     Block 14 : UI : Implemented foundation
     Block 15 : Evaluation metrics : Implemented foundation
-    Block 16 : Security hardening : Planned\n    Block 17 : Research and optimization : Planned
+    Block 16 : Security hardening : Planned
+    Block 17 : Research and optimization : Planned
 ~~~
 
 ### Block workflow
