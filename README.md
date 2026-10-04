@@ -432,6 +432,47 @@ else:
 
 ---
 
+## Evaluation metrics
+
+Block 15 adds a small, dependency-free evaluation foundation for local language models.
+
+### Current capabilities
+
+- aggregate next-token cross-entropy across evaluation examples
+- perplexity derived from mean loss, with overflow handled as infinity
+- exact next-token accuracy
+- token and example counts in a structured result
+- rejection of empty datasets, mismatched output dimensions, and non-finite logits/loss
+- parameter and accumulated-gradient audits for non-finite values
+- forward-only evaluation: no backward pass, optimizer step, or gradient reset
+
+Example:
+
+~~~python
+from aria.brain import TransformerLanguageModel
+from aria.evaluation import evaluate_language_model, inspect_parameter_health
+
+model = TransformerLanguageModel(
+    vocab_size=260,
+    hidden_size=16,
+    intermediate_size=32,
+    max_sequence_length=8,
+    seed=7,
+)
+
+report = evaluate_language_model(model, [
+    ([10, 11, 12], [11, 12, 13]),
+])
+print(report.mean_loss, report.perplexity, report.token_accuracy)
+
+health = inspect_parameter_health(model)
+print(health.healthy, health.non_finite_values, health.non_finite_gradients)
+~~~
+
+**Limitations:** these metrics measure next-token behavior on the examples supplied by the caller; they do not establish general language quality, factuality, safety, benchmark competitiveness, or training convergence. A representative held-out dataset, gradient/numerical validation, reproducible benchmark protocol, and broader quality evaluation are still needed. This block does not implement full checkpoint weight serialization or training resume.
+
+---
+
 ## Local API
 
 Block 13 adds a dependency-free HTTP interface around an existing `AriaRuntime`. It uses Python's standard library and does not download a model, create one automatically, or call an external AI provider.
