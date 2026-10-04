@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import urlsplit
@@ -11,6 +12,7 @@ from aria.runtime import AriaRuntime, RuntimeConfig
 
 
 DEFAULT_MAX_BODY_BYTES = 64 * 1024
+_UI_FILE = Path(__file__).resolve().parents[1] / "ui" / "index.html"
 
 
 def _json_bytes(payload: dict[str, Any]) -> bytes:
@@ -106,6 +108,19 @@ def create_api_server(
 
         def do_GET(self) -> None:
             path = urlsplit(self.path).path
+            if path == "/":
+                try:
+                    body = _UI_FILE.read_bytes()
+                except OSError:
+                    self._send_json(503, _error("ARIA UI assets are not available", "ui_unavailable"))
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(body)
+                return
             if path == "/health":
                 self._send_json(200, {
                     "status": "ok",
