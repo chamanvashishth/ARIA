@@ -445,6 +445,7 @@ Block 15 adds a small, dependency-free evaluation foundation for local language 
 - token and example counts in a structured result
 - rejection of empty datasets, mismatched output dimensions, and non-finite logits/loss
 - parameter and accumulated-gradient audits for non-finite values
+- central finite-difference gradient checks against reverse-mode autodiff, with bounded checks for larger parameter sets
 - forward-only evaluation: no backward pass, optimizer step, or gradient reset
 
 Example:
@@ -470,7 +471,7 @@ health = inspect_parameter_health(model)
 print(health.healthy, health.non_finite_values, health.non_finite_gradients)
 ~~~
 
-**Limitations:** these metrics measure next-token behavior on the examples supplied by the caller; they do not establish general language quality, factuality, safety, benchmark competitiveness, or training convergence. A representative held-out dataset, gradient/numerical validation, reproducible benchmark protocol, and broader quality evaluation are still needed. This block does not implement full checkpoint weight serialization or training resume.
+**Limitations:** these metrics measure next-token behavior on the examples supplied by the caller; they do not establish general language quality, factuality, safety, benchmark competitiveness, or training convergence. Gradient checks validate only the parameter values and deterministic loss path selected for a run; they do not establish correctness for every model operation. Reproducible performance benchmarks, representative held-out datasets, and broader quality evaluation are still needed. This block does not implement full checkpoint weight serialization or training resume.
 
 ---
 
@@ -708,7 +709,7 @@ timeline
     Block 14 : UI : Implemented foundation
     Block 15 : Evaluation metrics : Implemented foundation
     Block 16 : Security hardening : Implemented foundation
-    Block 17 : Research and optimization : Planned
+    Block 17 : Research and optimization : Implemented foundation
 ~~~
 
 ### Block workflow
