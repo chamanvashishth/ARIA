@@ -801,7 +801,7 @@ python -m pip install pytest
 pytest
 ~~~
 
-The repository's test suite is intended to protect the low-level neural, tokenizer, Transformer, and training foundations as ARIA grows.
+The repository's test suite is intended to protect the low-level neural, tokenizer, Transformer, and training foundations as ARIA grows. GitHub Actions runs `python -m pytest -ra` on pushes to `main`, pull requests, and manual workflow dispatches.
 
 ---
 
