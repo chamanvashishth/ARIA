@@ -59,7 +59,7 @@ class RMSNorm(Module):
                     dw[c] += grad[start + c] * xv[start + c] * inv
                     dx[start + c] += (
                         grad[start + c] * self.weight._values[c] * inv
-                        - xv[start + c] * self.weight._values[c] * dot * inv3 / hidden
+                        - xv[start + c] * dot * inv3 / hidden
                     )
             if x.requires_grad:
                 x._accumulate(dx)
