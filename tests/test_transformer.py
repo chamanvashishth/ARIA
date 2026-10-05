@@ -55,3 +55,25 @@ def test_transformer_rejects_long_sequence() -> None:
         assert "context length" in str(exc)
     else:
         raise AssertionError("expected context-length validation")
+
+def test_transformer_embedding_gradients_match_finite_differences() -> None:
+    from aria.evaluation import check_gradients
+
+    model = TransformerLanguageModel(
+        vocab_size=4,
+        hidden_size=2,
+        intermediate_size=3,
+        num_layers=1,
+        max_sequence_length=3,
+        seed=11,
+    )
+
+    report = check_gradients(
+        lambda: model.forward([1, 2]).sum(),
+        model.parameters(),
+        max_checks=4,
+    )
+
+    assert report.passed
+    assert report.checked_values == 4
+
