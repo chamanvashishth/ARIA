@@ -475,6 +475,34 @@ print(health.healthy, health.non_finite_values, health.non_finite_gradients)
 
 ---
 
+## Research & optimization
+
+Block 17 adds early diagnostics for validating learning behavior and collecting local performance measurements.
+
+### Reproducible tiny-corpus check
+
+A deterministic test trains the small foundation language model on a deliberately repetitive token pattern and compares next-token loss before and after training. This is a learning-pipeline sanity check only; it does not demonstrate language quality, generalization, or useful assistant behavior.
+
+Run it with:
+
+~~~bash
+pytest tests/test_training.py
+~~~
+
+### Local inference benchmark
+
+The dependency-free benchmark script creates a small, untrained Transformer and measures autoregressive forward-pass latency on the current machine:
+
+~~~bash
+python scripts/benchmark_inference.py --warmup 1 --iterations 5 --prompt-length 8 --new-tokens 4
+~~~
+
+It prints JSON containing model configuration, trainable parameter count, workload, Python/platform information, mean and median iteration latency, milliseconds per generated token, and tokens per second. Increase iterations for less noisy measurements and compare results only when the workload and environment are recorded consistently.
+
+**Limitations:** the benchmark uses an untrained model, measures a small pure-Python implementation, and is not comparable to optimized inference engines. No benchmark numbers are claimed here because the script has not been executed in this environment. Numerical gradient checks cover only the selected values and loss paths supplied by the caller.
+
+---
+
 ## Local API
 
 Block 13 adds a dependency-free HTTP interface around an existing `AriaRuntime`. It uses Python's standard library and does not download a model, create one automatically, or call an external AI provider.
