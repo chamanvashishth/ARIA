@@ -1,4 +1,5 @@
-from aria.brain import SGD, TransformerLanguageModel
+from aria.brain import SGD, TinyLanguageModel, TransformerLanguageModel
+from aria.evaluation import evaluate_language_model
 from aria.tokenizer import ByteTokenizer
 from aria.training import LanguageModelTrainer, TokenWindowDataset
 
@@ -30,3 +31,21 @@ def test_trainer_runs_and_updates_model() -> None:
     assert all(step.loss > 0 for step in history)
     assert model.lm_head.weight._values != before
     assert trainer.step_count == 2
+
+
+def test_tiny_corpus_training_reduces_loss() -> None:
+    # A deliberately simple repeating pattern checks the learning loop, not
+    # general language quality or held-out generalization.
+    token_ids = [1, 2] * 16
+    dataset = TokenWindowDataset(token_ids, sequence_length=2, stride=1)
+    model = TinyLanguageModel(vocab_size=3, embedding_dim=8, seed=23)
+    optimizer = SGD(model.parameters(), learning_rate=0.05)
+    examples = [dataset[index] for index in range(len(dataset))]
+
+    initial = evaluate_language_model(model, examples).mean_loss
+    trainer = LanguageModelTrainer(model, optimizer, dataset)
+    trainer.train(120)
+    final = evaluate_language_model(model, examples).mean_loss
+
+    assert final < initial * 0.8
+    assert trainer.step_count == 120
