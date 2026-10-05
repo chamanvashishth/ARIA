@@ -118,3 +118,18 @@ def test_causal_attention_gradients_match_finite_differences() -> None:
     assert report.checked_values == sum(len(parameter._values) for parameter in parameters)
     assert report.max_absolute_error < 1e-5
 
+def test_transformer_prefix_logits_are_independent_of_future_tokens() -> None:
+    model = TransformerLanguageModel(
+        vocab_size=7,
+        hidden_size=4,
+        intermediate_size=8,
+        num_layers=2,
+        max_sequence_length=8,
+        seed=19,
+    )
+
+    prefix_logits = model.forward([1, 2])._values
+    extended_logits = model.forward([1, 2, 3])._values
+
+    assert prefix_logits == extended_logits[: 2 * model.vocab_size]
+
