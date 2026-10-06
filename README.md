@@ -207,6 +207,7 @@ Model-weight checkpoint
 - configurable stride
 - next-token target generation
 - training step tracking
+- resume-aware dataset ordering
 - gradient reset
 - forward/backward training
 - SGD parameter updates
@@ -217,6 +218,7 @@ Model-weight checkpoint
 - optimizer learning-rate state
 - model restoration with parameter-name and shape validation
 - trainer step restoration for continued training
+- deterministic continuation from the saved dataset position
 
 Checkpoint files remain human-readable JSON. Metadata-only checkpoints from the earlier format remain loadable, but they cannot restore model weights; attempting to resume from one fails explicitly.
 
