@@ -1,3 +1,5 @@
+import pytest
+
 from aria.brain import SGD, TinyLanguageModel, TransformerLanguageModel
 from aria.evaluation import evaluate_language_model
 from aria.tokenizer import ByteTokenizer
