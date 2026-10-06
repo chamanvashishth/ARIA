@@ -197,7 +197,7 @@ SGD parameter update
  ↓
 Loss history
  ↓
-Training metadata checkpoint
+Model-weight checkpoint
 ~~~
 
 ### Current capabilities
@@ -212,9 +212,13 @@ Training metadata checkpoint
 - SGD parameter updates
 - loss history
 - experiment configuration metadata
-- JSON checkpoint metadata
+- JSON model-weight checkpoints
+- named parameter values and shapes
+- optimizer learning-rate state
+- model restoration with parameter-name and shape validation
+- trainer step restoration for continued training
 
-The current checkpoint layer records the training experiment and observed losses. **Full model-weight serialization and resume-from-weight-checkpoint support are still future work.**
+Checkpoint files remain human-readable JSON. Metadata-only checkpoints from the earlier format remain loadable, but they cannot restore model weights; attempting to resume from one fails explicitly.
 
 ---
 
@@ -471,7 +475,7 @@ health = inspect_parameter_health(model)
 print(health.healthy, health.non_finite_values, health.non_finite_gradients)
 ~~~
 
-**Limitations:** these metrics measure next-token behavior on the examples supplied by the caller; they do not establish general language quality, factuality, safety, benchmark competitiveness, or training convergence. Gradient checks validate only the parameter values and deterministic loss path selected for a run; they do not establish correctness for every model operation. Reproducible performance benchmarks, representative held-out datasets, and broader quality evaluation are still needed. This block does not implement full checkpoint weight serialization or training resume.
+**Limitations:** these metrics measure next-token behavior on the examples supplied by the caller; they do not establish general language quality, factuality, safety, benchmark competitiveness, or training convergence. Gradient checks validate only the parameter values and deterministic loss path selected for a run; they do not establish correctness for every model operation. Reproducible performance benchmarks, representative held-out datasets, and broader quality evaluation are still needed. Checkpoint serialization and resume are now implemented as a foundation: weights, shapes, optimizer learning rate, and trainer step are persisted and restored. Optimizers with additional mutable state, distributed checkpoints, sharded formats, atomic checkpoint rotation, and production-scale binary formats remain future work.
 
 ---
 
