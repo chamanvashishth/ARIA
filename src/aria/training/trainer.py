@@ -39,7 +39,10 @@ class LanguageModelTrainer:
     def train(self, steps: int) -> list[TrainingStep]:
         if steps <= 0:
             raise ValueError("steps must be positive")
+        if len(self.dataset) == 0:
+            raise ValueError("dataset must contain at least one training example")
         history = []
-        for step in range(steps):
-            history.append(self.train_step(step % len(self.dataset)))
+        for offset in range(steps):
+            dataset_index = (self.step_count + offset) % len(self.dataset)
+            history.append(self.train_step(dataset_index))
         return history
