@@ -3,7 +3,7 @@ import pytest
 from aria.brain import SGD, TinyLanguageModel, TransformerLanguageModel
 from aria.evaluation import evaluate_language_model
 from aria.tokenizer import ByteTokenizer
-from aria.training import LanguageModelTrainer, TokenWindowDataset
+from aria.training import (\n    LanguageModelTrainer,\n    TokenWindowDataset,\n    build_train_validation_datasets,\n    split_token_ids,\n)
 
 
 def test_token_window_dataset_creates_next_token_pairs() -> None:
@@ -51,3 +51,24 @@ def test_tiny_corpus_training_reduces_loss() -> None:
 
     assert final < initial * 0.8
     assert trainer.step_count == 120
+
+
+def test_split_token_ids_is_deterministic_and_non_overlapping() -> None:
+    train, validation = split_token_ids(list(range(10)), validation_fraction=0.3)
+    assert train == list(range(7))
+    assert validation == [7, 8, 9]
+    assert set(train).isdisjoint(validation)
+
+
+def test_build_train_validation_datasets_preserves_split_boundary() -> None:
+    train, validation = build_train_validation_datasets(
+        list(range(12)),
+        sequence_length=3,
+        stride=1,
+        validation_fraction=0.25,
+    )
+
+    assert train.token_ids == list(range(9))
+    assert validation.token_ids == [9, 10, 11]
+    assert train[-1] == ([5, 6, 7], [6, 7, 8])
+    assert validation[0] == ([9, 10, 11], [10, 11, 12]) if False else validation[0] == ([9, 10, 11], [10, 11, 12])
