@@ -95,7 +95,63 @@ def test_checkpoint_restores_exact_model_output_and_training_continuation(tmp_pa
         assert actual == pytest.approx(expected, rel=1e-12, abs=1e-12)
 
 
-def test_restore_rejects_metadata_only_checkpoint(tmp_path: Path) -> None:
+def test_checkpoint_has_version_and_atomic_save(tmp_path: Path) -> None:
+    model, optimizer, trainer = _build_training_stack(seed=12)
+    path = tmp_path / "checkpoint.json"
+    config = TrainingConfig(learning_rate=0.01, sequence_length=4, steps=1, seed=12)
+
+    train_with_checkpoint(
+        model,
+        optimizer,
+        trainer,
+        config=config,
+        checkpoint_path=path,
+    )
+
+    payload = path.read_text(encoding="utf-8")
+    assert '"format_version": 1' in payload
+    assert not (tmp_path / ".checkpoint.json.tmp").exists()
+
+
+def test_restore_rejects_sequence_length_mismatch(tmp_path: Path) -> None:
+    model, optimizer, trainer = _build_training_stack(seed=13)
+    path = tmp_path / "checkpoint.json"
+    train_with_checkpoint(
+        model,
+        optimizer,
+        trainer,
+        config=TrainingConfig(learning_rate=0.01, sequence_length=4, steps=1, seed=13),
+        checkpoint_path=path,
+    )
+
+    mismatch_model, mismatch_optimizer, mismatch_trainer = _build_training_stack(seed=13)
+    mismatch_trainer.dataset = TokenWindowDataset(
+        ByteTokenizer().encode("hello hello hello"),
+        sequence_length=2,
+        stride=1,
+    )
+    with pytest.raises(ValueError, match="sequence length does not match"):
+        restore_training_checkpoint(
+            path,
+            mismatch_model,
+            mismatch_optimizer,
+            mismatch_trainer,
+        )
+
+
+def test_load_rejects_unknown_checkpoint_version(tmp_path: Path) -> None:
+    path = tmp_path / "future.json"
+    path.write_text(
+        '{"format_version": 999, "step": 0, "losses": [], '
+        '"config": {"learning_rate": 0.01, "sequence_length": 4, "steps": 1}}',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="unsupported checkpoint format version"):
+        TrainingCheckpoint.load(path)
+
+
+def test_restore_rejects_metadata_only_checkpoint(tmp_path: Path) -> Path:
     path = tmp_path / "metadata-only.json"
     TrainingCheckpoint(
         step=2,
