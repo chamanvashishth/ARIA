@@ -72,3 +72,34 @@ def test_build_train_validation_datasets_preserves_split_boundary() -> None:
     assert validation.token_ids == [12, 13, 14, 15]
     assert train[-1] == ([8, 9, 10], [9, 10, 11])
     assert validation[0] == ([12, 13, 14], [13, 14, 15])
+
+
+def test_train_and_evaluate_reports_train_and_validation_changes() -> None:
+    train, validation = build_train_validation_datasets(
+        [1, 2] * 20,
+        sequence_length=2,
+        stride=1,
+        validation_fraction=0.25,
+    )
+    model = TinyLanguageModel(vocab_size=3, embedding_dim=8, seed=23)
+    optimizer = SGD(model.parameters(), learning_rate=0.05)
+    trainer = LanguageModelTrainer(model, optimizer, train)
+
+    report = trainer.train_and_evaluate(60, validation)
+
+    assert report.steps == 60
+    assert report.final_train_loss < report.initial_train_loss
+    assert report.final_validation.token_count == len(validation) * validation.sequence_length
+    assert report.final_generalization_gap == pytest.approx(
+        report.final_validation.mean_loss - report.final_train_loss
+    )
+
+
+def test_train_and_evaluate_rejects_mismatched_sequence_lengths() -> None:
+    train = TokenWindowDataset([1, 2, 1, 2, 1, 2], sequence_length=2)
+    validation = TokenWindowDataset([1, 2, 1, 2, 1], sequence_length=3)
+    model = TinyLanguageModel(vocab_size=3, embedding_dim=4, seed=5)
+    trainer = LanguageModelTrainer(model, SGD(model.parameters(), learning_rate=0.01), train)
+
+    with pytest.raises(ValueError, match="sequence lengths must match"):
+        trainer.train_and_evaluate(1, validation)
