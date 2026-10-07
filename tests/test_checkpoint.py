@@ -151,7 +151,7 @@ def test_load_rejects_unknown_checkpoint_version(tmp_path: Path) -> None:
         TrainingCheckpoint.load(path)
 
 
-def test_restore_rejects_metadata_only_checkpoint(tmp_path: Path) -> Path:
+def test_restore_rejects_metadata_only_checkpoint(tmp_path: Path) -> None:
     path = tmp_path / "metadata-only.json"
     TrainingCheckpoint(
         step=2,
