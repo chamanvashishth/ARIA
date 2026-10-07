@@ -62,13 +62,13 @@ def test_split_token_ids_is_deterministic_and_non_overlapping() -> None:
 
 def test_build_train_validation_datasets_preserves_split_boundary() -> None:
     train, validation = build_train_validation_datasets(
-        list(range(12)),
+        list(range(16)),
         sequence_length=3,
         stride=1,
         validation_fraction=0.25,
     )
 
-    assert train.token_ids == list(range(9))
-    assert validation.token_ids == [9, 10, 11]
-    assert train[-1] == ([5, 6, 7], [6, 7, 8])
-    assert validation[0] == ([9, 10, 11], [10, 11, 12]) if False else validation[0] == ([9, 10, 11], [10, 11, 12])
+    assert train.token_ids == list(range(12))
+    assert validation.token_ids == [12, 13, 14, 15]
+    assert train[-1] == ([8, 9, 10], [9, 10, 11])
+    assert validation[0] == ([12, 13, 14], [13, 14, 15])
