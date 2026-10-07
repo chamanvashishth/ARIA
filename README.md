@@ -203,9 +203,11 @@ Model-weight checkpoint
 ### Current capabilities
 
 - deterministic token-window datasets
+- deterministic train/validation token-stream splitting before window creation
 - configurable sequence length
 - configurable stride
 - next-token target generation
+- leakage-resistant train/validation window boundaries
 - training step tracking
 - resume-aware dataset ordering
 - gradient reset
