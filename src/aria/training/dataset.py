@@ -6,7 +6,12 @@ from __future__ import annotations
 class TokenWindowDataset:
     """Create overlapping next-token training examples from token IDs."""
 
-    def __init__(self, token_ids: list[int], sequence_length: int, stride: int | None = None) -> None:
+    def __init__(
+        self,
+        token_ids: list[int],
+        sequence_length: int,
+        stride: int | None = None,
+    ) -> None:
         if sequence_length <= 0:
             raise ValueError("sequence length must be positive")
         if len(token_ids) < sequence_length + 1:
@@ -27,3 +32,42 @@ class TokenWindowDataset:
         inputs = self.token_ids[start:start + self.sequence_length]
         targets = self.token_ids[start + 1:start + self.sequence_length + 1]
         return inputs, targets
+
+
+def split_token_ids(
+    token_ids: list[int],
+    *,
+    validation_fraction: float = 0.2,
+) -> tuple[list[int], list[int]]:
+    """Split a token stream into non-overlapping train and validation streams."""
+
+    if len(token_ids) < 4:
+        raise ValueError("at least 4 tokens are required for a train/validation split")
+    if not 0.0 < validation_fraction < 1.0:
+        raise ValueError("validation_fraction must be between 0 and 1")
+
+    validation_size = max(1, int(len(token_ids) * validation_fraction))
+    train_size = len(token_ids) - validation_size
+    if train_size < 2 or validation_size < 2:
+        raise ValueError("train and validation streams must each contain at least 2 tokens")
+
+    return list(token_ids[:train_size]), list(token_ids[train_size:])
+
+
+def build_train_validation_datasets(
+    token_ids: list[int],
+    sequence_length: int,
+    *,
+    stride: int | None = None,
+    validation_fraction: float = 0.2,
+) -> tuple[TokenWindowDataset, TokenWindowDataset]:
+    """Create deterministic, non-overlapping train and validation datasets."""
+
+    train_tokens, validation_tokens = split_token_ids(
+        token_ids,
+        validation_fraction=validation_fraction,
+    )
+    return (
+        TokenWindowDataset(train_tokens, sequence_length, stride),
+        TokenWindowDataset(validation_tokens, sequence_length, stride),
+    )
