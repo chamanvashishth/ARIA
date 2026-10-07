@@ -213,12 +213,14 @@ Model-weight checkpoint
 - SGD parameter updates
 - loss history
 - experiment configuration metadata
-- JSON model-weight checkpoints
+- versioned JSON model-weight checkpoints
+- atomic checkpoint replacement
 - named parameter values and shapes
 - optimizer learning-rate state
 - model restoration with parameter-name and shape validation
 - trainer step restoration for continued training
 - deterministic continuation from the saved dataset position
+- checkpoint/trainer sequence-length compatibility validation
 
 Checkpoint files remain human-readable JSON. Metadata-only checkpoints from the earlier format remain loadable, but they cannot restore model weights; attempting to resume from one fails explicitly.
 
