@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,8 @@ class TrainingCheckpoint:
     Older metadata-only checkpoints remain loadable with an empty mapping.
     """
 
+    FORMAT_VERSION = 1
+
     step: int
     losses: list[float]
     config: TrainingConfig
@@ -36,14 +39,34 @@ class TrainingCheckpoint:
     optimizer_learning_rate: float | None = None
 
     def save(self, path: Path) -> None:
+        if self.step < 0:
+            raise ValueError("checkpoint step cannot be negative")
+        if any(not math.isfinite(loss) for loss in self.losses):
+            raise ValueError("checkpoint losses must be finite")
+        if self.config.learning_rate <= 0:
+            raise ValueError("checkpoint learning rate must be positive")
+        if self.config.sequence_length <= 0 or self.config.steps <= 0:
+            raise ValueError("checkpoint training dimensions must be positive")
+        if self.optimizer_learning_rate is not None and self.optimizer_learning_rate <= 0:
+            raise ValueError("checkpoint optimizer learning rate must be positive")
+
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = asdict(self)
-        path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        payload["format_version"] = self.FORMAT_VERSION
+        temporary = path.with_name(f".{path.name}.tmp")
+        temporary.write_text(
+            json.dumps(payload, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        temporary.replace(path)
 
     @classmethod
     def load(cls, path: Path) -> "TrainingCheckpoint":
         payload = json.loads(path.read_text(encoding="utf-8"))
-        return cls(
+        version = payload.get("format_version", 0)
+        if version not in (0, cls.FORMAT_VERSION):
+            raise ValueError(f"unsupported checkpoint format version: {version}")
+        checkpoint = cls(
             step=int(payload["step"]),
             losses=[float(value) for value in payload["losses"]],
             config=TrainingConfig(**payload["config"]),
@@ -61,6 +84,20 @@ class TrainingCheckpoint:
                 else float(payload["optimizer_learning_rate"])
             ),
         )
+        if checkpoint.step < 0:
+            raise ValueError("checkpoint step cannot be negative")
+        if any(not math.isfinite(loss) for loss in checkpoint.losses):
+            raise ValueError("checkpoint losses must be finite")
+        if checkpoint.config.learning_rate <= 0:
+            raise ValueError("checkpoint learning rate must be positive")
+        if checkpoint.config.sequence_length <= 0 or checkpoint.config.steps <= 0:
+            raise ValueError("checkpoint training dimensions must be positive")
+        if (
+            checkpoint.optimizer_learning_rate is not None
+            and checkpoint.optimizer_learning_rate <= 0
+        ):
+            raise ValueError("checkpoint optimizer learning rate must be positive")
+        return checkpoint
 
 
 def _named_parameters(module: Module) -> dict[str, Parameter]:
@@ -167,6 +204,11 @@ def restore_training_checkpoint(
     checkpoint = TrainingCheckpoint.load(checkpoint_path)
     if not checkpoint.parameter_values:
         raise ValueError("checkpoint does not contain model weights")
+    if checkpoint.config.sequence_length != trainer.dataset.sequence_length:
+        raise ValueError(
+            "checkpoint sequence length does not match trainer dataset: "
+            f"{checkpoint.config.sequence_length} != {trainer.dataset.sequence_length}"
+        )
 
     restore_model_state(model, checkpoint.parameter_values, checkpoint.parameter_shapes)
     if checkpoint.optimizer_learning_rate is not None:
