@@ -31,6 +31,13 @@ def _build_training_stack(seed: int, learning_rate: float = 0.01):
     return model, optimizer, trainer
 
 
+def _parameter_values_by_name(model):
+    from aria.training.checkpoint import capture_model_state
+
+    values, _ = capture_model_state(model)
+    return values
+
+
 def test_training_checkpoint_round_trip(tmp_path: Path) -> None:
     model, optimizer, trainer = _build_training_stack(seed=6)
     config = TrainingConfig(learning_rate=0.01, sequence_length=4, steps=2, seed=6)
@@ -181,12 +188,13 @@ def test_best_validation_checkpoint_stops_and_saves_best_state(tmp_path: Path) -
         ),
         checkpoint_path=path,
         patience=2,
+        min_delta=100.0,
     )
 
     assert path.exists()
-    assert checkpoint.step <= executed_steps
-    assert checkpoint.losses
-    assert checkpoint.step == len(checkpoint.losses)
+    assert checkpoint.step == 1
+    assert executed_steps == 3
+    assert checkpoint.losses == [checkpoint.losses[0]]
     assert checkpoint.parameter_values
 
     restored_model, restored_optimizer, restored_trainer = _build_training_stack(
@@ -199,13 +207,32 @@ def test_best_validation_checkpoint_stops_and_saves_best_state(tmp_path: Path) -
         restored_optimizer,
         restored_trainer,
     )
-    assert restored.step == checkpoint.step
-    assert restored_trainer.step_count == checkpoint.step
+    assert restored.step == 1
+    assert restored_trainer.step_count == 1
     assert restored_optimizer.learning_rate == 0.01
-    assert [p._values for p in restored_model.parameters()] == [
-        p._values for p in model.parameters()
-    ] if checkpoint.step == executed_steps else True
+    for name, values in checkpoint.parameter_values.items():
+        assert values == pytest.approx(
+            _parameter_values_by_name(restored_model)[name],
+            rel=1e-12,
+            abs=1e-12,
+        )
 
+
+def test_best_validation_checkpoint_rejects_invalid_controls(tmp_path: Path) -> None:
+    model, optimizer, trainer = _build_training_stack(seed=22)
+    path = tmp_path / "best.json"
+    kwargs = dict(
+        model=model,
+        optimizer=optimizer,
+        trainer=trainer,
+        validation_dataset=trainer.dataset,
+        config=TrainingConfig(learning_rate=0.01, sequence_length=4, steps=2),
+        checkpoint_path=path,
+    )
+    with pytest.raises(ValueError, match="patience must be positive"):
+        train_with_best_validation_checkpoint(**kwargs, patience=0)
+    with pytest.raises(ValueError, match="min_delta must be finite"):
+        train_with_best_validation_checkpoint(**kwargs, patience=2, min_delta=-1.0)
 
 def test_best_validation_checkpoint_rejects_invalid_controls(tmp_path: Path) -> None:
     model, optimizer, trainer = _build_training_stack(seed=22)
