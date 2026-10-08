@@ -233,19 +233,3 @@ def test_best_validation_checkpoint_rejects_invalid_controls(tmp_path: Path) -> 
         train_with_best_validation_checkpoint(**kwargs, patience=0)
     with pytest.raises(ValueError, match="min_delta must be finite"):
         train_with_best_validation_checkpoint(**kwargs, patience=2, min_delta=-1.0)
-
-def test_best_validation_checkpoint_rejects_invalid_controls(tmp_path: Path) -> None:
-    model, optimizer, trainer = _build_training_stack(seed=22)
-    path = tmp_path / "best.json"
-    kwargs = dict(
-        model=model,
-        optimizer=optimizer,
-        trainer=trainer,
-        validation_dataset=trainer.dataset,
-        config=TrainingConfig(learning_rate=0.01, sequence_length=4, steps=2),
-        checkpoint_path=path,
-    )
-    with pytest.raises(ValueError, match="patience must be positive"):
-        train_with_best_validation_checkpoint(**kwargs, patience=0)
-    with pytest.raises(ValueError, match="min_delta must be finite"):
-        train_with_best_validation_checkpoint(**kwargs, patience=2, min_delta=-1.0)
