@@ -207,6 +207,8 @@ Model-weight checkpoint
 - train/validation evaluation reports with loss change and generalization-gap metrics
 - best-validation checkpointing with configurable patience and minimum improvement
 - early stopping based on validation loss
+- deterministic exponential and step learning-rate schedules
+- complete-dataset epoch semantics; one sequence remains one optimizer step
 - configurable sequence length
 - configurable stride
 - next-token target generation
