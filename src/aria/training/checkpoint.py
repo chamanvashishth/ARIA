@@ -215,8 +215,12 @@ def train_with_best_validation_checkpoint(
         raise ValueError("patience must be positive")
     if not math.isfinite(min_delta) or min_delta < 0:
         raise ValueError("min_delta must be finite and non-negative")
+    if len(trainer.dataset) == 0:
+        raise ValueError("training dataset must contain at least one example")
     if validation_dataset.sequence_length != trainer.dataset.sequence_length:
         raise ValueError("train and validation sequence lengths must match")
+    if config.sequence_length != trainer.dataset.sequence_length:
+        raise ValueError("config sequence length does not match trainer dataset")
     if len(validation_dataset) == 0:
         raise ValueError("validation dataset must contain at least one example")
 
