@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from aria.brain.language_model import _log_softmax_loss
 from aria.brain.module import Module
-from aria.brain.optim import SGD
+from aria.brain.optim import LearningRateScheduler, SGD
 from aria.evaluation import EvaluationResult, evaluate_language_model
 from aria.training.dataset import TokenWindowDataset
 
@@ -15,6 +15,7 @@ from aria.training.dataset import TokenWindowDataset
 class TrainingStep:
     step: int
     loss: float
+    learning_rate: float
 
 
 @dataclass(frozen=True)
@@ -43,10 +44,17 @@ class TrainingEvaluationReport:
 class LanguageModelTrainer:
     """Run deterministic single-example training steps."""
 
-    def __init__(self, model: Module, optimizer: SGD, dataset: TokenWindowDataset) -> None:
+    def __init__(
+        self,
+        model: Module,
+        optimizer: SGD,
+        dataset: TokenWindowDataset,
+        scheduler: LearningRateScheduler | None = None,
+    ) -> None:
         self.model = model
         self.optimizer = optimizer
         self.dataset = dataset
+        self.scheduler = scheduler
         self.step_count = 0
 
     def train_step(self, index: int) -> TrainingStep:
@@ -57,7 +65,14 @@ class LanguageModelTrainer:
         loss.backward()
         self.optimizer.step()
         self.step_count += 1
-        return TrainingStep(step=self.step_count, loss=loss.item())
+        learning_rate = self.optimizer.learning_rate
+        if self.scheduler is not None:
+            learning_rate = self.scheduler.step(self.optimizer, self.step_count)
+        return TrainingStep(
+            step=self.step_count,
+            loss=loss.item(),
+            learning_rate=learning_rate,
+        )
 
     def train(self, steps: int) -> list[TrainingStep]:
         if steps <= 0:
@@ -88,8 +103,7 @@ class LanguageModelTrainer:
 
         train_examples = [self.dataset[index] for index in range(len(self.dataset))]
         validation_examples = [
-            validation_dataset[index]
-            for index in range(len(validation_dataset))
+            validation_dataset[index] for index in range(len(validation_dataset))
         ]
 
         initial_train = evaluate_language_model(self.model, train_examples)
