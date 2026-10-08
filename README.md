@@ -212,7 +212,8 @@ Model-weight checkpoint
 - best-validation checkpointing with configurable patience and minimum improvement
 - early stopping based on validation loss
 - deterministic exponential and step learning-rate schedules
-- complete-dataset epoch semantics; one sequence remains one optimizer step
+- configurable mini-batch gradient accumulation with averaged gradients
+- complete-dataset epoch semantics with a final partial batch when needed
 - configurable sequence length
 - configurable stride
 - next-token target generation
