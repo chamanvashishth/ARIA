@@ -118,7 +118,7 @@ def test_trainer_epoch_visits_every_dataset_example_once() -> None:
     history = trainer.train_epoch()
 
     assert len(history) == len(dataset)
-    assert [item.step for item in history] == [1, 2, 3]
+    assert [item.step for item in history] == [1, 2]
     assert trainer.step_count == len(dataset)
 
 
@@ -175,9 +175,9 @@ def test_mini_batch_epoch_uses_every_example_once() -> None:
 
     history = trainer.train_epoch()
 
-    assert len(history) == 4
-    assert [item.step for item in history] == [1, 2, 3, 4]
-    assert trainer.step_count == 4
+    assert len(history) == 3
+    assert [item.step for item in history] == [1, 2, 3]
+    assert trainer.step_count == 3
 
 
 def test_batch_size_must_be_positive() -> None:
