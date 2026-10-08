@@ -85,6 +85,27 @@ class LanguageModelTrainer:
             history.append(self.train_step(dataset_index))
         return history
 
+    def train_epoch(self) -> list[TrainingStep]:
+        """Train exactly once on every dataset example."""
+
+        if len(self.dataset) == 0:
+            raise ValueError("dataset must contain at least one training example")
+        start = self.step_count % len(self.dataset)
+        history = []
+        for offset in range(len(self.dataset)):
+            history.append(self.train_step((start + offset) % len(self.dataset)))
+        return history
+
+    def train_epochs(self, epochs: int) -> list[TrainingStep]:
+        """Train for a fixed number of complete dataset passes."""
+
+        if epochs <= 0:
+            raise ValueError("epochs must be positive")
+        history = []
+        for _ in range(epochs):
+            history.extend(self.train_epoch())
+        return history
+
     def train_and_evaluate(
         self,
         steps: int,
