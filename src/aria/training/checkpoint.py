@@ -181,6 +181,9 @@ def train_with_checkpoint(
 ) -> TrainingCheckpoint:
     """Run training and persist model weights plus observed losses."""
 
+    if trainer.batch_size != config.batch_size:
+        raise ValueError("checkpoint batch size does not match trainer")
+
     history = trainer.train(config.steps)
     parameter_values, parameter_shapes = capture_model_state(model)
     checkpoint = TrainingCheckpoint(
