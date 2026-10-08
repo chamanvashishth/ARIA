@@ -195,6 +195,10 @@ Backpropagation
  ↓
 SGD parameter update
  ↓
+Mini-batch gradient accumulation
+ ↓
+SGD parameter update
+ ↓
 Loss history
  ↓
 Model-weight checkpoint
