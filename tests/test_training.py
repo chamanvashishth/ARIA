@@ -3,7 +3,12 @@ import pytest
 from aria.brain import SGD, TinyLanguageModel, TransformerLanguageModel
 from aria.evaluation import evaluate_language_model
 from aria.tokenizer import ByteTokenizer
-from aria.training import (\n    LanguageModelTrainer,\n    TokenWindowDataset,\n    build_train_validation_datasets,\n    split_token_ids,\n)
+from aria.training import (
+    LanguageModelTrainer,
+    TokenWindowDataset,
+    build_train_validation_datasets,
+    split_token_ids,
+)
 
 
 def test_token_window_dataset_creates_next_token_pairs() -> None:
@@ -142,3 +147,41 @@ def test_scheduler_rejects_invalid_configuration() -> None:
         ExponentialDecay(gamma=0)
     with pytest.raises(ValueError, match="drop_every"):
         StepDecay(drop_every=0)
+
+
+def test_mini_batch_averages_gradients_and_counts_one_optimizer_step() -> None:
+    dataset = TokenWindowDataset([1, 2, 1, 2, 1, 2], sequence_length=2, stride=1)
+    model = TinyLanguageModel(vocab_size=3, embedding_dim=4, seed=31)
+    optimizer = SGD(model.parameters(), learning_rate=0.01)
+    trainer = LanguageModelTrainer(model, optimizer, dataset, batch_size=2)
+
+    history = trainer.train(1)
+
+    assert len(history) == 1
+    assert history[0].step == 1
+    assert history[0].loss > 0
+    assert trainer.step_count == 1
+
+
+def test_mini_batch_epoch_uses_every_example_once() -> None:
+    dataset = TokenWindowDataset([1, 2, 3, 4, 5, 6, 1], sequence_length=2, stride=1)
+    model = TinyLanguageModel(vocab_size=7, embedding_dim=4, seed=32)
+    trainer = LanguageModelTrainer(
+        model,
+        SGD(model.parameters(), learning_rate=0.01),
+        dataset,
+        batch_size=2,
+    )
+
+    history = trainer.train_epoch()
+
+    assert len(history) == 4
+    assert [item.step for item in history] == [1, 2, 3, 4]
+    assert trainer.step_count == 4
+
+
+def test_batch_size_must_be_positive() -> None:
+    model = TinyLanguageModel(vocab_size=3, embedding_dim=4, seed=33)
+    dataset = TokenWindowDataset([1, 2, 1, 2], sequence_length=2)
+    with pytest.raises(ValueError, match="batch_size"):
+        LanguageModelTrainer(model, SGD(model.parameters(), learning_rate=0.01), dataset, batch_size=0)
