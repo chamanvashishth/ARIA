@@ -205,6 +205,8 @@ Model-weight checkpoint
 - deterministic token-window datasets
 - deterministic train/validation token-stream splitting before window creation
 - train/validation evaluation reports with loss change and generalization-gap metrics
+- best-validation checkpointing with configurable patience and minimum improvement
+- early stopping based on validation loss
 - configurable sequence length
 - configurable stride
 - next-token target generation
