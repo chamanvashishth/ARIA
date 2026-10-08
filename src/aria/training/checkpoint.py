@@ -10,7 +10,8 @@ from typing import Any
 
 from aria.brain.module import Module
 from aria.brain.optim import SGD
-from aria.brain.parameter import Parameter\nfrom aria.evaluation import evaluate_language_model
+from aria.brain.parameter import Parameter
+from aria.evaluation import evaluate_language_model
 
 
 @dataclass(frozen=True)
