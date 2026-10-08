@@ -103,3 +103,42 @@ def test_train_and_evaluate_rejects_mismatched_sequence_lengths() -> None:
 
     with pytest.raises(ValueError, match="sequence lengths must match"):
         trainer.train_and_evaluate(1, validation)
+
+
+def test_trainer_epoch_visits_every_dataset_example_once() -> None:
+    dataset = TokenWindowDataset([1, 2, 3, 4, 5, 6], sequence_length=2, stride=2)
+    model = TinyLanguageModel(vocab_size=7, embedding_dim=4, seed=11)
+    trainer = LanguageModelTrainer(model, SGD(model.parameters(), learning_rate=0.01), dataset)
+
+    history = trainer.train_epoch()
+
+    assert len(history) == len(dataset)
+    assert [item.step for item in history] == [1, 2, 3]
+    assert trainer.step_count == len(dataset)
+
+
+def test_scheduler_changes_learning_rate_deterministically() -> None:
+    from aria.brain import StepDecay
+
+    model = TinyLanguageModel(vocab_size=7, embedding_dim=4, seed=12)
+    optimizer = SGD(model.parameters(), learning_rate=0.1)
+    trainer = LanguageModelTrainer(
+        model,
+        optimizer,
+        TokenWindowDataset([1, 2, 3, 4, 5, 6], sequence_length=2, stride=2),
+        scheduler=StepDecay(drop_every=2, gamma=0.5),
+    )
+
+    history = trainer.train(4)
+
+    assert [round(item.learning_rate, 8) for item in history] == [0.1, 0.05, 0.05, 0.025]
+    assert optimizer.learning_rate == pytest.approx(0.025)
+
+
+def test_scheduler_rejects_invalid_configuration() -> None:
+    from aria.brain import ExponentialDecay, StepDecay
+
+    with pytest.raises(ValueError, match="gamma"):
+        ExponentialDecay(gamma=0)
+    with pytest.raises(ValueError, match="drop_every"):
+        StepDecay(drop_every=0)
