@@ -20,6 +20,7 @@ class TrainingConfig:
     sequence_length: int
     steps: int
     seed: int | None = None
+    batch_size: int = 1
 
 
 @dataclass(frozen=True)
@@ -46,7 +47,7 @@ class TrainingCheckpoint:
             raise ValueError("checkpoint losses must be finite")
         if self.config.learning_rate <= 0:
             raise ValueError("checkpoint learning rate must be positive")
-        if self.config.sequence_length <= 0 or self.config.steps <= 0:
+        if self.config.sequence_length <= 0 or self.config.steps <= 0 or self.config.batch_size <= 0:
             raise ValueError("checkpoint training dimensions must be positive")
         if self.optimizer_learning_rate is not None and self.optimizer_learning_rate <= 0:
             raise ValueError("checkpoint optimizer learning rate must be positive")
@@ -91,7 +92,7 @@ class TrainingCheckpoint:
             raise ValueError("checkpoint losses must be finite")
         if checkpoint.config.learning_rate <= 0:
             raise ValueError("checkpoint learning rate must be positive")
-        if checkpoint.config.sequence_length <= 0 or checkpoint.config.steps <= 0:
+        if checkpoint.config.sequence_length <= 0 or checkpoint.config.steps <= 0 or checkpoint.config.batch_size <= 0:
             raise ValueError("checkpoint training dimensions must be positive")
         if (
             checkpoint.optimizer_learning_rate is not None
@@ -214,7 +215,7 @@ def train_with_best_validation_checkpoint(
     """
     if patience <= 0:
         raise ValueError("patience must be positive")
-    if config.steps <= 0 or config.learning_rate <= 0:
+    if config.steps <= 0 or config.learning_rate <= 0 or config.batch_size <= 0:
         raise ValueError("checkpoint training configuration must be positive")
     if not math.isfinite(min_delta) or min_delta < 0:
         raise ValueError("min_delta must be finite and non-negative")
@@ -235,8 +236,16 @@ def train_with_best_validation_checkpoint(
     losses: list[float] = []
     best_checkpoint: TrainingCheckpoint | None = None
 
+    if trainer.batch_size != config.batch_size:
+        trainer.batch_size = config.batch_size
+
     for _ in range(config.steps):
-        step = trainer.train_step((trainer.step_count) % len(trainer.dataset))
+        start = (trainer.step_count * trainer.batch_size) % len(trainer.dataset)
+        indices = [
+            (start + item) % len(trainer.dataset)
+            for item in range(trainer.batch_size)
+        ]
+        step = trainer.train_batch(indices)
         losses.append(step.loss)
         validation = evaluate_language_model(model, validation_examples)
         if validation.mean_loss < best_loss - min_delta:
@@ -282,6 +291,7 @@ def restore_training_checkpoint(
     if checkpoint.optimizer_learning_rate is not None:
         optimizer.learning_rate = checkpoint.optimizer_learning_rate
     trainer.step_count = checkpoint.step
+    trainer.batch_size = checkpoint.config.batch_size
     return checkpoint
 
 
