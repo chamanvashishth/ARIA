@@ -10,7 +10,7 @@ from typing import Any
 
 from aria.brain.module import Module
 from aria.brain.optim import SGD
-from aria.brain.parameter import Parameter
+from aria.brain.parameter import Parameter\nfrom aria.evaluation import evaluate_language_model
 
 
 @dataclass(frozen=True)
@@ -192,6 +192,67 @@ def train_with_checkpoint(
     checkpoint.save(checkpoint_path)
     return checkpoint
 
+
+
+def train_with_best_validation_checkpoint(
+    model: Module,
+    optimizer: SGD,
+    trainer,
+    *,
+    validation_dataset,
+    config: TrainingConfig,
+    checkpoint_path: Path,
+    patience: int = 5,
+    min_delta: float = 0.0,
+) -> tuple[TrainingCheckpoint, int]:
+    """Train with validation checks and persist the best validation model.
+
+    Returns the best checkpoint and the number of executed training steps.
+    The saved checkpoint contains the model state at the best validation loss,
+    not necessarily the final training step.
+    """
+    if patience <= 0:
+        raise ValueError("patience must be positive")
+    if not math.isfinite(min_delta) or min_delta < 0:
+        raise ValueError("min_delta must be finite and non-negative")
+    if validation_dataset.sequence_length != trainer.dataset.sequence_length:
+        raise ValueError("train and validation sequence lengths must match")
+    if len(validation_dataset) == 0:
+        raise ValueError("validation dataset must contain at least one example")
+
+    validation_examples = [
+        validation_dataset[index] for index in range(len(validation_dataset))
+    ]
+    best_loss = math.inf
+    stale_steps = 0
+    losses: list[float] = []
+    best_checkpoint: TrainingCheckpoint | None = None
+
+    for _ in range(config.steps):
+        step = trainer.train_step((trainer.step_count) % len(trainer.dataset))
+        losses.append(step.loss)
+        validation = evaluate_language_model(model, validation_examples)
+        if validation.mean_loss < best_loss - min_delta:
+            best_loss = validation.mean_loss
+            stale_steps = 0
+            parameter_values, parameter_shapes = capture_model_state(model)
+            best_checkpoint = TrainingCheckpoint(
+                step=trainer.step_count,
+                losses=list(losses),
+                config=config,
+                parameter_values=parameter_values,
+                parameter_shapes=parameter_shapes,
+                optimizer_learning_rate=optimizer.learning_rate,
+            )
+            best_checkpoint.save(checkpoint_path)
+        else:
+            stale_steps += 1
+            if stale_steps >= patience:
+                break
+
+    if best_checkpoint is None:
+        raise RuntimeError("training produced no validation checkpoint")
+    return best_checkpoint, trainer.step_count
 
 def restore_training_checkpoint(
     checkpoint_path: Path,
