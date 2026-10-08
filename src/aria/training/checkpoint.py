@@ -213,6 +213,8 @@ def train_with_best_validation_checkpoint(
     """
     if patience <= 0:
         raise ValueError("patience must be positive")
+    if config.steps <= 0 or config.learning_rate <= 0:
+        raise ValueError("checkpoint training configuration must be positive")
     if not math.isfinite(min_delta) or min_delta < 0:
         raise ValueError("min_delta must be finite and non-negative")
     if len(trainer.dataset) == 0:
