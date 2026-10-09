@@ -10,6 +10,7 @@ from aria.training.checkpoint import (
     train_with_checkpoint,
 )
 from aria.training.dataset import (
+    TokenBatchSampler,
     TokenWindowDataset,
     build_train_validation_datasets,
     split_token_ids,
@@ -22,7 +23,8 @@ from aria.training.trainer import (
 
 __all__ = [
     "LanguageModelTrainer",
-    "TokenBatchSampler",\n    "TokenWindowDataset",
+    "TokenBatchSampler",
+    "TokenWindowDataset",
     "build_train_validation_datasets",
     "split_token_ids",
     "TrainingCheckpoint",
