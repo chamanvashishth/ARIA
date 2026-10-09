@@ -69,3 +69,33 @@ def test_batch_sweep_rejects_invalid_grid() -> None:
             iterations=1,
             seed=74,
         )
+
+
+
+def test_transformer_component_profiler_reports_forward_and_backward() -> None:
+    from scripts.profile_transformer import profile_transformer_components
+
+    report = profile_transformer_components(
+        batch_size=1,
+        sequence_length=2,
+        iterations=1,
+        warmup=0,
+        seed=75,
+    )
+
+    assert report["benchmark"] == "aria_transformer_component_profile"
+    assert set(report["components"]) == {
+        "linear_forward_and_backward",
+        "causal_attention_forward_and_backward",
+        "full_transformer_training_step",
+    }
+    for component in report["components"].values():
+        assert component["forward_and_loss"]["median_ms"] >= 0
+        assert component["backward"]["median_ms"] >= 0
+
+
+def test_transformer_component_profiler_rejects_invalid_dimensions() -> None:
+    from scripts.profile_transformer import profile_transformer_components
+
+    with pytest.raises(ValueError, match="must be positive"):
+        profile_transformer_components(batch_size=0, sequence_length=2, iterations=1, warmup=0)
