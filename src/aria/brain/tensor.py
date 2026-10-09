@@ -153,6 +153,11 @@ class Tensor:
             topo.append(node)
 
         visit(self)
+        # Intermediate gradients belong to this traversal, while leaf gradients
+        # intentionally accumulate across backward() calls until zero_grad().
+        for node in topo:
+            if node._parents:
+                node.grad = None
         self.grad = Tensor.scalar(1.0)
 
         for node in reversed(topo):
