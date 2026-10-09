@@ -120,7 +120,7 @@ def test_checkpoint_has_version_and_atomic_save(tmp_path: Path) -> None:
     )
 
     payload = path.read_text(encoding="utf-8")
-    assert '"format_version": 2' in payload
+    assert '"format_version": 3' in payload
     assert not (tmp_path / ".checkpoint.json.tmp").exists()
 
 
@@ -435,3 +435,48 @@ def test_legacy_metadata_checkpoint_remains_loadable(tmp_path: Path, version: in
     assert checkpoint.losses == [1.0]
     assert checkpoint.parameter_values == {}
     assert checkpoint.scheduler_state is None
+
+
+
+def test_checkpoint_validates_dataset_fingerprint_before_restoring(tmp_path: Path) -> None:
+    model, optimizer, trainer = _build_training_stack(seed=71)
+    path = tmp_path / "checkpoint.json"
+    save_training_checkpoint(
+        model,
+        optimizer,
+        trainer,
+        config=TrainingConfig(learning_rate=0.01, sequence_length=4, steps=1, seed=71),
+        checkpoint_path=path,
+    )
+
+    other_model, other_optimizer, other_trainer = _build_training_stack(seed=71)
+    other_trainer.dataset = TokenWindowDataset(
+        ByteTokenizer().encode("different training tokens"),
+        sequence_length=4,
+        stride=2,
+    )
+    before = [parameter._values[:] for parameter in other_model.parameters()]
+    with pytest.raises(ValueError, match="dataset fingerprint"):
+        restore_training_checkpoint(path, other_model, other_optimizer, other_trainer)
+
+    for actual, expected in zip(
+        [parameter._values for parameter in other_model.parameters()], before
+    ):
+        assert actual == expected
+
+
+def test_checkpoint_restore_rejects_optimizer_for_different_model(tmp_path: Path) -> None:
+    model, optimizer, trainer = _build_training_stack(seed=72)
+    path = tmp_path / "checkpoint.json"
+    save_training_checkpoint(
+        model,
+        optimizer,
+        trainer,
+        config=TrainingConfig(learning_rate=0.01, sequence_length=4, steps=1, seed=72),
+        checkpoint_path=path,
+    )
+
+    other_model, _, other_trainer = _build_training_stack(seed=72)
+    wrong_optimizer = SGD(model.parameters(), learning_rate=0.5)
+    with pytest.raises(ValueError, match="optimizer parameters do not match"):
+        restore_training_checkpoint(path, other_model, wrong_optimizer, other_trainer)
