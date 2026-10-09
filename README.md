@@ -193,11 +193,13 @@ Cross-entropy loss
  ↓
 Backpropagation
  ↓
-SGD parameter update
+Batched forward pass
  ↓
-Mini-batch gradient accumulation
+Mean batch loss
  ↓
-SGD parameter update
+Backpropagation through the batch
+ ↓
+One SGD parameter update
  ↓
 Loss history
  ↓
