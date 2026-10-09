@@ -236,3 +236,85 @@ def test_best_validation_checkpoint_rejects_invalid_controls(tmp_path: Path) -> 
         train_with_best_validation_checkpoint(**kwargs, patience=0)
     with pytest.raises(ValueError, match="min_delta must be finite"):
         train_with_best_validation_checkpoint(**kwargs, patience=2, min_delta=-1.0)
+
+
+
+def test_checkpoint_restores_scheduler_configuration_for_exact_continuation(tmp_path: Path) -> None:
+    from aria.brain.optim import ExponentialDecay
+
+    tokenizer = ByteTokenizer()
+    tokens = tokenizer.encode("hello hello hello")
+    dataset = TokenWindowDataset(tokens, sequence_length=4, stride=2)
+
+    def build(gamma: float, minimum: float):
+        model = TransformerLanguageModel(
+            vocab_size=tokenizer.VOCAB_SIZE,
+            hidden_size=8,
+            intermediate_size=16,
+            num_layers=1,
+            max_sequence_length=4,
+            seed=41,
+        )
+        optimizer = SGD(model.parameters(), learning_rate=0.02)
+        scheduler = ExponentialDecay(gamma=gamma, minimum=minimum)
+        trainer = LanguageModelTrainer(
+            model, optimizer, dataset, scheduler=scheduler
+        )
+        return model, optimizer, trainer, scheduler
+
+    path = tmp_path / "scheduler-checkpoint.json"
+    model, optimizer, trainer, scheduler = build(0.8, 0.001)
+    config = TrainingConfig(
+        learning_rate=0.02, sequence_length=4, steps=2, seed=41
+    )
+    train_with_checkpoint(
+        model, optimizer, trainer, config=config, checkpoint_path=path
+    )
+    assert scheduler.gamma == 0.8
+    assert optimizer.learning_rate == pytest.approx(0.02 * 0.8**2)
+
+    trainer.train(3)
+    expected_parameters = [p._values[:] for p in model.parameters()]
+    expected_lr = optimizer.learning_rate
+
+    resumed_model, resumed_optimizer, resumed_trainer, resumed_scheduler = build(
+        0.5, 0.02
+    )
+    checkpoint = restore_training_checkpoint(
+        path, resumed_model, resumed_optimizer, resumed_trainer
+    )
+    assert checkpoint.scheduler_state == {
+        "type": "ExponentialDecay",
+        "gamma": 0.8,
+        "minimum": 0.001,
+    }
+    assert resumed_scheduler.gamma == 0.8
+    assert resumed_scheduler.minimum == 0.001
+    resumed_trainer.train(3)
+
+    assert resumed_optimizer.learning_rate == pytest.approx(expected_lr)
+    for actual, expected in zip(resumed_model.parameters(), expected_parameters):
+        assert actual._values == pytest.approx(expected._values, rel=1e-12, abs=1e-12)
+
+
+def test_checkpoint_rejects_scheduler_mismatch_without_mutating_model(tmp_path: Path) -> None:
+    from aria.brain.optim import ExponentialDecay
+
+    model, optimizer, trainer = _build_training_stack(seed=43, learning_rate=0.01)
+    trainer.scheduler = ExponentialDecay(gamma=0.9)
+    path = tmp_path / "scheduler-mismatch.json"
+    train_with_checkpoint(
+        model,
+        optimizer,
+        trainer,
+        config=TrainingConfig(learning_rate=0.01, sequence_length=4, steps=1, seed=43),
+        checkpoint_path=path,
+    )
+
+    other_model, other_optimizer, other_trainer = _build_training_stack(
+        seed=43, learning_rate=0.01
+    )
+    before = [parameter._values[:] for parameter in other_model.parameters()]
+    with pytest.raises(ValueError, match="trainer has no scheduler"):
+        restore_training_checkpoint(path, other_model, other_optimizer, other_trainer)
+    assert [parameter._values for parameter in other_model.parameters()] == before
