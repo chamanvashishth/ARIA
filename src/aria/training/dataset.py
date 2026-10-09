@@ -71,3 +71,49 @@ def build_train_validation_datasets(
         TokenWindowDataset(train_tokens, sequence_length, stride),
         TokenWindowDataset(validation_tokens, sequence_length, stride),
     )
+
+
+class TokenBatchSampler:
+    """Yield deterministic mini-batches of dataset indices.
+
+    Shuffling is reproducible for a given seed and epoch. Unless drop_last is
+    enabled, the final batch may be smaller than batch_size.
+    """
+
+    def __init__(
+        self,
+        dataset: TokenWindowDataset,
+        batch_size: int,
+        *,
+        shuffle: bool = False,
+        seed: int = 0,
+        drop_last: bool = False,
+    ) -> None:
+        import random
+
+        if batch_size <= 0:
+            raise ValueError("batch_size must be positive")
+        if not isinstance(seed, int):
+            raise TypeError("seed must be an integer")
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.seed = seed
+        self.drop_last = drop_last
+
+    def batches(self, epoch: int = 0) -> list[list[int]]:
+        """Return this epoch's batches; epoch is a non-negative counter."""
+        import random
+
+        if epoch < 0:
+            raise ValueError("epoch must be non-negative")
+        indices = list(range(len(self.dataset)))
+        if self.shuffle:
+            random.Random(self.seed + epoch).shuffle(indices)
+        batches = [
+            indices[start:start + self.batch_size]
+            for start in range(0, len(indices), self.batch_size)
+        ]
+        if self.drop_last and batches and len(batches[-1]) < self.batch_size:
+            batches.pop()
+        return batches
