@@ -212,7 +212,9 @@ Model-weight checkpoint
 - best-validation checkpointing with configurable patience and minimum improvement
 - early stopping based on validation loss
 - deterministic exponential and step learning-rate schedules
-- configurable mini-batch gradient accumulation with averaged gradients
+- configurable mini-batch training with averaged gradients
+- a batched TinyLanguageModel path that shares embedding and vocabulary projections across equal-length examples
+- Transformer mini-batches still run as separate sequences until attention supports a batch dimension, preventing cross-example attention leakage
 - deterministic batch sampler with seeded per-epoch shuffling
 - optional `drop_last` behavior for fixed-size batches
 - complete-dataset epoch semantics with a final partial batch when needed
