@@ -60,11 +60,16 @@ class TrainingCheckpoint:
         payload = asdict(self)
         payload["format_version"] = self.FORMAT_VERSION
         temporary = path.with_name(f".{path.name}.tmp")
-        temporary.write_text(
-            json.dumps(payload, indent=2, sort_keys=True),
-            encoding="utf-8",
-        )
-        temporary.replace(path)
+        try:
+            temporary.write_text(
+                json.dumps(payload, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+            temporary.replace(path)
+        finally:
+            # A failed serialization/write/replace must not leave a stale temp
+            # file behind. The destination is replaced only after a full write.
+            temporary.unlink(missing_ok=True)
 
     @classmethod
     def load(cls, path: Path) -> "TrainingCheckpoint":
@@ -184,24 +189,29 @@ def restore_model_state(
         parameter.zero_grad()
 
 
-def train_with_checkpoint(
+def save_training_checkpoint(
     model: Module,
     optimizer: SGD,
     trainer,
     *,
     config: TrainingConfig,
     checkpoint_path: Path,
+    losses: list[float] | None = None,
 ) -> TrainingCheckpoint:
-    """Run training and persist model weights plus observed losses."""
+    """Snapshot the current model and training state without advancing training.
 
+    Rebuild the same model architecture and dataset before restoring this
+    checkpoint. Only the optimizer learning rate is persisted; optimizer
+    implementations with additional mutable state need their own state format.
+    """
     if trainer.batch_size != config.batch_size:
         raise ValueError("checkpoint batch size does not match trainer")
-
-    history = trainer.train(config.steps)
+    if trainer.dataset.sequence_length != config.sequence_length:
+        raise ValueError("checkpoint sequence length does not match trainer dataset")
     parameter_values, parameter_shapes = capture_model_state(model)
     checkpoint = TrainingCheckpoint(
         step=trainer.step_count,
-        losses=[item.loss for item in history],
+        losses=list(losses or []),
         config=config,
         parameter_values=parameter_values,
         parameter_shapes=parameter_shapes,
@@ -211,6 +221,27 @@ def train_with_checkpoint(
     checkpoint.save(checkpoint_path)
     return checkpoint
 
+
+def train_with_checkpoint(
+    model: Module,
+    optimizer: SGD,
+    trainer,
+    *,
+    config: TrainingConfig,
+    checkpoint_path: Path,
+) -> TrainingCheckpoint:
+    """Run training, then persist model weights and the observed loss history."""
+    if trainer.batch_size != config.batch_size:
+        raise ValueError("checkpoint batch size does not match trainer")
+    history = trainer.train(config.steps)
+    return save_training_checkpoint(
+        model,
+        optimizer,
+        trainer,
+        config=config,
+        checkpoint_path=checkpoint_path,
+        losses=[item.loss for item in history],
+    )
 
 
 def train_with_best_validation_checkpoint(
