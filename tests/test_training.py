@@ -265,10 +265,10 @@ def test_trainer_uses_batched_loss_path_for_tiny_model() -> None:
         batch_size=2,
     )
 
-    history = trainer.train_batch([0, 1])
+    result = trainer.train_batch([0, 1])
 
-    assert len(history) == 1
-    assert history[0].loss > 0
+    assert result.step == 1
+    assert result.loss > 0
     assert trainer.step_count == 1
 
 
@@ -290,9 +290,9 @@ def test_transformer_trainer_uses_batched_loss_for_mini_batch() -> None:
     )
     before = list(model.lm_head.weight._values)
 
-    history = trainer.train_batch([0, 1])
+    result = trainer.train_batch([0, 1])
 
-    assert len(history) == 1
-    assert history[0].loss > 0
+    assert result.step == 1
+    assert result.loss > 0
     assert trainer.step_count == 1
     assert model.lm_head.weight._values != before
