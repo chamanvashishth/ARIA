@@ -213,8 +213,9 @@ Model-weight checkpoint
 - early stopping based on validation loss
 - deterministic exponential and step learning-rate schedules
 - configurable mini-batch training with averaged gradients
-- a batched TinyLanguageModel path that shares embedding and vocabulary projections across equal-length examples
-- Transformer mini-batches still run as separate sequences until attention supports a batch dimension, preventing cross-example attention leakage
+- batched TinyLanguageModel execution across equal-length examples
+- Transformer execution with `[batch, time, hidden]` activations, flattened shared Linear projections, and independent causal attention per sample
+- batched loss and gradient-equivalence checks against independent sequence execution
 - deterministic batch sampler with seeded per-epoch shuffling
 - optional `drop_last` behavior for fixed-size batches
 - complete-dataset epoch semantics with a final partial batch when needed
