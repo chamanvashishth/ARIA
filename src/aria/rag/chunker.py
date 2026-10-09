@@ -32,6 +32,10 @@ class TextChunker:
         chunks: list[DocumentChunk] = []
         step = self.chunk_size - self.overlap
         for index, start in enumerate(range(0, len(document.text), step)):
+            # If the remaining suffix fits entirely inside the previous
+            # chunk's overlap, it adds no new source text and is redundant.
+            if len(document.text) - start <= self.overlap:
+                break
             text = document.text[start : start + self.chunk_size]
             if not text:
                 continue
