@@ -134,3 +134,32 @@ def test_transformer_profiler_sweep_rejects_invalid_grid() -> None:
             iterations=1,
             warmup=0,
         )
+
+
+
+def test_transformer_profiler_cli_writes_json_report(tmp_path, monkeypatch, capsys) -> None:
+    import json
+    import sys
+
+    from scripts.profile_transformer import main
+
+    output = tmp_path / "profile.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "profile_transformer.py",
+            "--batch-size", "1",
+            "--sequence-length", "1",
+            "--iterations", "1",
+            "--warmup", "0",
+            "--output", str(output),
+        ],
+    )
+
+    main()
+
+    report = json.loads(output.read_text(encoding="utf-8"))
+    assert report["benchmark"] == "aria_transformer_component_profile"
+    assert report["configuration"]["batch_size"] == 1
+    assert capsys.readouterr().out == ""
