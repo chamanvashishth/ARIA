@@ -17,13 +17,36 @@ class SGD:
         self.learning_rate = learning_rate
 
     def step(self) -> None:
+        """Apply one atomic SGD update, rejecting invalid gradients or results.
+
+        All updates are validated before any parameter is changed. This avoids
+        leaving a model partially updated if one gradient is malformed or
+        non-finite.
+        """
+        if not math.isfinite(self.learning_rate) or self.learning_rate <= 0:
+            raise ValueError("learning rate must be finite and positive")
+
+        updates: list[tuple[Parameter, list[float]]] = []
         for parameter in self.parameters:
             if parameter.grad is None:
                 continue
-            parameter._values = [
+            if len(parameter.grad._values) != len(parameter._values):
+                raise ValueError("gradient size must match parameter size")
+            if not all(math.isfinite(value) for value in parameter._values):
+                raise ValueError("parameter values must be finite before an update")
+            if not all(math.isfinite(value) for value in parameter.grad._values):
+                raise ValueError("gradient values must be finite")
+
+            updated = [
                 value - self.learning_rate * gradient
                 for value, gradient in zip(parameter._values, parameter.grad._values)
             ]
+            if not all(math.isfinite(value) for value in updated):
+                raise ValueError("SGD update would produce non-finite parameter values")
+            updates.append((parameter, updated))
+
+        for parameter, updated in updates:
+            parameter._values = updated
             parameter.data = _reshape(parameter._values, parameter.shape)
 
     def zero_grad(self) -> None:
