@@ -318,3 +318,51 @@ def test_checkpoint_rejects_scheduler_mismatch_without_mutating_model(tmp_path: 
     with pytest.raises(ValueError, match="trainer has no scheduler"):
         restore_training_checkpoint(path, other_model, other_optimizer, other_trainer)
     assert [parameter._values for parameter in other_model.parameters()] == before
+
+
+
+def test_restore_rejects_non_finite_parameter_without_partial_mutation(tmp_path: Path) -> None:
+    import json
+
+    model, optimizer, trainer = _build_training_stack(seed=51, learning_rate=0.01)
+    path = tmp_path / "corrupted.json"
+    train_with_checkpoint(
+        model,
+        optimizer,
+        trainer,
+        config=TrainingConfig(learning_rate=0.01, sequence_length=4, steps=1, seed=51),
+        checkpoint_path=path,
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    first_name = next(iter(payload["parameter_values"]))
+    payload["parameter_values"][first_name][0] = float("nan")
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    target_model, target_optimizer, target_trainer = _build_training_stack(
+        seed=52, learning_rate=0.03
+    )
+    before = [parameter._values[:] for parameter in target_model.parameters()]
+    before_lr = target_optimizer.learning_rate
+    before_step = target_trainer.step_count
+    with pytest.raises(ValueError, match="parameter values must be finite"):
+        restore_training_checkpoint(path, target_model, target_optimizer, target_trainer)
+
+    assert [parameter._values for parameter in target_model.parameters()] == before
+    assert target_optimizer.learning_rate == before_lr
+    assert target_trainer.step_count == before_step
+
+
+def test_restore_model_state_validates_all_parameters_before_mutating() -> None:
+    from aria.training.checkpoint import capture_model_state, restore_model_state
+
+    model, _, _ = _build_training_stack(seed=53)
+    values, shapes = capture_model_state(model)
+    names = list(values)
+    values[names[0]] = [value + 1.0 for value in values[names[0]]]
+    shapes[names[-1]] = [999]
+    before = [parameter._values[:] for parameter in model.parameters()]
+
+    with pytest.raises(ValueError, match="checkpoint shape mismatch"):
+        restore_model_state(model, values, shapes)
+
+    assert [parameter._values for parameter in model.parameters()] == before
