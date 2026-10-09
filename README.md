@@ -232,7 +232,7 @@ Model-weight checkpoint
 - SGD parameter updates
 - loss history
 - experiment configuration metadata
-- versioned JSON model-weight checkpoints
+- versioned JSON model-weight checkpoints with dataset fingerprints
 - atomic checkpoint replacement
 - named parameter values and shapes
 - optimizer learning-rate state
@@ -240,6 +240,8 @@ Model-weight checkpoint
 - trainer step restoration for continued training
 - deterministic continuation from the saved dataset position
 - checkpoint/trainer sequence-length compatibility validation
+- ordered token-stream and window-stride fingerprint validation on restore
+- optimizer-to-model parameter identity validation before restore
 
 Checkpoint files remain human-readable JSON. Metadata-only checkpoints from the earlier formats remain loadable, but they cannot restore model weights; attempting to resume from one fails explicitly.
 
@@ -308,9 +310,9 @@ print("Resumed from step", restored.step, "to", trainer.step_count)
 **Resume requirements and boundaries**
 
 - Recreate the same model architecture and parameter names, tokenizer/vocabulary, and compatible sequence-length/dataset setup before restoration.
-- The checkpoint restores model weights, trainer step count and batch size, optimizer learning rate, and supported `ExponentialDecay` / `StepDecay` scheduler configuration.
+- The checkpoint restores model weights, trainer step count and batch size, optimizer learning rate, and supported `ExponentialDecay` / `StepDecay` scheduler configuration. Format version 3 also fingerprints the ordered token stream and window stride, rejecting accidental resume against different training tokens or window settings.
 - Current SGD has no momentum state. The checkpoint does not serialize arbitrary optimizer state, random-number-generator state, dataset contents, or tokenizer artifacts.
-- Scheduler type mismatches and incompatible model parameters are rejected. Legacy metadata-only checkpoints can be inspected, but cannot be used to resume because they contain no weights.
+- Scheduler type mismatches and incompatible model parameters are rejected. Legacy metadata-only checkpoints can be inspected, but cannot be used to resume because they contain no weights. Older weight-bearing formats without a dataset fingerprint remain loadable, but cannot receive that dataset-identity check.
 - Saves write to a sibling temporary file and replace the destination only after the write completes. A failed replacement leaves the prior destination untouched and cleans up the temporary file.
 
 ---
