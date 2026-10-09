@@ -521,10 +521,10 @@ pytest tests/test_training.py
 The dependency-free benchmark script creates a small, untrained Transformer and measures autoregressive forward-pass latency on the current machine. It also compares fixed-length batched forward execution with running the same sequences individually, checks logit equivalence, and reports median latency, throughput, and a median speedup ratio:
 
 ~~~bash
-python scripts/benchmark_inference.py --warmup 2 --iterations 10 --prompt-length 8 --new-tokens 4 --batch-size 4 --batch-sequence-length 8
+python scripts/benchmark_inference.py --warmup 2 --iterations 10 --prompt-length 8 --new-tokens 4 --batch-size 4 --batch-sequence-length 8 --sweep
 ~~~
 
-The JSON output separates autoregressive inference measurements from the forward-only batch comparison. A speedup ratio above `1` means the batched path was faster for that run; it is not a universal performance claim. Increase iterations for less noisy measurements and compare results only when the workload and environment are recorded consistently.
+The JSON output separates autoregressive inference measurements from the forward-only batch comparison. With `--sweep`, it also measures batch sizes `1, 2, 4, 8` at sequence lengths `4, 8, 16`, reporting logit-equivalence checks and throughput for each combination. A speedup ratio above `1` means the batched path was faster for that run; it is not a universal performance claim. Increase iterations for less noisy measurements and compare results only when the workload and environment are recorded consistently.
 
 **Limitations:** the benchmark uses an untrained model, measures a small pure-Python implementation, and is not comparable to optimized inference engines. Run it on the target machine and retain the environment metadata before drawing performance conclusions. The comparison excludes backpropagation and optimizer updates. Numerical gradient checks cover only the selected values and loss paths supplied by the caller.
 
