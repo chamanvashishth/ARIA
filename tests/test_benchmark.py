@@ -1,7 +1,7 @@
 import pytest
 
 from aria.brain import TransformerLanguageModel
-from scripts.benchmark_inference import compare_batch_execution
+from scripts.benchmark_inference import benchmark_batch_sweep, compare_batch_execution
 
 
 def test_batch_benchmark_reports_equivalent_logits_and_positive_throughput() -> None:
@@ -40,3 +40,32 @@ def test_batch_benchmark_rejects_mixed_sequence_lengths() -> None:
 
     with pytest.raises(ValueError, match="same length"):
         compare_batch_execution(model, [[1, 2], [3]], warmup=0, iterations=1)
+
+
+
+def test_batch_sweep_covers_grid_and_checks_logits() -> None:
+    report = benchmark_batch_sweep(
+        batch_sizes=[1, 2],
+        sequence_lengths=[2, 3],
+        warmup=0,
+        iterations=1,
+        seed=73,
+    )
+
+    assert len(report["results"]) == 4
+    assert {
+        (item["batch_size"], item["sequence_length"])
+        for item in report["results"]
+    } == {(1, 2), (2, 2), (1, 3), (2, 3)}
+    assert all(item["correctness"]["matches_within_1e-9"] for item in report["results"])
+
+
+def test_batch_sweep_rejects_invalid_grid() -> None:
+    with pytest.raises(ValueError, match="positive integers"):
+        benchmark_batch_sweep(
+            batch_sizes=[1, 0],
+            sequence_lengths=[2],
+            warmup=0,
+            iterations=1,
+            seed=74,
+        )
