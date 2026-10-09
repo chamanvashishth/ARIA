@@ -99,3 +99,38 @@ def test_transformer_component_profiler_rejects_invalid_dimensions() -> None:
 
     with pytest.raises(ValueError, match="must be positive"):
         profile_transformer_components(batch_size=0, sequence_length=2, iterations=1, warmup=0)
+
+
+
+def test_transformer_profiler_sweep_covers_grid() -> None:
+    from scripts.profile_transformer import profile_transformer_sweep
+
+    report = profile_transformer_sweep(
+        batch_sizes=[1, 2],
+        sequence_lengths=[2, 3],
+        iterations=1,
+        warmup=0,
+        seed=77,
+    )
+
+    assert len(report["results"]) == 4
+    assert {
+        (item["configuration"]["batch_size"], item["configuration"]["sequence_length"])
+        for item in report["results"]
+    } == {(1, 2), (2, 2), (1, 3), (2, 3)}
+    assert all(
+        item["components"]["full_transformer_training_step"]["backward"]["median_ms"] >= 0
+        for item in report["results"]
+    )
+
+
+def test_transformer_profiler_sweep_rejects_invalid_grid() -> None:
+    from scripts.profile_transformer import profile_transformer_sweep
+
+    with pytest.raises(ValueError, match="positive integers"):
+        profile_transformer_sweep(
+            batch_sizes=[1],
+            sequence_lengths=[0],
+            iterations=1,
+            warmup=0,
+        )
