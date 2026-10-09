@@ -75,7 +75,28 @@ class LanguageModelTrainer:
             ):
                 raise ValueError("training gradients must be finite")
 
+    def _run_transaction(self, operation):
+        """Roll back parameters and trainer/optimizer state if a step fails."""
+        parameters = self.model.parameters()
+        values_before = [list(parameter._values) for parameter in parameters]
+        data_before = [parameter.data for parameter in parameters]
+        learning_rate_before = self.optimizer.learning_rate
+        step_count_before = self.step_count
+        try:
+            return operation()
+        except Exception:
+            for parameter, values, data in zip(parameters, values_before, data_before):
+                parameter._values = values
+                parameter.data = data
+            self.optimizer.zero_grad()
+            self.optimizer.learning_rate = learning_rate_before
+            self.step_count = step_count_before
+            raise
+
     def train_step(self, index: int) -> TrainingStep:
+        return self._run_transaction(lambda: self._train_step(index))
+
+    def _train_step(self, index: int) -> TrainingStep:
         token_ids, targets = self.dataset[index]
         self.optimizer.zero_grad()
         logits = self.model.forward(token_ids)
@@ -96,7 +117,9 @@ class LanguageModelTrainer:
 
     def train_batch(self, indices: list[int]) -> TrainingStep:
         """Run one optimizer step over a deterministic mini-batch."""
+        return self._run_transaction(lambda: self._train_batch(indices))
 
+    def _train_batch(self, indices: list[int]) -> TrainingStep:
         if not indices:
             raise ValueError("mini-batch must contain at least one example")
         if any(not 0 <= index < len(self.dataset) for index in indices):
