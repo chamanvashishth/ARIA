@@ -74,7 +74,7 @@ def profile_transformer_components(
     )
     linear_profile = _profile_backward(
         lambda: linear.forward(linear_input).sum(),
-        linear.zero_grad,
+        lambda: (linear.zero_grad(), linear_input.zero_grad()),
         warmup=warmup, iterations=iterations,
     )
 
@@ -86,7 +86,7 @@ def profile_transformer_components(
     )
     attention_profile = _profile_backward(
         lambda: attention.forward(attention_input).sum(),
-        attention.zero_grad,
+        lambda: (attention.zero_grad(), attention_input.zero_grad()),
         warmup=warmup, iterations=iterations,
     )
 
