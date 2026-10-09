@@ -43,7 +43,7 @@ def _profile_backward(forward_loss: Callable[[], Tensor], zero_grad: Callable[[]
                       *, warmup: int, iterations: int) -> dict[str, dict[str, float]]:
     forward_samples: list[float] = []
     backward_samples: list[float] = []
-    for _ in range(warmup + iterations):
+    for index in range(warmup + iterations):
         zero_grad()
         started = time.perf_counter()
         loss = forward_loss()
@@ -51,16 +51,9 @@ def _profile_backward(forward_loss: Callable[[], Tensor], zero_grad: Callable[[]
         started = time.perf_counter()
         loss.backward()
         backward_elapsed = time.perf_counter() - started
-        if len(forward_samples) >= warmup:
+        if index >= warmup:
             forward_samples.append(forward_elapsed)
             backward_samples.append(backward_elapsed)
-        elif len(forward_samples) == 0 and warmup == 0:
-            forward_samples.append(forward_elapsed)
-            backward_samples.append(backward_elapsed)
-        # Keep warmup results out of measured samples.
-        if len(forward_samples) > iterations:
-            forward_samples.pop(0)
-            backward_samples.pop(0)
     return {"forward_and_loss": _summary(forward_samples), "backward": _summary(backward_samples)}
 
 
