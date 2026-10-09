@@ -26,6 +26,8 @@ class TokenWindowDataset:
         return 1 + (len(self.token_ids) - self.sequence_length - 1) // self.stride
 
     def __getitem__(self, index: int) -> tuple[list[int], list[int]]:
+        if index < 0:
+            index += len(self)
         if not 0 <= index < len(self):
             raise IndexError(index)
         start = index * self.stride
