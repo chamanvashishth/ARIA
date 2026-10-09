@@ -270,3 +270,29 @@ def test_trainer_uses_batched_loss_path_for_tiny_model() -> None:
     assert len(history) == 1
     assert history[0].loss > 0
     assert trainer.step_count == 1
+
+
+def test_transformer_trainer_uses_batched_loss_for_mini_batch() -> None:
+    dataset = TokenWindowDataset([1, 2, 3, 4, 5, 6, 7], sequence_length=2, stride=1)
+    model = TransformerLanguageModel(
+        vocab_size=8,
+        hidden_size=4,
+        intermediate_size=8,
+        num_layers=1,
+        max_sequence_length=2,
+        seed=84,
+    )
+    trainer = LanguageModelTrainer(
+        model,
+        SGD(model.parameters(), learning_rate=0.01),
+        dataset,
+        batch_size=2,
+    )
+    before = list(model.lm_head.weight._values)
+
+    history = trainer.train_batch([0, 1])
+
+    assert len(history) == 1
+    assert history[0].loss > 0
+    assert trainer.step_count == 1
+    assert model.lm_head.weight._values != before
