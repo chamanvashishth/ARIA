@@ -61,3 +61,55 @@ def test_sequential_composes_layers() -> None:
     model = Sequential(Linear(2, 3, seed=1), ReLU(), Linear(3, 1, seed=2))
     output = model.forward(Tensor.from_list([[1.0, 2.0]]))
     assert output.shape == (1, 1)
+
+
+
+def test_relu_input_gradients_match_finite_differences_away_from_zero() -> None:
+    from aria.evaluation.core import check_gradients
+
+    inputs = Parameter([[-1.5, 0.25, 2.0]])
+    report = check_gradients(
+        lambda: (ReLU().forward(inputs) * ReLU().forward(inputs)).sum(),
+        [inputs],
+        epsilon=1e-5,
+        absolute_tolerance=1e-5,
+        relative_tolerance=1e-4,
+        max_checks=None,
+    )
+
+    assert report.passed
+    assert report.checked_values == len(inputs._values)
+    assert report.max_absolute_error < 1e-5
+
+
+def test_embedding_parameter_gradients_match_finite_differences_with_repeated_ids() -> None:
+    from aria.evaluation.core import check_gradients
+
+    layer = Embedding(3, 2, seed=85)
+    token_ids = [2, 0, 2]
+    report = check_gradients(
+        lambda: (layer.forward(token_ids) * layer.forward(token_ids)).sum(),
+        layer.parameters(),
+        epsilon=1e-5,
+        absolute_tolerance=1e-5,
+        relative_tolerance=1e-4,
+        max_checks=None,
+    )
+
+    assert report.passed
+    assert report.checked_values == len(layer.weight._values)
+    assert report.max_absolute_error < 1e-5
+
+
+def test_embedding_accumulates_repeated_token_rows_in_backward() -> None:
+    layer = Embedding(3, 2, seed=86)
+    layer.weight = Parameter([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+
+    layer.forward([2, 2, 0]).sum().backward()
+
+    assert layer.weight.grad is not None
+    assert layer.weight.grad.to_list() == [
+        [1.0, 1.0],
+        [0.0, 0.0],
+        [2.0, 2.0],
+    ]
