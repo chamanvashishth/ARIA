@@ -19,6 +19,78 @@ import time
 from aria.brain import TransformerLanguageModel
 
 
+def compare_batch_execution(
+    model: TransformerLanguageModel,
+    sequences: list[list[int]],
+    *,
+    warmup: int,
+    iterations: int,
+) -> dict[str, object]:
+    """Compare batched forward execution with the same inputs run individually."""
+    if not sequences or not sequences[0]:
+        raise ValueError("sequences must be a non-empty batch of non-empty sequences")
+    sequence_length = len(sequences[0])
+    if any(len(sequence) != sequence_length for sequence in sequences):
+        raise ValueError("all sequences must have the same length")
+    if warmup < 0 or iterations <= 0:
+        raise ValueError("warmup must be non-negative and iterations must be positive")
+
+    def individual_forward() -> None:
+        for sequence in sequences:
+            model.forward(sequence)
+
+    def batched_forward() -> None:
+        model.forward_batch(sequences)
+
+    individual_logits = [model.forward(sequence)._values for sequence in sequences]
+    batched = model.forward_batch(sequences)
+    vocab_size = model.vocab_size
+    max_absolute_error = max(
+        (abs(individual_logits[index][offset] - batched._values[index * sequence_length * vocab_size + offset])
+         for index in range(len(sequences))
+         for offset in range(sequence_length * vocab_size)),
+        default=0.0,
+    )
+
+    for _ in range(warmup):
+        individual_forward()
+        batched_forward()
+
+    def measure(run) -> list[float]:
+        samples = []
+        for _ in range(iterations):
+            started = time.perf_counter()
+            run()
+            samples.append(time.perf_counter() - started)
+        return samples
+
+    individual_times = measure(individual_forward)
+    batched_times = measure(batched_forward)
+    individual_median = statistics.median(individual_times)
+    batched_median = statistics.median(batched_times)
+    return {
+        "batch_size": len(sequences),
+        "sequence_length": sequence_length,
+        "iterations": iterations,
+        "warmup_iterations": warmup,
+        "correctness": {"max_absolute_logit_error": max_absolute_error, "matches_within_1e-9": max_absolute_error <= 1e-9},
+        "individual_execution": {
+            "median_milliseconds_per_batch": individual_median * 1000,
+            "sequences_per_second": len(sequences) / statistics.mean(individual_times),
+        },
+        "batched_execution": {
+            "median_milliseconds_per_batch": batched_median * 1000,
+            "sequences_per_second": len(sequences) / statistics.mean(batched_times),
+        },
+        "median_speedup_ratio": individual_median / batched_median if batched_median > 0 else None,
+        "notes": [
+            "Forward-only comparison; excludes backward pass and optimizer updates.",
+            "Speedup ratio above 1 means batched execution was faster in this run.",
+            "Small pure-Python workloads can be noisy; repeat on the target machine.",
+        ],
+    }
+
+
 def parameter_count(model: TransformerLanguageModel) -> int:
     """Count scalar values in all trainable parameters."""
     return sum(len(parameter._values) for parameter in model.parameters())
@@ -31,6 +103,8 @@ def benchmark(
     prompt_length: int,
     new_tokens: int,
     seed: int,
+    batch_size: int = 4,
+    batch_sequence_length: int = 8,
 ) -> dict[str, object]:
     if warmup < 0:
         raise ValueError("warmup must be non-negative")
@@ -38,6 +112,8 @@ def benchmark(
         raise ValueError("iterations must be positive")
     if prompt_length <= 0 or new_tokens <= 0:
         raise ValueError("prompt_length and new_tokens must be positive")
+    if batch_size <= 0 or batch_sequence_length <= 0:
+        raise ValueError("batch_size and batch_sequence_length must be positive")
 
     model = TransformerLanguageModel(
         vocab_size=64,
@@ -68,6 +144,19 @@ def benchmark(
         durations.append(time.perf_counter() - started)
 
     total_seconds = sum(durations)
+    comparison_model = TransformerLanguageModel(
+        vocab_size=64,
+        hidden_size=16,
+        intermediate_size=32,
+        num_layers=1,
+        max_sequence_length=max(32, batch_sequence_length),
+        seed=seed,
+    )
+    sequences = [[(row * 7 + col) % comparison_model.vocab_size for col in range(batch_sequence_length)]
+                 for row in range(batch_size)]
+    batch_comparison = compare_batch_execution(
+        comparison_model, sequences, warmup=warmup, iterations=iterations
+    )
     return {
         "benchmark": "aria_local_autoregressive_inference",
         "model": {
@@ -97,6 +186,7 @@ def benchmark(
             "tokens_per_second": (iterations * new_tokens / total_seconds)
             if total_seconds > 0 else None,
         },
+        "batch_execution_comparison": batch_comparison,
         "environment": {
             "python_version": sys.version.split()[0],
             "implementation": platform.python_implementation(),
@@ -118,6 +208,8 @@ def main() -> None:
     parser.add_argument("--prompt-length", type=int, default=8)
     parser.add_argument("--new-tokens", type=int, default=4)
     parser.add_argument("--seed", type=int, default=17)
+    parser.add_argument("--batch-size", type=int, default=4)
+    parser.add_argument("--batch-sequence-length", type=int, default=8)
     args = parser.parse_args()
     print(json.dumps(benchmark(
         warmup=args.warmup,
@@ -125,6 +217,8 @@ def main() -> None:
         prompt_length=args.prompt_length,
         new_tokens=args.new_tokens,
         seed=args.seed,
+        batch_size=args.batch_size,
+        batch_sequence_length=args.batch_sequence_length,
     ), indent=2))
 
 
