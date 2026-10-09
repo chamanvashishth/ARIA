@@ -8,7 +8,7 @@ from aria.brain.language_model import _log_softmax_loss
 from aria.brain.module import Module
 from aria.brain.optim import LearningRateScheduler, SGD
 from aria.evaluation import EvaluationResult, evaluate_language_model
-from aria.training.dataset import TokenWindowDataset
+from aria.training.dataset import TokenBatchSampler, TokenWindowDataset
 
 
 @dataclass(frozen=True)
@@ -128,29 +128,56 @@ class LanguageModelTrainer:
             history.append(self.train_batch(indices))
         return history
 
-    def train_epoch(self) -> list[TrainingStep]:
-        """Train exactly once on every dataset example."""
+    def train_epoch(
+        self,
+        *,
+        epoch: int = 0,
+        shuffle: bool = False,
+        seed: int = 0,
+        drop_last: bool = False,
+    ) -> list[TrainingStep]:
+        """Train one dataset pass using deterministic sampled mini-batches."""
 
         if len(self.dataset) == 0:
             raise ValueError("dataset must contain at least one training example")
-        start = self.step_count % len(self.dataset)
-        history = []
-        for offset in range(0, len(self.dataset), self.batch_size):
-            indices = [
-                (start + item) % len(self.dataset)
-                for item in range(offset, min(offset + self.batch_size, len(self.dataset)))
-            ]
-            history.append(self.train_batch(indices))
+        sampler = TokenBatchSampler(
+            self.dataset,
+            self.batch_size,
+            shuffle=shuffle,
+            seed=seed,
+            drop_last=drop_last,
+        )
+        history = [
+            self.train_batch(indices)
+            for indices in sampler.batches(epoch=epoch)
+        ]
         return history
 
-    def train_epochs(self, epochs: int) -> list[TrainingStep]:
-        """Train for a fixed number of complete dataset passes."""
+    def train_epochs(
+        self,
+        epochs: int,
+        *,
+        shuffle: bool = False,
+        seed: int = 0,
+        drop_last: bool = False,
+        start_epoch: int = 0,
+    ) -> list[TrainingStep]:
+        """Train for complete dataset passes with reproducible epoch shuffling."""
 
         if epochs <= 0:
             raise ValueError("epochs must be positive")
+        if start_epoch < 0:
+            raise ValueError("start_epoch must be non-negative")
         history = []
-        for _ in range(epochs):
-            history.extend(self.train_epoch())
+        for epoch in range(start_epoch, start_epoch + epochs):
+            history.extend(
+                self.train_epoch(
+                    epoch=epoch,
+                    shuffle=shuffle,
+                    seed=seed,
+                    drop_last=drop_last,
+                )
+            )
         return history
 
     def train_and_evaluate(
