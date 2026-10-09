@@ -36,7 +36,7 @@ class ByteTokenizer:
                 continue
             else:
                 raise ValueError(f"invalid token id: {token_id}")
-        return bytes(byte_values).decode("utf-8", errors="strict")
+        return bytes(byte_values).decode("utf-8", errors="replace")
 
     def token_to_bytes(self, token_id: int) -> bytes:
         if 0 <= token_id <= 255:
