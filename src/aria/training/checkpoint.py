@@ -46,12 +46,15 @@ class TrainingCheckpoint:
             raise ValueError("checkpoint step cannot be negative")
         if any(not math.isfinite(loss) for loss in self.losses):
             raise ValueError("checkpoint losses must be finite")
-        if self.config.learning_rate <= 0:
-            raise ValueError("checkpoint learning rate must be positive")
+        if not math.isfinite(self.config.learning_rate) or self.config.learning_rate <= 0:
+            raise ValueError("checkpoint learning rate must be finite and positive")
         if self.config.sequence_length <= 0 or self.config.steps <= 0 or self.config.batch_size <= 0:
             raise ValueError("checkpoint training dimensions must be positive")
-        if self.optimizer_learning_rate is not None and self.optimizer_learning_rate <= 0:
-            raise ValueError("checkpoint optimizer learning rate must be positive")
+        if self.optimizer_learning_rate is not None and (
+            not math.isfinite(self.optimizer_learning_rate)
+            or self.optimizer_learning_rate <= 0
+        ):
+            raise ValueError("checkpoint optimizer learning rate must be finite and positive")
 
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = asdict(self)
@@ -92,15 +95,18 @@ class TrainingCheckpoint:
             raise ValueError("checkpoint step cannot be negative")
         if any(not math.isfinite(loss) for loss in checkpoint.losses):
             raise ValueError("checkpoint losses must be finite")
-        if checkpoint.config.learning_rate <= 0:
-            raise ValueError("checkpoint learning rate must be positive")
+        if not math.isfinite(checkpoint.config.learning_rate) or checkpoint.config.learning_rate <= 0:
+            raise ValueError("checkpoint learning rate must be finite and positive")
         if checkpoint.config.sequence_length <= 0 or checkpoint.config.steps <= 0 or checkpoint.config.batch_size <= 0:
             raise ValueError("checkpoint training dimensions must be positive")
         if (
             checkpoint.optimizer_learning_rate is not None
-            and checkpoint.optimizer_learning_rate <= 0
+            and (
+                not math.isfinite(checkpoint.optimizer_learning_rate)
+                or checkpoint.optimizer_learning_rate <= 0
+            )
         ):
-            raise ValueError("checkpoint optimizer learning rate must be positive")
+            raise ValueError("checkpoint optimizer learning rate must be finite and positive")
         return checkpoint
 
 
@@ -156,6 +162,7 @@ def restore_model_state(
             f"(missing={missing}, unexpected={unexpected})"
         )
 
+    # Validate every entry before mutating any parameter.
     for name, parameter in named.items():
         values = parameter_values[name]
         shape = tuple(parameter_shapes.get(name, []))
@@ -168,7 +175,11 @@ def restore_model_state(
                 f"checkpoint value count mismatch for {name}: "
                 f"expected {len(parameter._values)}, got {len(values)}"
             )
-        parameter._values = list(values)
+        if not all(math.isfinite(value) for value in values):
+            raise ValueError(f"checkpoint parameter values must be finite for {name}")
+
+    for name, parameter in named.items():
+        parameter._values = list(parameter_values[name])
         parameter.data = _reshape(parameter._values, parameter.shape)
         parameter.zero_grad()
 
@@ -350,12 +361,49 @@ def restore_training_checkpoint(
             f"{checkpoint.config.sequence_length} != {trainer.dataset.sequence_length}"
         )
 
+    if checkpoint.step < 0:
+        raise ValueError("checkpoint step cannot be negative")
+    if checkpoint.config.batch_size <= 0:
+        raise ValueError("checkpoint batch size must be positive")
+    if checkpoint.optimizer_learning_rate is not None and (
+        not math.isfinite(checkpoint.optimizer_learning_rate)
+        or checkpoint.optimizer_learning_rate <= 0
+    ):
+        raise ValueError("checkpoint optimizer learning rate must be finite and positive")
+
+    # Validate all model state before touching model, optimizer, or trainer.
+    named_parameters = _named_parameters(model)
+    expected_names = set(named_parameters)
+    actual_names = set(checkpoint.parameter_values)
+    if expected_names != actual_names:
+        missing = sorted(expected_names - actual_names)
+        unexpected = sorted(actual_names - expected_names)
+        raise ValueError(
+            "checkpoint parameter names do not match "
+            f"(missing={missing}, unexpected={unexpected})"
+        )
+    for name, parameter in named_parameters.items():
+        values = checkpoint.parameter_values[name]
+        shape = tuple(checkpoint.parameter_shapes.get(name, []))
+        if shape != parameter.shape:
+            raise ValueError(
+                f"checkpoint shape mismatch for {name}: expected {parameter.shape}, got {shape}"
+            )
+        if len(values) != len(parameter._values):
+            raise ValueError(
+                f"checkpoint value count mismatch for {name}: "
+                f"expected {len(parameter._values)}, got {len(values)}"
+            )
+        if not all(math.isfinite(value) for value in values):
+            raise ValueError(f"checkpoint parameter values must be finite for {name}")
     _restore_scheduler_state(trainer.scheduler, checkpoint.scheduler_state)
+
     restore_model_state(model, checkpoint.parameter_values, checkpoint.parameter_shapes)
     if checkpoint.optimizer_learning_rate is not None:
         optimizer.learning_rate = checkpoint.optimizer_learning_rate
     trainer.step_count = checkpoint.step
     trainer.batch_size = checkpoint.config.batch_size
+    optimizer.zero_grad()
     return checkpoint
 
 
