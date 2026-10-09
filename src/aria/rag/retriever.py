@@ -10,7 +10,7 @@ from collections.abc import Iterable
 from aria.rag.documents import DocumentChunk
 
 
-_TOKEN_PATTERN = re.compile(r"[^\W_]+", flags=re.UNICODE)
+_TOKEN_PATTERN = re.compile(r"(?:[^\W_]|[\u0900-\u097F])+", flags=re.UNICODE)
 
 
 def tokenize_terms(text: str) -> list[str]:
