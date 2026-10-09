@@ -119,11 +119,12 @@ class LanguageModelTrainer:
         if len(self.dataset) == 0:
             raise ValueError("dataset must contain at least one training example")
         history = []
+        effective_batch_size = min(self.batch_size, len(self.dataset))
         for _ in range(steps):
-            start = (self.step_count * self.batch_size) % len(self.dataset)
+            start = (self.step_count * effective_batch_size) % len(self.dataset)
             indices = [
                 (start + item) % len(self.dataset)
-                for item in range(self.batch_size)
+                for item in range(effective_batch_size)
             ]
             history.append(self.train_batch(indices))
         return history
