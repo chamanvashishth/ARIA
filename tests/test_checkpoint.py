@@ -119,7 +119,7 @@ def test_checkpoint_has_version_and_atomic_save(tmp_path: Path) -> None:
     )
 
     payload = path.read_text(encoding="utf-8")
-    assert '"format_version": 1' in payload
+    assert '"format_version": 2' in payload
     assert not (tmp_path / ".checkpoint.json.tmp").exists()
 
 
