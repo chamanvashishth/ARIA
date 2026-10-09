@@ -168,6 +168,19 @@ class Tensor:
             raise ValueError("item() requires a scalar tensor")
         return self._values[0]
 
+    def reshape(self, shape: Shape) -> Tensor:
+        """Return a view-like tensor with the same values and a gradient path."""
+        if any(dim < 0 for dim in shape):
+            raise ValueError("tensor dimensions must be non-negative")
+        if prod(shape) != len(self._values):
+            raise ValueError("reshape must preserve the number of values")
+        out = Tensor.operation(
+            _build(self._values, shape),
+            parents=(self,),
+            backward=lambda result: self._accumulate(result.grad._values) if self.requires_grad else None,
+        )
+        return out
+
     def to_list(self) -> object:
         return _build(self._values, self.shape)
 
