@@ -91,6 +91,64 @@ def compare_batch_execution(
     }
 
 
+
+def benchmark_batch_sweep(
+    *,
+    batch_sizes: list[int],
+    sequence_lengths: list[int],
+    warmup: int,
+    iterations: int,
+    seed: int,
+) -> dict[str, object]:
+    """Measure a batch-size/sequence-length grid with consistent model settings."""
+    if not batch_sizes or any(size <= 0 for size in batch_sizes):
+        raise ValueError("batch_sizes must contain positive integers")
+    if not sequence_lengths or any(length <= 0 for length in sequence_lengths):
+        raise ValueError("sequence_lengths must contain positive integers")
+    if warmup < 0 or iterations <= 0:
+        raise ValueError("warmup must be non-negative and iterations must be positive")
+
+    results = []
+    for sequence_length in sequence_lengths:
+        model = TransformerLanguageModel(
+            vocab_size=64,
+            hidden_size=16,
+            intermediate_size=32,
+            num_layers=1,
+            max_sequence_length=max(32, sequence_length),
+            seed=seed,
+        )
+        for batch_size in batch_sizes:
+            sequences = [
+                [(row * 7 + col) % model.vocab_size for col in range(sequence_length)]
+                for row in range(batch_size)
+            ]
+            result = compare_batch_execution(
+                model, sequences, warmup=warmup, iterations=iterations
+            )
+            results.append(result)
+
+    return {
+        "benchmark": "aria_transformer_batch_sweep",
+        "model": {
+            "vocab_size": 64,
+            "hidden_size": 16,
+            "intermediate_size": 32,
+            "num_layers": 1,
+            "trained": False,
+            "seed": seed,
+        },
+        "warmup_iterations": warmup,
+        "measured_iterations": iterations,
+        "results": results,
+        "notes": [
+            "Forward-only; excludes backward pass and optimizer updates.",
+            "Compare ratios within this run; avoid treating small differences as universal.",
+            "Logits are checked against individual execution for every grid point.",
+        ],
+    }
+
+
 def parameter_count(model: TransformerLanguageModel) -> int:
     """Count scalar values in all trainable parameters."""
     return sum(len(parameter._values) for parameter in model.parameters())
@@ -210,8 +268,9 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--batch-sequence-length", type=int, default=8)
+    parser.add_argument("--sweep", action="store_true", help="also benchmark batch sizes 1,2,4,8 across sequence lengths 4,8,16")
     args = parser.parse_args()
-    print(json.dumps(benchmark(
+    report = benchmark(
         warmup=args.warmup,
         iterations=args.iterations,
         prompt_length=args.prompt_length,
@@ -219,7 +278,16 @@ def main() -> None:
         seed=args.seed,
         batch_size=args.batch_size,
         batch_sequence_length=args.batch_sequence_length,
-    ), indent=2))
+    )
+    if args.sweep:
+        report["batch_sweep"] = benchmark_batch_sweep(
+            batch_sizes=[1, 2, 4, 8],
+            sequence_lengths=[4, 8, 16],
+            warmup=args.warmup,
+            iterations=args.iterations,
+            seed=args.seed,
+        )
+    print(json.dumps(report, indent=2))
 
 
 if __name__ == "__main__":
