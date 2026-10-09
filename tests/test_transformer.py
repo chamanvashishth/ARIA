@@ -240,3 +240,27 @@ def test_transformer_batched_gradient_checker_passes() -> None:
 
     assert report.passed
     assert report.checked_values == 8
+
+
+
+def test_batched_causal_attention_gradients_match_finite_differences() -> None:
+    from aria.brain import Parameter
+    from aria.brain.transformer import CausalSelfAttention
+    from aria.evaluation import check_gradients
+
+    inputs = Parameter([
+        [[0.2, -0.4], [0.7, 0.1]],
+        [[-0.3, 0.5], [0.9, -0.2]],
+    ])
+    attention = CausalSelfAttention(hidden_size=2, seed=76)
+
+    def loss():
+        output = attention.forward(inputs)
+        return (output * output).sum()
+
+    parameters = [inputs, *attention.parameters()]
+    report = check_gradients(loss, parameters, max_checks=None)
+
+    assert report.passed
+    assert report.checked_values == sum(len(parameter._values) for parameter in parameters)
+    assert report.max_absolute_error < 1e-5
