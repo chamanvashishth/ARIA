@@ -321,3 +321,33 @@ def test_transformer_block_gradients_match_finite_differences() -> None:
     assert report.passed
     assert report.checked_values == sum(len(parameter._values) for parameter in parameters)
     assert report.max_absolute_error < 2e-5
+
+
+
+def test_transformer_language_model_all_parameter_gradients_match_finite_differences() -> None:
+    from aria.evaluation import check_gradients
+
+    # Keep the model tiny so every scalar parameter can be checked exhaustively.
+    model = TransformerLanguageModel(
+        vocab_size=3,
+        hidden_size=2,
+        intermediate_size=2,
+        num_layers=1,
+        max_sequence_length=2,
+        seed=123,
+    )
+
+    report = check_gradients(
+        lambda: model.loss_batch([[0, 1]], [[1, 2]]),
+        model.parameters(),
+        epsilon=1e-5,
+        absolute_tolerance=3e-5,
+        relative_tolerance=3e-4,
+        max_checks=None,
+    )
+
+    assert report.passed
+    assert report.checked_values == sum(
+        len(parameter._values) for parameter in model.parameters()
+    )
+    assert report.max_absolute_error < 3e-5
