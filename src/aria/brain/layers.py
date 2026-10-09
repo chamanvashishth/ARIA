@@ -23,9 +23,11 @@ class Linear(Module):
         self.bias = Parameter([0.0] * out_features) if bias else None
 
     def forward(self, x: Tensor) -> Tensor:
-        if len(x.shape) != 2:
-            raise ValueError("Linear input must be 2-D")
-        batch, in_features = x.shape
+        if len(x.shape) < 2:
+            raise ValueError("Linear input must have at least 2 dimensions")
+        leading_shape = x.shape[:-1]
+        rows = math.prod(leading_shape)
+        in_features = x.shape[-1]
         if in_features != self.weight.shape[0]:
             raise ValueError("Linear input dimension does not match weight")
         out_features = self.weight.shape[1]
@@ -33,29 +35,35 @@ class Linear(Module):
         values = [
             sum(xv[row * in_features + k] * wv[k * out_features + col] for k in range(in_features))
             + (self.bias._values[col] if self.bias is not None else 0.0)
-            for row in range(batch)
+            for row in range(rows)
             for col in range(out_features)
         ]
-        output_data = [values[i * out_features:(i + 1) * out_features] for i in range(batch)]
 
         def backward(out: Tensor) -> None:
             grad = out.grad._values
             if x.requires_grad:
-                dx = []
-                for row in range(batch):
-                    for k in range(in_features):
-                        dx.append(sum(grad[row * out_features + col] * wv[k * out_features + col] for col in range(out_features)))
+                dx = [
+                    sum(grad[row * out_features + col] * wv[k * out_features + col] for col in range(out_features))
+                    for row in range(rows)
+                    for k in range(in_features)
+                ]
                 x._accumulate(dx)
             if self.weight.requires_grad:
-                dw = []
-                for k in range(in_features):
-                    for col in range(out_features):
-                        dw.append(sum(xv[row * in_features + k] * grad[row * out_features + col] for row in range(batch)))
+                dw = [
+                    sum(xv[row * in_features + k] * grad[row * out_features + col] for row in range(rows))
+                    for k in range(in_features)
+                    for col in range(out_features)
+                ]
                 self.weight._accumulate(dw)
             if self.bias is not None and self.bias.requires_grad:
-                self.bias._accumulate([sum(grad[row * out_features + col] for row in range(batch)) for col in range(out_features)])
+                self.bias._accumulate([
+                    sum(grad[row * out_features + col] for row in range(rows))
+                    for col in range(out_features)
+                ])
 
-        return Tensor.operation(output_data, parents=(x, self.weight, *( (self.bias,) if self.bias is not None else () )), backward=backward)
+        parents = (x, self.weight, *((self.bias,) if self.bias is not None else ()))
+        return Tensor.operation(_reshape(values, (*leading_shape, out_features)), parents=parents, backward=backward)
+
 
 
 class ReLU(Module):
