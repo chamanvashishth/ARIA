@@ -225,3 +225,48 @@ def test_train_epochs_supports_seeded_shuffle() -> None:
 
     assert len(history) == 2 * ((len(dataset) + 1) // 2)
     assert trainer.step_count == len(history)
+
+
+def test_tiny_language_model_batched_logits_match_per_sequence_forward() -> None:
+    model = TinyLanguageModel(vocab_size=7, embedding_dim=5, seed=81)
+    inputs = [[1, 2, 3], [3, 4, 5]]
+    batched = model.forward_batch(inputs)
+
+    expected = [
+        value
+        for sequence in inputs
+        for value in model.forward(sequence)._values
+    ]
+    assert batched.shape == (len(inputs) * len(inputs[0]), 7)
+    assert batched._values == pytest.approx(expected)
+
+
+def test_tiny_language_model_batched_loss_matches_mean_of_sequence_losses() -> None:
+    model = TinyLanguageModel(vocab_size=7, embedding_dim=5, seed=82)
+    inputs = [[1, 2, 3], [3, 4, 5]]
+    targets = [[2, 3, 4], [4, 5, 6]]
+
+    batched_loss = model.loss_batch(inputs, targets).item()
+    individual_losses = [
+        model.loss(sequence, target).item()
+        for sequence, target in zip(inputs, targets)
+    ]
+
+    assert batched_loss == pytest.approx(sum(individual_losses) / len(individual_losses))
+
+
+def test_trainer_uses_batched_loss_path_for_tiny_model() -> None:
+    dataset = TokenWindowDataset([1, 2, 3, 4, 5, 6], sequence_length=2, stride=2)
+    model = TinyLanguageModel(vocab_size=7, embedding_dim=4, seed=83)
+    trainer = LanguageModelTrainer(
+        model,
+        SGD(model.parameters(), learning_rate=0.01),
+        dataset,
+        batch_size=2,
+    )
+
+    history = trainer.train_batch([0, 1])
+
+    assert len(history) == 1
+    assert history[0].loss > 0
+    assert trainer.step_count == 1
