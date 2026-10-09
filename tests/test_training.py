@@ -296,3 +296,36 @@ def test_transformer_trainer_uses_batched_loss_for_mini_batch() -> None:
     assert result.loss > 0
     assert trainer.step_count == 1
     assert model.lm_head.weight._values != before
+
+
+
+def test_transformer_training_reduces_fixed_corpus_loss_and_keeps_parameters_finite() -> None:
+    from aria.evaluation import inspect_parameter_health
+
+    token_ids = [1, 2] * 8
+    dataset = TokenWindowDataset(token_ids, sequence_length=2, stride=1)
+    model = TransformerLanguageModel(
+        vocab_size=3,
+        hidden_size=4,
+        intermediate_size=8,
+        num_layers=1,
+        max_sequence_length=2,
+        seed=124,
+    )
+    optimizer = SGD(model.parameters(), learning_rate=0.02)
+    examples = [dataset[index] for index in range(len(dataset))]
+
+    initial_loss = evaluate_language_model(model, examples).mean_loss
+    trainer = LanguageModelTrainer(model, optimizer, dataset, batch_size=2)
+    history = trainer.train(60)
+    final_loss = evaluate_language_model(model, examples).mean_loss
+    health = inspect_parameter_health(model)
+
+    assert len(history) == 60
+    assert trainer.step_count == 60
+    assert final_loss < initial_loss
+    assert all(__import__("math").isfinite(step.loss) for step in history)
+    assert health.healthy
+    assert health.parameter_count == sum(
+        len(parameter._values) for parameter in model.parameters()
+    )
