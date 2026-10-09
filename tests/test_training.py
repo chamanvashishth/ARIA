@@ -376,7 +376,7 @@ def test_trainer_rejects_non_finite_gradients_without_updating_parameters(monkey
             ),
         )
 
-    monkeypatch.setattr(trainer_module, "_log_softmax_loss", invalid_loss)
+    monkeypatch.setattr(model, "loss_batch", invalid_loss)
 
     with pytest.raises(ValueError, match="training gradients must be finite"):
         trainer.train_batch([0])
