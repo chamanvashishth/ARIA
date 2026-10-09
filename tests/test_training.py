@@ -5,6 +5,7 @@ from aria.evaluation import evaluate_language_model
 from aria.tokenizer import ByteTokenizer
 from aria.training import (
     LanguageModelTrainer,
+    TokenBatchSampler,
     TokenWindowDataset,
     build_train_validation_datasets,
     split_token_ids,
@@ -185,3 +186,42 @@ def test_batch_size_must_be_positive() -> None:
     dataset = TokenWindowDataset([1, 2, 1, 2], sequence_length=2)
     with pytest.raises(ValueError, match="batch_size"):
         LanguageModelTrainer(model, SGD(model.parameters(), learning_rate=0.01), dataset, batch_size=0)
+
+
+
+def test_batch_sampler_is_deterministic_and_covers_each_index_once() -> None:
+    dataset = TokenWindowDataset(list(range(20)), sequence_length=2, stride=2)
+    sampler = TokenBatchSampler(dataset, batch_size=3, shuffle=True, seed=17)
+    first = sampler.batches(epoch=4)
+    second = sampler.batches(epoch=4)
+
+    assert first == second
+    assert sorted(index for batch in first for index in batch) == list(range(len(dataset)))
+    assert all(0 < len(batch) <= 3 for batch in first)
+    assert sampler.batches(epoch=5) != first
+
+
+def test_batch_sampler_drop_last_and_invalid_epoch() -> None:
+    dataset = TokenWindowDataset(list(range(12)), sequence_length=2, stride=2)
+    sampler = TokenBatchSampler(dataset, batch_size=2, drop_last=True)
+    batches = sampler.batches()
+
+    assert all(len(batch) == 2 for batch in batches)
+    with pytest.raises(ValueError, match="epoch"):
+        sampler.batches(epoch=-1)
+
+
+def test_train_epochs_supports_seeded_shuffle() -> None:
+    dataset = TokenWindowDataset([1, 2, 3, 4, 5, 6, 1, 2, 3], sequence_length=2, stride=1)
+    model = TinyLanguageModel(vocab_size=7, embedding_dim=4, seed=34)
+    trainer = LanguageModelTrainer(
+        model,
+        SGD(model.parameters(), learning_rate=0.01),
+        dataset,
+        batch_size=2,
+    )
+
+    history = trainer.train_epochs(2, shuffle=True, seed=99)
+
+    assert len(history) == 2 * ((len(dataset) + 1) // 2)
+    assert trainer.step_count == len(history)
