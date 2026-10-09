@@ -33,3 +33,20 @@ def test_module_collects_parameters() -> None:
 def test_rejects_ragged_tensor() -> None:
     with pytest.raises(ValueError):
         Tensor.from_list([[1.0], [2.0, 3.0]])
+
+
+
+def test_repeated_backward_reuses_graph_without_stale_intermediate_gradients() -> None:
+    x = Parameter(2.0)
+    squared = x * x
+    loss = squared.sum()
+
+    loss.backward()
+    assert x.grad is not None
+    assert x.grad.item() == pytest.approx(4.0)
+
+    loss.backward()
+    assert x.grad is not None
+    # Leaf gradients accumulate, but the intermediate squared gradient must
+    # be recomputed instead of retaining its value from the previous traversal.
+    assert x.grad.item() == pytest.approx(8.0)
