@@ -50,3 +50,31 @@ def test_repeated_backward_reuses_graph_without_stale_intermediate_gradients() -
     # Leaf gradients accumulate, but the intermediate squared gradient must
     # be recomputed instead of retaining its value from the previous traversal.
     assert x.grad.item() == pytest.approx(8.0)
+
+
+
+def test_shared_intermediate_accumulates_gradients_from_both_branches() -> None:
+    x = Parameter(2.0)
+    shared = x * x
+    left = shared * 3.0
+    right = shared * 5.0
+    loss = (left + right).sum()
+
+    loss.backward()
+
+    assert shared.grad is not None
+    assert shared.grad.item() == pytest.approx(8.0)
+    assert x.grad is not None
+    assert x.grad.item() == pytest.approx(32.0)
+
+
+def test_repeated_backward_on_branching_graph_accumulates_only_leaf_gradients() -> None:
+    x = Parameter(2.0)
+    shared = x * x
+    loss = (shared * 3.0 + shared * 5.0).sum()
+
+    loss.backward()
+    loss.backward()
+
+    assert x.grad is not None
+    assert x.grad.item() == pytest.approx(64.0)
