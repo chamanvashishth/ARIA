@@ -22,7 +22,7 @@ from aria.training.trainer import (
 
 __all__ = [
     "LanguageModelTrainer",
-    "TokenWindowDataset",
+    "TokenBatchSampler",\n    "TokenWindowDataset",
     "build_train_validation_datasets",
     "split_token_ids",
     "TrainingCheckpoint",
