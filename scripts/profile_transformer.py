@@ -12,6 +12,7 @@ import json
 import platform
 import statistics
 import sys
+from pathlib import Path
 import time
 from collections.abc import Callable
 
@@ -181,6 +182,10 @@ def main() -> None:
         "--sweep", action="store_true",
         help="also profile batch sizes 1,2,4 across sequence lengths 4,8,16",
     )
+    parser.add_argument(
+        "--output", type=Path,
+        help="write the JSON report to this file instead of standard output",
+    )
     args = parser.parse_args()
     report = profile_transformer_components(
         batch_size=args.batch_size, sequence_length=args.sequence_length,
@@ -194,7 +199,11 @@ def main() -> None:
             warmup=args.warmup,
             seed=args.seed,
         )
-    print(json.dumps(report, indent=2))
+    rendered = json.dumps(report, indent=2) + "\\n"
+    if args.output:
+        args.output.write_text(rendered, encoding="utf-8")
+    else:
+        print(rendered, end="")
 
 
 if __name__ == "__main__":
