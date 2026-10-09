@@ -129,6 +129,47 @@ def profile_transformer_components(
     }
 
 
+
+def profile_transformer_sweep(
+    *,
+    batch_sizes: list[int],
+    sequence_lengths: list[int],
+    iterations: int = 5,
+    warmup: int = 1,
+    seed: int = 29,
+) -> dict[str, object]:
+    """Profile a grid of batch sizes and sequence lengths."""
+    if not batch_sizes or any(size <= 0 for size in batch_sizes):
+        raise ValueError("batch_sizes must contain positive integers")
+    if not sequence_lengths or any(length <= 0 for length in sequence_lengths):
+        raise ValueError("sequence_lengths must contain positive integers")
+    if iterations <= 0 or warmup < 0:
+        raise ValueError("iterations must be positive and warmup must be non-negative")
+
+    results = []
+    for sequence_length in sequence_lengths:
+        for batch_size in batch_sizes:
+            results.append(profile_transformer_components(
+                batch_size=batch_size,
+                sequence_length=sequence_length,
+                iterations=iterations,
+                warmup=warmup,
+                seed=seed,
+            ))
+    return {
+        "benchmark": "aria_transformer_component_profile_sweep",
+        "batch_sizes": batch_sizes,
+        "sequence_lengths": sequence_lengths,
+        "iterations": iterations,
+        "warmup": warmup,
+        "results": results,
+        "notes": [
+            "Each configuration creates a fresh deterministically seeded model.",
+            "Compare component timings across configurations on the same machine.",
+            "This sweep profiles diagnostic small models, not production workloads.",
+        ],
+    }
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--batch-size", type=int, default=2)
@@ -136,11 +177,24 @@ def main() -> None:
     parser.add_argument("--iterations", type=int, default=5)
     parser.add_argument("--warmup", type=int, default=1)
     parser.add_argument("--seed", type=int, default=29)
+    parser.add_argument(
+        "--sweep", action="store_true",
+        help="also profile batch sizes 1,2,4 across sequence lengths 4,8,16",
+    )
     args = parser.parse_args()
-    print(json.dumps(profile_transformer_components(
+    report = profile_transformer_components(
         batch_size=args.batch_size, sequence_length=args.sequence_length,
         iterations=args.iterations, warmup=args.warmup, seed=args.seed,
-    ), indent=2))
+    )
+    if args.sweep:
+        report["sweep"] = profile_transformer_sweep(
+            batch_sizes=[1, 2, 4],
+            sequence_lengths=[4, 8, 16],
+            iterations=args.iterations,
+            warmup=args.warmup,
+            seed=args.seed,
+        )
+    print(json.dumps(report, indent=2))
 
 
 if __name__ == "__main__":
