@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from aria.brain.module import Module
-from aria.brain.optim import SGD
+from aria.brain.optim import ExponentialDecay, SGD, StepDecay
 from aria.brain.parameter import Parameter
 from aria.evaluation import evaluate_language_model
 
@@ -31,7 +31,7 @@ class TrainingCheckpoint:
     Older metadata-only checkpoints remain loadable with an empty mapping.
     """
 
-    FORMAT_VERSION = 1
+    FORMAT_VERSION = 2
 
     step: int
     losses: list[float]
@@ -39,6 +39,7 @@ class TrainingCheckpoint:
     parameter_values: dict[str, list[float]] = field(default_factory=dict)
     parameter_shapes: dict[str, list[int]] = field(default_factory=dict)
     optimizer_learning_rate: float | None = None
+    scheduler_state: dict[str, Any] | None = None
 
     def save(self, path: Path) -> None:
         if self.step < 0:
@@ -66,7 +67,7 @@ class TrainingCheckpoint:
     def load(cls, path: Path) -> "TrainingCheckpoint":
         payload = json.loads(path.read_text(encoding="utf-8"))
         version = payload.get("format_version", 0)
-        if version not in (0, cls.FORMAT_VERSION):
+        if version not in (0, 1, cls.FORMAT_VERSION):
             raise ValueError(f"unsupported checkpoint format version: {version}")
         checkpoint = cls(
             step=int(payload["step"]),
@@ -85,6 +86,7 @@ class TrainingCheckpoint:
                 if payload.get("optimizer_learning_rate") is None
                 else float(payload["optimizer_learning_rate"])
             ),
+            scheduler_state=payload.get("scheduler_state"),
         )
         if checkpoint.step < 0:
             raise ValueError("checkpoint step cannot be negative")
@@ -193,6 +195,7 @@ def train_with_checkpoint(
         parameter_values=parameter_values,
         parameter_shapes=parameter_shapes,
         optimizer_learning_rate=optimizer.learning_rate,
+        scheduler_state=_capture_scheduler_state(trainer.scheduler),
     )
     checkpoint.save(checkpoint_path)
     return checkpoint
@@ -263,6 +266,7 @@ def train_with_best_validation_checkpoint(
                 parameter_values=parameter_values,
                 parameter_shapes=parameter_shapes,
                 optimizer_learning_rate=optimizer.learning_rate,
+                scheduler_state=_capture_scheduler_state(trainer.scheduler),
             )
             best_checkpoint.save(checkpoint_path)
         else:
@@ -273,6 +277,61 @@ def train_with_best_validation_checkpoint(
     if best_checkpoint is None:
         raise RuntimeError("training produced no validation checkpoint")
     return best_checkpoint, trainer.step_count
+
+
+def _capture_scheduler_state(scheduler) -> dict[str, Any] | None:
+    """Capture configuration for schedulers whose behavior is deterministic."""
+    if scheduler is None:
+        return None
+    if isinstance(scheduler, ExponentialDecay):
+        return {
+            "type": "ExponentialDecay",
+            "gamma": scheduler.gamma,
+            "minimum": scheduler.minimum,
+        }
+    if isinstance(scheduler, StepDecay):
+        return {
+            "type": "StepDecay",
+            "drop_every": scheduler.drop_every,
+            "gamma": scheduler.gamma,
+            "minimum": scheduler.minimum,
+        }
+    raise ValueError(
+        "checkpointing does not support scheduler type "
+        f"{type(scheduler).__name__}; use ExponentialDecay or StepDecay"
+    )
+
+
+def _restore_scheduler_state(scheduler, state: dict[str, Any] | None) -> None:
+    """Restore a supported scheduler configuration after validating its type."""
+    if state is None:
+        return
+    if scheduler is None:
+        raise ValueError("checkpoint contains scheduler state but trainer has no scheduler")
+    scheduler_type = state.get("type")
+    if scheduler_type == "ExponentialDecay" and isinstance(scheduler, ExponentialDecay):
+        restored = ExponentialDecay(
+            gamma=float(state["gamma"]),
+            minimum=float(state["minimum"]),
+        )
+        scheduler.gamma = restored.gamma
+        scheduler.minimum = restored.minimum
+        return
+    if scheduler_type == "StepDecay" and isinstance(scheduler, StepDecay):
+        restored = StepDecay(
+            drop_every=int(state["drop_every"]),
+            gamma=float(state["gamma"]),
+            minimum=float(state["minimum"]),
+        )
+        scheduler.drop_every = restored.drop_every
+        scheduler.gamma = restored.gamma
+        scheduler.minimum = restored.minimum
+        return
+    raise ValueError(
+        "checkpoint scheduler does not match trainer scheduler "
+        f"(checkpoint={scheduler_type}, trainer={type(scheduler).__name__})"
+    )
+
 
 def restore_training_checkpoint(
     checkpoint_path: Path,
@@ -291,6 +350,7 @@ def restore_training_checkpoint(
             f"{checkpoint.config.sequence_length} != {trainer.dataset.sequence_length}"
         )
 
+    _restore_scheduler_state(trainer.scheduler, checkpoint.scheduler_state)
     restore_model_state(model, checkpoint.parameter_values, checkpoint.parameter_shapes)
     if checkpoint.optimizer_learning_rate is not None:
         optimizer.learning_rate = checkpoint.optimizer_learning_rate
