@@ -542,10 +542,10 @@ The JSON report separates forward-plus-loss time from backward time and includes
 Add `--sweep` to profile batch sizes `1, 2, 4` at sequence lengths `4, 8, 16` in the same run:
 
 ~~~bash
-python scripts/profile_transformer.py --warmup 1 --iterations 5 --sweep
+python scripts/profile_transformer.py --warmup 1 --iterations 5 --sweep --output transformer-profile.json
 ~~~
 
-The sweep emits the requested single-configuration report plus a grid of per-configuration component timings. This makes it easier to see how forward and backward costs scale with batch and sequence size without pretending to measure performance on a different machine.
+The sweep emits the requested single-configuration report plus a grid of per-configuration component timings. Use `--output transformer-profile.json` to save the report for later comparison or review. This makes it easier to see how forward and backward costs scale with batch and sequence size without pretending to measure performance on a different machine.
 
 ---
 
