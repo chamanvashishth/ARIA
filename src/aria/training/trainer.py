@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 
 from aria.brain.language_model import _log_softmax_loss
 from aria.brain.module import Module
@@ -61,12 +62,27 @@ class LanguageModelTrainer:
         self.batch_size = batch_size
         self.step_count = 0
 
+    def _validate_loss(self, loss: object) -> float:
+        value = loss.item()
+        if not math.isfinite(value):
+            raise ValueError("training loss must be finite")
+        return value
+
+    def _validate_gradients(self) -> None:
+        for parameter in self.model.parameters():
+            if parameter.grad is not None and not all(
+                math.isfinite(value) for value in parameter.grad._values
+            ):
+                raise ValueError("training gradients must be finite")
+
     def train_step(self, index: int) -> TrainingStep:
         token_ids, targets = self.dataset[index]
         self.optimizer.zero_grad()
         logits = self.model.forward(token_ids)
         loss = _log_softmax_loss(logits, targets)
+        loss_value = self._validate_loss(loss)
         loss.backward()
+        self._validate_gradients()
         self.optimizer.step()
         self.step_count += 1
         learning_rate = self.optimizer.learning_rate
@@ -98,15 +114,19 @@ class LanguageModelTrainer:
                 [tokens for tokens, _ in examples],
                 [targets for _, targets in examples],
             )
+            loss_value = self._validate_loss(loss)
             loss.backward()
-            losses.append(loss.item())
+            self._validate_gradients()
+            losses.append(loss_value)
         else:
             # The Transformer keeps examples separate until attention supports
             # a true [batch, time, hidden] path; this avoids cross-sample leakage.
             for token_ids, targets in examples:
                 loss = _log_softmax_loss(self.model.forward(token_ids), targets)
+                loss_value = self._validate_loss(loss)
                 loss.backward()
-                losses.append(loss.item())
+                self._validate_gradients()
+                losses.append(loss_value)
 
             # Each example produces a mean sequence loss. Average accumulated
             # gradients so batch size does not change update magnitude.
