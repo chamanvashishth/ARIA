@@ -42,7 +42,7 @@ class TrainingEvaluationReport:
 
 
 class LanguageModelTrainer:
-    """Run deterministic single-example or mini-batch training steps."""
+    """Run deterministic training steps with model-supported batch execution."""
 
     def __init__(
         self,
@@ -87,20 +87,34 @@ class LanguageModelTrainer:
             raise IndexError("mini-batch contains an invalid dataset index")
 
         self.optimizer.zero_grad()
+        examples = [self.dataset[index] for index in indices]
+        batched_loss = getattr(self.model, "loss_batch", None)
         losses: list[float] = []
-        for index in indices:
-            token_ids, targets = self.dataset[index]
-            loss = _log_softmax_loss(self.model.forward(token_ids), targets)
+        if callable(batched_loss):
+            # Models with an explicit batch API can perform one forward/loss
+            # pass. TinyLanguageModel flattens equal-length token positions,
+            # sharing embedding and vocabulary projections across the batch.
+            loss = batched_loss(
+                [tokens for tokens, _ in examples],
+                [targets for _, targets in examples],
+            )
             loss.backward()
             losses.append(loss.item())
+        else:
+            # The Transformer keeps examples separate until attention supports
+            # a true [batch, time, hidden] path; this avoids cross-sample leakage.
+            for token_ids, targets in examples:
+                loss = _log_softmax_loss(self.model.forward(token_ids), targets)
+                loss.backward()
+                losses.append(loss.item())
 
-        # Each example produces a mean sequence loss. Average accumulated
-        # gradients so batch size does not change update magnitude.
-        scale = 1.0 / len(indices)
-        for parameter in self.model.parameters():
-            if parameter.grad is not None:
-                parameter.grad._values = [value * scale for value in parameter.grad._values]
-                parameter.grad.data = parameter.grad.to_list()
+            # Each example produces a mean sequence loss. Average accumulated
+            # gradients so batch size does not change update magnitude.
+            scale = 1.0 / len(indices)
+            for parameter in self.model.parameters():
+                if parameter.grad is not None:
+                    parameter.grad._values = [value * scale for value in parameter.grad._values]
+                    parameter.grad.data = parameter.grad.to_list()
 
         self.optimizer.step()
         self.step_count += 1
