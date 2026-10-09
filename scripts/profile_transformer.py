@@ -199,7 +199,7 @@ def main() -> None:
             warmup=args.warmup,
             seed=args.seed,
         )
-    rendered = json.dumps(report, indent=2) + "\\n"
+    rendered = json.dumps(report, indent=2) + "\n"
     if args.output:
         args.output.write_text(rendered, encoding="utf-8")
     else:
