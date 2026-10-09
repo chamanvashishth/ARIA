@@ -34,13 +34,14 @@ class RMSNorm(Module):
         self.eps = eps
 
     def forward(self, x: Tensor) -> Tensor:
-        if len(x.shape) != 2:
-            raise ValueError("RMSNorm expects [time, hidden]")
-        time, hidden = x.shape
+        if len(x.shape) < 2:
+            raise ValueError("RMSNorm expects [..., hidden]")
+        hidden = x.shape[-1]
+        rows = math.prod(x.shape[:-1])
         xv = x._values
         out = []
         inv_rms = []
-        for row in range(time):
+        for row in range(rows):
             start = row * hidden
             rms = math.sqrt(sum(v * v for v in xv[start:start + hidden]) / hidden + self.eps)
             inv_rms.append(1.0 / rms)
@@ -50,7 +51,7 @@ class RMSNorm(Module):
             grad = result.grad._values
             dx = [0.0] * len(xv)
             dw = [0.0] * hidden
-            for row in range(time):
+            for row in range(rows):
                 start = row * hidden
                 dot = sum(grad[start + c] * self.weight._values[c] * xv[start + c] for c in range(hidden))
                 inv = inv_rms[row]
@@ -68,6 +69,7 @@ class RMSNorm(Module):
         return Tensor.operation(_reshape(out, x.shape), parents=(x, self.weight), backward=backward)
 
 
+
 class CausalSelfAttention(Module):
     """Single-head causal self-attention."""
 
@@ -79,60 +81,65 @@ class CausalSelfAttention(Module):
         self.scale = 1.0 / math.sqrt(hidden_size)
 
     def forward(self, x: Tensor) -> Tensor:
-        if len(x.shape) != 2:
-            raise ValueError("attention expects [time, hidden]")
-        time, hidden = x.shape
-        q_tensor = self.query.forward(x)
-        k_tensor = self.key.forward(x)
-        v_tensor = self.value.forward(x)
-        q = q_tensor._values
-        k = k_tensor._values
-        v = v_tensor._values
-        outputs = [0.0] * (time * hidden)
-        cache: list[tuple[list[float], list[float], list[float], list[float]]] = []
+        if len(x.shape) not in (2, 3):
+            raise ValueError("attention expects [time, hidden] or [batch, time, hidden]")
+        batched = len(x.shape) == 3
+        batch, time, hidden = (x.shape if batched else (1, *x.shape))
+        if hidden != self.hidden_size or batch <= 0 or time <= 0:
+            raise ValueError("attention input dimensions are invalid")
+        flat_x = x.reshape((batch * time, hidden)) if batched else x
+        q_tensor = self.query.forward(flat_x)
+        k_tensor = self.key.forward(flat_x)
+        v_tensor = self.value.forward(flat_x)
+        q, k, v = q_tensor._values, k_tensor._values, v_tensor._values
+        outputs = [0.0] * (batch * time * hidden)
+        cache: list[tuple[int, int, list[float]]] = []
 
-        for i in range(time):
-            scores = [
-                sum(q[i * hidden + d] * k[j * hidden + d] for d in range(hidden)) * self.scale
-                if j <= i else -float("inf")
-                for j in range(time)
-            ]
-            maximum = max(scores[:i + 1])
-            exp_scores = [math.exp(s - maximum) if j <= i else 0.0 for j, s in enumerate(scores)]
-            normalizer = sum(exp_scores)
-            probs = [v / normalizer for v in exp_scores]
-            for d in range(hidden):
-                outputs[i * hidden + d] = sum(probs[j] * v[j * hidden + d] for j in range(i + 1))
-            cache.append((probs, q[i * hidden:(i + 1) * hidden], k[:time * hidden], v[:time * hidden]))
+        for b in range(batch):
+            offset = b * time * hidden
+            for i in range(time):
+                scores = [
+                    sum(q[offset + i * hidden + d] * k[offset + j * hidden + d] for d in range(hidden)) * self.scale
+                    if j <= i else -float("inf")
+                    for j in range(time)
+                ]
+                maximum = max(scores[:i + 1])
+                exp_scores = [math.exp(s - maximum) if j <= i else 0.0 for j, s in enumerate(scores)]
+                normalizer = sum(exp_scores)
+                probs = [value / normalizer for value in exp_scores]
+                for d in range(hidden):
+                    outputs[offset + i * hidden + d] = sum(
+                        probs[j] * v[offset + j * hidden + d] for j in range(i + 1)
+                    )
+                cache.append((b, i, probs))
 
-        # Rebuild the gradient path through q/k/v with a custom backward.
         def backward(result: Tensor) -> None:
             grad_out = result.grad._values
             dq = [0.0] * len(q)
             dk = [0.0] * len(k)
             dv = [0.0] * len(v)
-            for i in range(time):
-                probs = cache[i][0]
-                # dV and dP from the weighted value sum.
+            for b, i, probs in cache:
+                offset = b * time * hidden
                 dprob = [0.0] * time
                 for j in range(i + 1):
                     for d in range(hidden):
-                        go = grad_out[i * hidden + d]
-                        dv[j * hidden + d] += probs[j] * go
-                        dprob[j] += go * v[j * hidden + d]
+                        go = grad_out[offset + i * hidden + d]
+                        dv[offset + j * hidden + d] += probs[j] * go
+                        dprob[j] += go * v[offset + j * hidden + d]
                 dot = sum(dprob[j] * probs[j] for j in range(i + 1))
-                ds = [(dprob[j] - dot) * probs[j] for j in range(i + 1)]
-                for j, dsj in enumerate(ds):
+                for j in range(i + 1):
+                    ds = (dprob[j] - dot) * probs[j]
                     for d in range(hidden):
-                        dq[i * hidden + d] += dsj * k[j * hidden + d] * self.scale
-                        dk[j * hidden + d] += dsj * q[i * hidden + d] * self.scale
+                        dq[offset + i * hidden + d] += ds * k[offset + j * hidden + d] * self.scale
+                        dk[offset + j * hidden + d] += ds * q[offset + i * hidden + d] * self.scale
 
-            # Push q/k/v gradients through their Linear layers.
             q_tensor._accumulate(dq)
             k_tensor._accumulate(dk)
             v_tensor._accumulate(dv)
 
-        return Tensor.operation(_reshape(outputs, x.shape), parents=(q_tensor, k_tensor, v_tensor), backward=backward)
+        output_shape = (batch, time, hidden) if batched else (time, hidden)
+        return Tensor.operation(_reshape(outputs, output_shape), parents=(q_tensor, k_tensor, v_tensor), backward=backward)
+
 
 
 class FeedForward(Module):
@@ -202,3 +209,41 @@ class TransformerLanguageModel(Module):
         for layer in self.layers:
             hidden = layer.forward(hidden)
         return self.lm_head.forward(self.norm.forward(hidden))
+
+    def forward_batch(self, token_batches: list[list[int]]) -> Tensor:
+        """Run a fixed-length batch with independent causal attention per item."""
+        if not token_batches:
+            raise ValueError("batch must contain at least one sequence")
+        sequence_length = len(token_batches[0])
+        if sequence_length == 0:
+            raise ValueError("token sequences cannot be empty")
+        if sequence_length > self.max_sequence_length:
+            raise ValueError("sequence exceeds model context length")
+        if any(len(sequence) != sequence_length for sequence in token_batches):
+            raise ValueError("all batch sequences must have the same length")
+        batch_size = len(token_batches)
+        flat_tokens = [token for sequence in token_batches for token in sequence]
+        flat_positions = list(range(sequence_length)) * batch_size
+        token = self.token_embedding.forward(flat_tokens).reshape((batch_size, sequence_length, self.hidden_size))
+        position = self.position_embedding.forward(flat_positions).reshape((batch_size, sequence_length, self.hidden_size))
+        hidden = token + position
+        for layer in self.layers:
+            hidden = layer.forward(hidden)
+        return self.lm_head.forward(self.norm.forward(hidden))
+
+    def loss_batch(
+        self,
+        token_batches: list[list[int]],
+        target_batches: list[list[int]],
+    ) -> Tensor:
+        """Mean next-token cross-entropy over a fixed-length batch."""
+        if len(token_batches) != len(target_batches) or not token_batches:
+            raise ValueError("input and target batches must have equal non-zero size")
+        if any(len(inputs) != len(targets) for inputs, targets in zip(token_batches, target_batches)):
+            raise ValueError("each input sequence must match its target length")
+        logits = self.forward_batch(token_batches)
+        batch_size, sequence_length, vocab_size = logits.shape
+        flat_logits = logits.reshape((batch_size * sequence_length, vocab_size))
+        flat_targets = [target for sequence in target_batches for target in sequence]
+        from aria.brain.language_model import _log_softmax_loss
+        return _log_softmax_loss(flat_logits, flat_targets)
