@@ -241,7 +241,77 @@ Model-weight checkpoint
 - deterministic continuation from the saved dataset position
 - checkpoint/trainer sequence-length compatibility validation
 
-Checkpoint files remain human-readable JSON. Metadata-only checkpoints from the earlier format remain loadable, but they cannot restore model weights; attempting to resume from one fails explicitly.
+Checkpoint files remain human-readable JSON. Metadata-only checkpoints from the earlier formats remain loadable, but they cannot restore model weights; attempting to resume from one fails explicitly.
+
+### Save a snapshot, restore it, and resume
+
+Use `save_training_checkpoint` when you want a checkpoint of the *current* model without running another training step. Use `train_with_checkpoint` to train for a configured number of steps and then save the result.
+
+~~~python
+from pathlib import Path
+
+from aria.brain import SGD, TransformerLanguageModel
+from aria.tokenizer import ByteTokenizer
+from aria.training import (
+    LanguageModelTrainer,
+    TokenWindowDataset,
+    TrainingConfig,
+    restore_training_checkpoint,
+    save_training_checkpoint,
+    train_with_checkpoint,
+)
+
+tokenizer = ByteTokenizer()
+tokens = tokenizer.encode("a small local training corpus")
+dataset = TokenWindowDataset(tokens, sequence_length=4, stride=2)
+model = TransformerLanguageModel(
+    vocab_size=tokenizer.VOCAB_SIZE,
+    hidden_size=8,
+    intermediate_size=16,
+    num_layers=1,
+    max_sequence_length=4,
+    seed=7,
+)
+optimizer = SGD(model.parameters(), learning_rate=0.01)
+trainer = LanguageModelTrainer(model, optimizer, dataset)
+config = TrainingConfig(
+    learning_rate=0.01,
+    sequence_length=4,
+    steps=10,
+    seed=7,
+    batch_size=1,
+)
+
+# Option A: save the current state without advancing training.
+save_training_checkpoint(
+    model, optimizer, trainer,
+    config=config,
+    checkpoint_path=Path("checkpoint.json"),
+)
+
+# Option B: train for config.steps, then save weights and loss history.
+train_with_checkpoint(
+    model, optimizer, trainer,
+    config=config,
+    checkpoint_path=Path("checkpoint.json"),
+)
+
+# To resume in a fresh process, rebuild the same model, tokenizer,
+# dataset settings, optimizer, and trainer, then restore the checkpoint.
+restored = restore_training_checkpoint(
+    Path("checkpoint.json"), model, optimizer, trainer
+)
+trainer.train(5)  # continue for five additional steps
+print("Resumed from step", restored.step, "to", trainer.step_count)
+~~~
+
+**Resume requirements and boundaries**
+
+- Recreate the same model architecture and parameter names, tokenizer/vocabulary, and compatible sequence-length/dataset setup before restoration.
+- The checkpoint restores model weights, trainer step count and batch size, optimizer learning rate, and supported `ExponentialDecay` / `StepDecay` scheduler configuration.
+- Current SGD has no momentum state. The checkpoint does not serialize arbitrary optimizer state, random-number-generator state, dataset contents, or tokenizer artifacts.
+- Scheduler type mismatches and incompatible model parameters are rejected. Legacy metadata-only checkpoints can be inspected, but cannot be used to resume because they contain no weights.
+- Saves write to a sibling temporary file and replace the destination only after the write completes. A failed replacement leaves the prior destination untouched and cleans up the temporary file.
 
 ---
 
