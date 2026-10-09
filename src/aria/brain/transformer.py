@@ -98,19 +98,23 @@ class CausalSelfAttention(Module):
         for b in range(batch):
             offset = b * time * hidden
             for i in range(time):
+                # Compute only the visible causal prefix. Building masked entries
+                # for future positions wastes allocations and softmax work at every step.
+                query_start = offset + i * hidden
                 scores = [
-                    sum(q[offset + i * hidden + d] * k[offset + j * hidden + d] for d in range(hidden)) * self.scale
-                    if j <= i else -float("inf")
-                    for j in range(time)
+                    sum(q[query_start + d] * k[offset + j * hidden + d] for d in range(hidden))
+                    * self.scale
+                    for j in range(i + 1)
                 ]
-                maximum = max(scores[:i + 1])
-                exp_scores = [math.exp(s - maximum) if j <= i else 0.0 for j, s in enumerate(scores)]
+                maximum = max(scores)
+                exp_scores = [math.exp(score - maximum) for score in scores]
                 normalizer = sum(exp_scores)
-                probs = [value / normalizer for value in exp_scores]
+                probs = [score / normalizer for score in exp_scores]
                 for d in range(hidden):
-                    outputs[offset + i * hidden + d] = sum(
+                    outputs[query_start + d] = sum(
                         probs[j] * v[offset + j * hidden + d] for j in range(i + 1)
                     )
+                # Cache only probabilities that can contribute to this query.
                 cache.append((b, i, probs))
 
         def backward(result: Tensor) -> None:
@@ -120,7 +124,7 @@ class CausalSelfAttention(Module):
             dv = [0.0] * len(v)
             for b, i, probs in cache:
                 offset = b * time * hidden
-                dprob = [0.0] * time
+                dprob = [0.0] * len(probs)
                 for j in range(i + 1):
                     for d in range(hidden):
                         go = grad_out[offset + i * hidden + d]
