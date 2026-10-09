@@ -133,3 +133,108 @@ def test_transformer_prefix_logits_are_independent_of_future_tokens() -> None:
 
     assert prefix_logits == extended_logits[: 2 * model.vocab_size]
 
+
+
+def test_transformer_batched_logits_match_independent_forward_passes() -> None:
+    model = TransformerLanguageModel(
+        vocab_size=9,
+        hidden_size=4,
+        intermediate_size=8,
+        num_layers=2,
+        max_sequence_length=5,
+        seed=41,
+    )
+    sequences = [[1, 2, 3], [4, 5, 6]]
+    batched = model.forward_batch(sequences)
+
+    assert batched.shape == (2, 3, 9)
+    for index, sequence in enumerate(sequences):
+        individual = model.forward(sequence)
+        start = index * 3 * model.vocab_size
+        assert batched._values[start:start + 3 * model.vocab_size] == individual._values
+
+
+def test_transformer_batched_attention_has_no_cross_sample_leakage() -> None:
+    model = TransformerLanguageModel(
+        vocab_size=9,
+        hidden_size=4,
+        intermediate_size=8,
+        num_layers=2,
+        max_sequence_length=5,
+        seed=42,
+    )
+    first = [1, 2, 3]
+    batch_a = model.forward_batch([first, [4, 5, 6]])
+    batch_b = model.forward_batch([first, [7, 8, 1]])
+
+    width = len(first) * model.vocab_size
+    assert batch_a._values[:width] == batch_b._values[:width]
+
+
+def test_transformer_batched_loss_and_gradients_match_individual_mean() -> None:
+    from aria.brain import SGD
+
+    sequences = [[1, 2, 3], [4, 5, 6]]
+    targets = [[2, 3, 4], [5, 6, 7]]
+    batched_model = TransformerLanguageModel(
+        vocab_size=9,
+        hidden_size=4,
+        intermediate_size=8,
+        num_layers=1,
+        max_sequence_length=5,
+        seed=43,
+    )
+    individual_model = TransformerLanguageModel(
+        vocab_size=9,
+        hidden_size=4,
+        intermediate_size=8,
+        num_layers=1,
+        max_sequence_length=5,
+        seed=43,
+    )
+
+    batch_loss = batched_model.loss_batch(sequences, targets)
+    batch_loss.backward()
+    individual_losses = [
+        individual_model.loss_batch([sequence], [target])
+        for sequence, target in zip(sequences, targets)
+    ]
+    for loss in individual_losses:
+        loss.backward()
+    for parameter in individual_model.parameters():
+        assert parameter.grad is not None
+        parameter.grad._values = [value / len(individual_losses) for value in parameter.grad._values]
+        parameter.grad.data = parameter.grad.to_list()
+
+    assert batch_loss.item() == __import__("pytest").approx(
+        sum(loss.item() for loss in individual_losses) / len(individual_losses)
+    )
+    for batched_parameter, individual_parameter in zip(
+        batched_model.parameters(), individual_model.parameters()
+    ):
+        assert batched_parameter.grad is not None
+        assert individual_parameter.grad is not None
+        assert batched_parameter.grad._values == __import__("pytest").approx(
+            individual_parameter.grad._values, abs=1e-8, rel=1e-7
+        )
+
+
+def test_transformer_batched_gradient_checker_passes() -> None:
+    from aria.evaluation import check_gradients
+
+    model = TransformerLanguageModel(
+        vocab_size=4,
+        hidden_size=2,
+        intermediate_size=3,
+        num_layers=1,
+        max_sequence_length=3,
+        seed=44,
+    )
+    report = check_gradients(
+        lambda: model.loss_batch([[1, 2], [2, 3]], [[2, 3], [3, 1]]),
+        model.parameters(),
+        max_checks=8,
+    )
+
+    assert report.passed
+    assert report.checked_values == 8
