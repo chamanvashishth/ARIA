@@ -329,3 +329,57 @@ def test_transformer_training_reduces_fixed_corpus_loss_and_keeps_parameters_fin
     assert health.parameter_count == sum(
         len(parameter._values) for parameter in model.parameters()
     )
+
+
+
+def test_trainer_rejects_non_finite_loss_before_backward_or_update(monkeypatch) -> None:
+    import aria.training.trainer as trainer_module
+    from aria.brain import Tensor
+
+    dataset = TokenWindowDataset([1, 2, 1, 2], sequence_length=2)
+    model = TinyLanguageModel(vocab_size=3, embedding_dim=4, seed=131)
+    optimizer = SGD(model.parameters(), learning_rate=0.01)
+    trainer = LanguageModelTrainer(model, optimizer, dataset)
+    before = [list(parameter._values) for parameter in model.parameters()]
+    monkeypatch.setattr(
+        trainer_module,
+        "_log_softmax_loss",
+        lambda logits, targets: Tensor.scalar(float("nan")),
+    )
+
+    with pytest.raises(ValueError, match="training loss must be finite"):
+        trainer.train_step(0)
+
+    assert [parameter._values for parameter in model.parameters()] == before
+    assert trainer.step_count == 0
+
+
+def test_trainer_rejects_non_finite_gradients_without_updating_parameters(monkeypatch) -> None:
+    import math
+    import aria.training.trainer as trainer_module
+    from aria.brain import Tensor
+
+    dataset = TokenWindowDataset([1, 2, 1, 2], sequence_length=2)
+    model = TinyLanguageModel(vocab_size=3, embedding_dim=4, seed=132)
+    optimizer = SGD(model.parameters(), learning_rate=0.01)
+    trainer = LanguageModelTrainer(model, optimizer, dataset)
+    parameters = model.parameters()
+    before = [list(parameter._values) for parameter in parameters]
+
+    def invalid_loss(logits, targets):
+        parameter = parameters[0]
+        return Tensor.operation(
+            1.0,
+            parents=(parameter,),
+            backward=lambda result: parameter._accumulate(
+                [math.nan] * len(parameter._values)
+            ),
+        )
+
+    monkeypatch.setattr(trainer_module, "_log_softmax_loss", invalid_loss)
+
+    with pytest.raises(ValueError, match="training gradients must be finite"):
+        trainer.train_batch([0])
+
+    assert [parameter._values for parameter in parameters] == before
+    assert trainer.step_count == 0
