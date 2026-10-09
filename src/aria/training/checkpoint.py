@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from dataclasses import asdict, dataclass, field
@@ -31,7 +32,7 @@ class TrainingCheckpoint:
     Older metadata-only checkpoints remain loadable with an empty mapping.
     """
 
-    FORMAT_VERSION = 2
+    FORMAT_VERSION = 3
 
     step: int
     losses: list[float]
@@ -40,6 +41,8 @@ class TrainingCheckpoint:
     parameter_shapes: dict[str, list[int]] = field(default_factory=dict)
     optimizer_learning_rate: float | None = None
     scheduler_state: dict[str, Any] | None = None
+    dataset_fingerprint: str | None = None
+    dataset_stride: int | None = None
 
     def save(self, path: Path) -> None:
         if self.step < 0:
@@ -75,7 +78,7 @@ class TrainingCheckpoint:
     def load(cls, path: Path) -> "TrainingCheckpoint":
         payload = json.loads(path.read_text(encoding="utf-8"))
         version = payload.get("format_version", 0)
-        if version not in (0, 1, cls.FORMAT_VERSION):
+        if version not in (0, 1, 2, cls.FORMAT_VERSION):
             raise ValueError(f"unsupported checkpoint format version: {version}")
         checkpoint = cls(
             step=int(payload["step"]),
@@ -95,6 +98,11 @@ class TrainingCheckpoint:
                 else float(payload["optimizer_learning_rate"])
             ),
             scheduler_state=payload.get("scheduler_state"),
+            dataset_fingerprint=payload.get("dataset_fingerprint"),
+            dataset_stride=(
+                None if payload.get("dataset_stride") is None
+                else int(payload["dataset_stride"])
+            ),
         )
         if checkpoint.step < 0:
             raise ValueError("checkpoint step cannot be negative")
@@ -189,6 +197,16 @@ def restore_model_state(
         parameter.zero_grad()
 
 
+def _dataset_fingerprint(dataset) -> str:
+    """Hash the ordered token stream and window settings used for training."""
+    payload = json.dumps(
+        {"token_ids": dataset.token_ids, "sequence_length": dataset.sequence_length,
+         "stride": dataset.stride},
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
 def save_training_checkpoint(
     model: Module,
     optimizer: SGD,
@@ -217,6 +235,8 @@ def save_training_checkpoint(
         parameter_shapes=parameter_shapes,
         optimizer_learning_rate=optimizer.learning_rate,
         scheduler_state=_capture_scheduler_state(trainer.scheduler),
+        dataset_fingerprint=_dataset_fingerprint(trainer.dataset),
+        dataset_stride=trainer.dataset.stride,
     )
     checkpoint.save(checkpoint_path)
     return checkpoint
@@ -402,8 +422,22 @@ def restore_training_checkpoint(
     ):
         raise ValueError("checkpoint optimizer learning rate must be finite and positive")
 
-    # Validate all model state before touching model, optimizer, or trainer.
+    # Validate the reconstructed data and optimizer wiring before mutation.
+    if checkpoint.dataset_fingerprint is not None:
+        if checkpoint.dataset_fingerprint != _dataset_fingerprint(trainer.dataset):
+            raise ValueError("checkpoint dataset fingerprint does not match trainer dataset")
+        if checkpoint.dataset_stride != trainer.dataset.stride:
+            raise ValueError("checkpoint dataset stride does not match trainer dataset")
+
     named_parameters = _named_parameters(model)
+    model_parameters = list(named_parameters.values())
+    if len(optimizer.parameters) != len(model_parameters) or any(
+        actual is not expected
+        for actual, expected in zip(optimizer.parameters, model_parameters)
+    ):
+        raise ValueError("optimizer parameters do not match model parameters")
+
+    # Validate all model state before touching model, optimizer, or trainer.
     expected_names = set(named_parameters)
     actual_names = set(checkpoint.parameter_values)
     if expected_names != actual_names:
