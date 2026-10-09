@@ -1,3 +1,5 @@
+import pytest
+
 from aria.brain import TransformerLanguageModel
 
 
@@ -206,7 +208,7 @@ def test_transformer_batched_loss_and_gradients_match_individual_mean() -> None:
         parameter.grad._values = [value / len(individual_losses) for value in parameter.grad._values]
         parameter.grad.data = parameter.grad.to_list()
 
-    assert batch_loss.item() == __import__("pytest").approx(
+    assert batch_loss.item() == pytest.approx(
         sum(loss.item() for loss in individual_losses) / len(individual_losses)
     )
     for batched_parameter, individual_parameter in zip(
