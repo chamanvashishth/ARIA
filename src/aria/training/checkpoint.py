@@ -243,10 +243,11 @@ def train_with_best_validation_checkpoint(
         trainer.batch_size = config.batch_size
 
     for _ in range(config.steps):
-        start = (trainer.step_count * trainer.batch_size) % len(trainer.dataset)
+        effective_batch_size = min(trainer.batch_size, len(trainer.dataset))
+        start = (trainer.step_count * effective_batch_size) % len(trainer.dataset)
         indices = [
             (start + item) % len(trainer.dataset)
-            for item in range(trainer.batch_size)
+            for item in range(effective_batch_size)
         ]
         step = trainer.train_batch(indices)
         losses.append(step.loss)
