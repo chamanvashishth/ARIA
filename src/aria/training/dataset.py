@@ -89,8 +89,6 @@ class TokenBatchSampler:
         seed: int = 0,
         drop_last: bool = False,
     ) -> None:
-        import random
-
         if batch_size <= 0:
             raise ValueError("batch_size must be positive")
         if not isinstance(seed, int):
