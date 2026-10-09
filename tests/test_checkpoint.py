@@ -12,6 +12,7 @@ from aria.training import (
     TrainingCheckpoint,
     TrainingConfig,
     restore_training_checkpoint,
+    save_training_checkpoint,
     train_with_best_validation_checkpoint,
     train_with_checkpoint,
 )
@@ -366,3 +367,71 @@ def test_restore_model_state_validates_all_parameters_before_mutating() -> None:
         restore_model_state(model, values, shapes)
 
     assert [parameter._values for parameter in model.parameters()] == before
+
+
+
+def test_save_training_checkpoint_snapshots_without_training(tmp_path: Path) -> None:
+    model, optimizer, trainer = _build_training_stack(seed=61)
+    path = tmp_path / "snapshot.json"
+    before = [parameter._values[:] for parameter in model.parameters()]
+
+    checkpoint = save_training_checkpoint(
+        model,
+        optimizer,
+        trainer,
+        config=TrainingConfig(learning_rate=0.01, sequence_length=4, steps=5, seed=61),
+        checkpoint_path=path,
+        losses=[1.25],
+    )
+
+    assert path.exists()
+    assert trainer.step_count == 0
+    assert checkpoint.step == 0
+    assert checkpoint.losses == [1.25]
+    for actual, expected in zip(
+        [parameter._values for parameter in model.parameters()], before
+    ):
+        assert actual == expected
+
+
+def test_save_failure_cleans_temporary_file_and_preserves_previous_checkpoint(
+    tmp_path: Path, monkeypatch
+) -> None:
+    path = tmp_path / "checkpoint.json"
+    path.write_text("previous valid checkpoint", encoding="utf-8")
+    checkpoint = TrainingCheckpoint(
+        step=0,
+        losses=[],
+        config=TrainingConfig(learning_rate=0.01, sequence_length=4, steps=1),
+    )
+
+    def fail_replace(self, target):
+        raise OSError("simulated replace failure")
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+    with pytest.raises(OSError, match="simulated replace failure"):
+        checkpoint.save(path)
+
+    assert path.read_text(encoding="utf-8") == "previous valid checkpoint"
+    assert not (tmp_path / ".checkpoint.json.tmp").exists()
+
+
+@pytest.mark.parametrize("version", [0, 1])
+def test_legacy_metadata_checkpoint_remains_loadable(tmp_path: Path, version: int) -> None:
+    path = tmp_path / f"legacy-v{version}.json"
+    path.write_text(
+        (
+            '{"step": 2, "losses": [1.0], '
+            '"config": {"learning_rate": 0.01, "sequence_length": 4, "steps": 2}}'
+            if version == 0
+            else '{"format_version": 1, "step": 2, "losses": [1.0], '
+            '"config": {"learning_rate": 0.01, "sequence_length": 4, "steps": 2}}'
+        ),
+        encoding="utf-8",
+    )
+
+    checkpoint = TrainingCheckpoint.load(path)
+    assert checkpoint.step == 2
+    assert checkpoint.losses == [1.0]
+    assert checkpoint.parameter_values == {}
+    assert checkpoint.scheduler_state is None
