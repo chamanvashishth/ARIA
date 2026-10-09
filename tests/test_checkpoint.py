@@ -294,7 +294,7 @@ def test_checkpoint_restores_scheduler_configuration_for_exact_continuation(tmp_
 
     assert resumed_optimizer.learning_rate == pytest.approx(expected_lr)
     for actual, expected in zip(resumed_model.parameters(), expected_parameters):
-        assert actual._values == pytest.approx(expected._values, rel=1e-12, abs=1e-12)
+        assert actual._values == pytest.approx(expected, rel=1e-12, abs=1e-12)
 
 
 def test_checkpoint_rejects_scheduler_mismatch_without_mutating_model(tmp_path: Path) -> None:
