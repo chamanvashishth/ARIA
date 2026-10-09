@@ -383,3 +383,56 @@ def test_trainer_rejects_non_finite_gradients_without_updating_parameters(monkey
 
     assert [parameter._values for parameter in parameters] == before
     assert trainer.step_count == 0
+    assert all(parameter.grad is None for parameter in parameters)
+
+
+
+def test_trainer_rolls_back_parameters_and_learning_rate_if_scheduler_fails() -> None:
+    class FailingScheduler:
+        def step(self, optimizer, completed_steps):
+            optimizer.learning_rate = 0.0
+            raise RuntimeError("scheduler failure")
+
+    dataset = TokenWindowDataset([1, 2, 1, 2], sequence_length=2)
+    model = TinyLanguageModel(vocab_size=3, embedding_dim=4, seed=133)
+    optimizer = SGD(model.parameters(), learning_rate=0.01)
+    trainer = LanguageModelTrainer(model, optimizer, dataset, scheduler=FailingScheduler())
+    parameters = model.parameters()
+    values_before = [list(parameter._values) for parameter in parameters]
+    learning_rate_before = optimizer.learning_rate
+
+    with pytest.raises(RuntimeError, match="scheduler failure"):
+        trainer.train_step(0)
+
+    assert [parameter._values for parameter in parameters] == values_before
+    assert trainer.step_count == 0
+    assert optimizer.learning_rate == learning_rate_before
+    assert all(parameter.grad is None for parameter in parameters)
+
+
+def test_trainer_clears_stale_gradients_after_non_finite_loss() -> None:
+    import aria.training.trainer as trainer_module
+    from aria.brain import Tensor
+
+    dataset = TokenWindowDataset([1, 2, 1, 2], sequence_length=2)
+    model = TinyLanguageModel(vocab_size=3, embedding_dim=4, seed=134)
+    optimizer = SGD(model.parameters(), learning_rate=0.01)
+    trainer = LanguageModelTrainer(model, optimizer, dataset)
+    parameters = model.parameters()
+    for parameter in parameters:
+        parameter.grad = Tensor(parameter.data)
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(
+        trainer_module,
+        "_log_softmax_loss",
+        lambda logits, targets: Tensor.scalar(float("inf")),
+    )
+
+    try:
+        with pytest.raises(ValueError, match="training loss must be finite"):
+            trainer.train_step(0)
+    finally:
+        monkeypatch.undo()
+
+    assert all(parameter.grad is None for parameter in parameters)
+    assert trainer.step_count == 0
