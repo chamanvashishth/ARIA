@@ -11,6 +11,8 @@ from aria.training import (
     TokenWindowDataset,
     TrainingCheckpoint,
     TrainingConfig,
+    restore_training_checkpoint,
+    train_with_best_validation_checkpoint,
     train_with_checkpoint,
 )
 
