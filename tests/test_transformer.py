@@ -264,3 +264,60 @@ def test_batched_causal_attention_gradients_match_finite_differences() -> None:
     assert report.passed
     assert report.checked_values == sum(len(parameter._values) for parameter in parameters)
     assert report.max_absolute_error < 1e-5
+
+
+
+def test_feed_forward_parameter_gradients_match_finite_differences() -> None:
+    from aria.brain import Parameter
+    from aria.evaluation import check_gradients
+    from aria.brain.transformer import FeedForward
+
+    inputs = Parameter([[0.2, -0.5], [0.8, 0.3]])
+    feed_forward = FeedForward(hidden_size=2, intermediate_size=3, seed=91)
+
+    # Chosen inputs and deterministic weights keep the hidden activations away
+    # from the ReLU kink so central differences test the smooth path.
+    def loss():
+        output = feed_forward.forward(inputs)
+        return (output * output).sum()
+
+    parameters = [inputs, *feed_forward.parameters()]
+    report = check_gradients(
+        loss,
+        parameters,
+        epsilon=1e-5,
+        absolute_tolerance=1e-5,
+        relative_tolerance=1e-4,
+        max_checks=None,
+    )
+
+    assert report.passed
+    assert report.checked_values == sum(len(parameter._values) for parameter in parameters)
+    assert report.max_absolute_error < 1e-5
+
+
+def test_transformer_block_gradients_match_finite_differences() -> None:
+    from aria.brain import Parameter
+    from aria.evaluation import check_gradients
+    from aria.brain.transformer import TransformerBlock
+
+    inputs = Parameter([[0.2, -0.4], [0.7, 0.1]])
+    block = TransformerBlock(hidden_size=2, intermediate_size=3, seed=92)
+
+    def loss():
+        output = block.forward(inputs)
+        return (output * output).sum()
+
+    parameters = [inputs, *block.parameters()]
+    report = check_gradients(
+        loss,
+        parameters,
+        epsilon=1e-5,
+        absolute_tolerance=2e-5,
+        relative_tolerance=2e-4,
+        max_checks=None,
+    )
+
+    assert report.passed
+    assert report.checked_values == sum(len(parameter._values) for parameter in parameters)
+    assert report.max_absolute_error < 2e-5
