@@ -71,5 +71,36 @@ class TinyLanguageModel(Module):
         hidden = self.embedding.forward(token_ids)
         return self.vocabulary.forward(hidden)
 
+    def forward_batch(self, token_batches: list[list[int]]) -> Tensor:
+        """Project a fixed-length batch through one embedding and one Linear call.
+
+        The result has shape [batch * time, vocab_size], with rows ordered by
+        batch first and then time. This model has no attention, so flattening
+        the token positions does not create cross-example interactions.
+        """
+        if not token_batches:
+            raise ValueError("batch must contain at least one sequence")
+        sequence_length = len(token_batches[0])
+        if sequence_length == 0:
+            raise ValueError("token sequences cannot be empty")
+        if any(len(sequence) != sequence_length for sequence in token_batches):
+            raise ValueError("all batch sequences must have the same length")
+        flattened_ids = [token for sequence in token_batches for token in sequence]
+        hidden = self.embedding.forward(flattened_ids)
+        return self.vocabulary.forward(hidden)
+
     def loss(self, token_ids: list[int], targets: list[int]) -> Tensor:
         return _log_softmax_loss(self.forward(token_ids), targets)
+
+    def loss_batch(
+        self,
+        token_batches: list[list[int]],
+        target_batches: list[list[int]],
+    ) -> Tensor:
+        """Compute mean next-token loss across an equal-length batch."""
+        if len(token_batches) != len(target_batches) or not token_batches:
+            raise ValueError("input and target batches must have equal non-zero size")
+        if any(len(inputs) != len(targets) for inputs, targets in zip(token_batches, target_batches)):
+            raise ValueError("each input sequence must match its target length")
+        flat_targets = [target for sequence in target_batches for target in sequence]
+        return _log_softmax_loss(self.forward_batch(token_batches), flat_targets)
