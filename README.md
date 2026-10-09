@@ -528,6 +528,17 @@ The JSON output separates autoregressive inference measurements from the forward
 
 **Limitations:** the benchmark uses an untrained model, measures a small pure-Python implementation, and is not comparable to optimized inference engines. Run it on the target machine and retain the environment metadata before drawing performance conclusions. The comparison excludes backpropagation and optimizer updates. Numerical gradient checks cover only the selected values and loss paths supplied by the caller.
 
+
+### Transformer component profiler
+
+To compare where time is spent in isolated Linear and causal-attention forward/backward paths versus a full Transformer training step, run:
+
+~~~bash
+python scripts/profile_transformer.py --warmup 1 --iterations 5 --batch-size 2 --sequence-length 8
+~~~
+
+The JSON report separates forward-plus-loss time from backward time and includes Python/platform metadata. It does not include optimizer updates, and isolated component timings are diagnostic rather than a strict additive breakdown of full-model runtime. Run on the target machine and increase iterations before interpreting small differences.
+
 ---
 
 ## Local API
