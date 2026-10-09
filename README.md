@@ -213,6 +213,8 @@ Model-weight checkpoint
 - early stopping based on validation loss
 - deterministic exponential and step learning-rate schedules
 - configurable mini-batch gradient accumulation with averaged gradients
+- deterministic batch sampler with seeded per-epoch shuffling
+- optional `drop_last` behavior for fixed-size batches
 - complete-dataset epoch semantics with a final partial batch when needed
 - configurable sequence length
 - configurable stride
