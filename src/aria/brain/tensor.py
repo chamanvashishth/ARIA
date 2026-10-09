@@ -127,14 +127,13 @@ class Tensor:
         return out
 
     def sum(self) -> Tensor:
-        out = Tensor.scalar(sum(self._values), requires_grad=self.requires_grad, _parents=(self,))
-
-        def backward() -> None:
+        def backward(out: Tensor) -> None:
             if self.requires_grad:
-                self._accumulate([g for g in out.grad._values for _ in self._values])
+                scale = out.grad._values[0]
+                self._accumulate([scale] * len(self._values))
 
-        out._backward = backward
-        return out
+        return Tensor.operation(sum(self._values), parents=(self,), backward=backward)
+
 
     def backward(self) -> None:
         if self.shape != ():
