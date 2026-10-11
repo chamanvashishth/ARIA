@@ -34,7 +34,7 @@ def _softmax(logits: list[float], temperature: float) -> list[float]:
 def _nucleus_candidates(
     logits: list[float],
     top_p: float,
-    temperature: float,
+    temperature: float = 1.0,
 ) -> tuple[list[int], list[float]]:
     """Return the smallest highest-probability prefix reaching top_p."""
     probabilities = _softmax(logits, temperature)
@@ -115,6 +115,7 @@ def generate(
     eos_token_id: int | None = None,
     stop_token_ids: list[int] | None = None,
     seed: int | None = None,
+    context_window: int | None = None,
 ) -> list[int]:
     """Generate tokens autoregressively with configurable sampling controls.
 
@@ -139,6 +140,12 @@ def generate(
         raise ValueError("repetition_window must be a positive integer")
     if len(prompt_tokens) > model.max_sequence_length:
         raise ValueError("prompt exceeds model context length")
+    if context_window is not None and (
+        isinstance(context_window, bool)
+        or not isinstance(context_window, int)
+        or not 1 <= context_window <= model.max_sequence_length
+    ):
+        raise ValueError("context_window must be between 1 and the model context length")
     for token in prompt_tokens:
         _validate_token_id(token, model.vocab_size, "prompt token")
     if eos_token_id is not None:
@@ -153,7 +160,8 @@ def generate(
     rng = random.Random(seed)
 
     for step in range(max_new_tokens):
-        context = generated[-model.max_sequence_length:]
+        window = context_window or model.max_sequence_length
+        context = generated[-window:]
         logits_tensor = model.forward(context)
         logits = list(logits_tensor.to_list()[-1])
         if len(logits) != model.vocab_size:
