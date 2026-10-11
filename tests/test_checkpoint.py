@@ -480,3 +480,51 @@ def test_checkpoint_restore_rejects_optimizer_for_different_model(tmp_path: Path
     wrong_optimizer = SGD(model.parameters(), learning_rate=0.5)
     with pytest.raises(ValueError, match="optimizer parameters do not match"):
         restore_training_checkpoint(path, other_model, wrong_optimizer, other_trainer)
+
+
+def test_checkpoint_restores_mid_epoch_sampler_cursor_and_exact_continuation(tmp_path: Path) -> None:
+    from aria.brain import TinyLanguageModel
+
+    tokens = [1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5]
+    dataset = TokenWindowDataset(tokens, sequence_length=2, stride=1)
+
+    def build(seed: int):
+        model = TinyLanguageModel(vocab_size=7, embedding_dim=5, seed=seed)
+        optimizer = SGD(model.parameters(), learning_rate=0.01)
+        trainer = LanguageModelTrainer(model, optimizer, dataset, batch_size=2)
+        return model, optimizer, trainer
+
+    model, optimizer, trainer = build(404)
+    trainer.train_epoch(shuffle=True, seed=91, max_batches=1)
+    path = tmp_path / "mid-epoch.json"
+    config = TrainingConfig(
+        learning_rate=0.01, sequence_length=2, steps=1, seed=404, batch_size=2
+    )
+    save_training_checkpoint(
+        model, optimizer, trainer, config=config, checkpoint_path=path
+    )
+
+    expected_history = trainer.train_epoch(shuffle=True, seed=91)
+    expected = [parameter._values[:] for parameter in model.parameters()]
+
+    restored_model, restored_optimizer, restored_trainer = build(404)
+    checkpoint = restore_training_checkpoint(
+        path, restored_model, restored_optimizer, restored_trainer
+    )
+    assert checkpoint.completed_epochs == 0
+    assert checkpoint.sampler_state == {
+        "epoch": 0,
+        "shuffle": True,
+        "seed": 91,
+        "drop_last": False,
+        "next_batch": 1,
+    }
+
+    actual_history = restored_trainer.train_epoch(shuffle=True, seed=91)
+    assert [item.loss for item in actual_history] == pytest.approx(
+        [item.loss for item in expected_history], rel=1e-12, abs=1e-12
+    )
+    for actual, wanted in zip(restored_model.parameters(), expected):
+        assert actual._values == pytest.approx(wanted, rel=1e-12, abs=1e-12)
+    assert restored_trainer.completed_epochs == 1
+    assert restored_trainer.sampler_state is None
