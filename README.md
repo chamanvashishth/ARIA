@@ -176,7 +176,7 @@ The tokenizer is intentionally simple at this stage. More advanced tokenization 
 
 ## Local generation controls
 
-ARIA's autoregressive generator supports temperature sampling, top-k filtering, nucleus (top-p) sampling, repetition penalties, minimum generation length, EOS handling, and explicit stop-token IDs. Top-k filtering is applied before top-p. A repetition penalty is applied to recently generated context tokens; set `repetition_window` to limit its scope. Generation accepts a seed for reproducible sampling.
+ARIA's autoregressive generator supports temperature sampling, top-k filtering, nucleus (top-p) sampling, repetition penalties, minimum generation length, EOS handling, and explicit stop-token IDs. Top-k filtering is applied before top-p. A repetition penalty is applied to recently generated context tokens; set `repetition_window` to limit its scope. Generation accepts a seed for reproducible sampling. The optional `context_window` setting lets callers use a smaller rolling context than the model maximum; each decoding step receives only the most recent tokens in that window.
 
 ~~~python
 from aria.inference import generate
