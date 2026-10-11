@@ -127,3 +127,29 @@ def test_temperature_must_be_finite_and_positive() -> None:
     for temperature in (0.0, float("inf"), float("nan")):
         with pytest.raises(ValueError, match="temperature"):
             sample_next_token([0.0, 1.0], temperature=temperature)
+
+
+
+def test_generation_uses_configured_sliding_context_window() -> None:
+    class ContextModel:
+        vocab_size = 4
+        max_sequence_length = 8
+        def __init__(self):
+            self.seen = []
+        def forward(self, token_ids):
+            from aria.brain.tensor import Tensor
+            self.seen.append(list(token_ids))
+            return Tensor.from_list([[0.0, 0.0, 0.0, 10.0] for _ in token_ids])
+
+    model = ContextModel()
+    generate(model, [0, 1, 2], max_new_tokens=2, context_window=2, top_k=1)
+    assert model.seen == [[1, 2], [2, 3]]
+
+
+@pytest.mark.parametrize("context_window", [0, -1, 9, True, 1.5])
+def test_generation_rejects_invalid_context_window(context_window) -> None:
+    model = TransformerLanguageModel(
+        vocab_size=8, hidden_size=4, intermediate_size=8, max_sequence_length=8
+    )
+    with pytest.raises(ValueError, match="context_window"):
+        generate(model, [1], max_new_tokens=1, context_window=context_window)
