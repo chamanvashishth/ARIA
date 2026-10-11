@@ -48,6 +48,7 @@ ARIA's normal runtime is designed to work without OpenAI, Anthropic, Gemini, hos
 | Local RAG | **Implemented — foundation** |
 | Agent / tools | **Implemented — controlled tool registry** |
 | Agent orchestration | **Implemented — approval-gated execution foundation** |
+| Software compute devices | **Implemented — CPU reference and virtual GPU/NPU emulation** |
 | Verification | **Implemented — structural checks foundation** |
 | Local API | **Implemented — loopback HTTP foundation** |
 | Local UI | **Implemented — browser interface foundation** |
@@ -154,6 +155,19 @@ It currently provides:
 It is **not yet claimed** to be production-ready, performant, or language-quality validated.
 
 ---
+
+## Software compute devices
+
+Block 19 introduces an explicit, dependency-free compute backend interface.
+
+- **VCPU:** pure-Python floating-point reference matrix multiplication.
+- **VGPU:** tiled matrix multiplication simulated with host-CPU loops.
+- **VNPU:** symmetric int8 input quantization with int32-style accumulation, simulated on the host CPU.
+- explicit device selection and capability metadata
+- input shape, type, and finite-value validation
+- numerical-equivalence tests for the tiled backend and tolerance tests for quantized output
+
+**Important limitation:** all three devices are software emulators and execute on the host CPU. They do not provide physical GPU/NPU access or hardware acceleration. These kernels are currently standalone matrix-multiplication primitives; they are not yet wired into Tensor autodiff, model training, or the inference engine.
 
 ## Tokenizer
 
@@ -914,6 +928,7 @@ timeline
     Block 16 : Security hardening : Implemented foundation
     Block 17 : Research and optimization : Implemented foundation
     Block 18 : Approval-gated orchestration : Implemented foundation
+    Block 19 : Software compute devices : Emulation foundation
 ~~~
 
 ### Block workflow

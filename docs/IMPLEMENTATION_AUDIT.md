@@ -59,14 +59,15 @@ Mypy is a mandatory quality job. It is not configured with `continue-on-error`.
 | Security hardening (16) | Partial foundation | API input bounds, local binding, response headers, explicit tools and dependency audit; no sandbox, auth, rate limiting or OS-level permissions |
 | Research and optimization (17) | Partial foundation | `scripts/benchmark_inference.py`, `scripts/profile_transformer.py`; scripts exist, but no representative benchmark suite or validated performance targets |
 | Agent orchestration (18) | Implemented foundation | `agent/orchestrator.py`; dependency-aware plans, mandatory per-step approval, registered-tool execution, structural result verification and execution reports |
+| Software compute devices (19) | Implemented emulation foundation | `compute/backends.py`; pure-Python VCPU reference, tiled VGPU CPU emulator and quantized VNPU CPU emulator; standalone matrix multiplication only |
 
 ## Verified missing or incomplete requirements
 
-### 1. Software-defined compute devices — not implemented
+### 1. Software-defined compute devices — implemented emulation foundation
 
-The repository has no compute/backend package for the planned software-defined VCPU, VGPU and VNPU. The tensor implementation currently executes Python-level operations. There is no device abstraction, command queue, virtual workgroup scheduler, quantized NPU simulator, or backend selection.
+The repository now exposes VCPU, VGPU and VNPU software backends through `aria.compute`. The VCPU is the pure-Python reference; VGPU uses tiled host-CPU loops; VNPU uses symmetric int8 quantization and integer-style accumulation, also on the host CPU. Backend metadata explicitly reports that hardware acceleration and autodiff are not provided.
 
-This should be implemented as a clearly labelled software emulator with CPU execution underneath. It must not claim physical GPU/NPU acceleration or require physical accelerator hardware.
+Remaining work: integrate the kernels into Tensor/Linear and model execution, define command/workgroup scheduling, add backend-aware training/inference tests, and benchmark numerical error and performance. No physical GPU/NPU is required or claimed.
 
 ### 2. Autonomous planning — not implemented
 
@@ -102,7 +103,7 @@ Current evaluation measures next-token behavior on caller-supplied examples and 
 
 ## Recommended implementation order
 
-1. **Compute backend abstraction:** define a truthful CPU reference backend and software-emulated VGPU/VNPU execution paths, with explicit capability reporting and numerical-equivalence tests.
+1. **Compute integration:** connect the emulated kernels to Tensor/Linear and model execution, with backend-aware autodiff, training and inference validation.
 2. **Local planner adapter:** accept structured plans from the local model, parse them strictly, reject malformed or unsupported tool requests, and retain the mandatory approval gate.
 3. **Agent roles and QA:** define a small set of typed, testable roles; avoid creating agents without distinct responsibilities and acceptance criteria.
 4. **Memory and RAG integration:** add local semantic indexing and provenance-preserving retrieval; evaluate relevance before injecting context into prompts.
