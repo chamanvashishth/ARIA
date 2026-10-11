@@ -4,8 +4,6 @@ import pytest
 
 from aria.brain import SGD, TransformerLanguageModel
 from aria.tokenizer import ByteTokenizer
-from aria.brain.parameter import Parameter
-from aria.evaluation import evaluate_language_model
 from aria.training import (
     LanguageModelTrainer,
     TokenWindowDataset,
