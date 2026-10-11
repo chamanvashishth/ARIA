@@ -110,6 +110,20 @@ class TrainingCheckpoint:
         )
         if checkpoint.step < 0:
             raise ValueError("checkpoint step cannot be negative")
+        if checkpoint.completed_epochs < 0:
+            raise ValueError("checkpoint completed epochs cannot be negative")
+        if checkpoint.sampler_state is not None:
+            state = checkpoint.sampler_state
+            required = {"epoch", "shuffle", "seed", "drop_last", "next_batch"}
+            if not isinstance(state, dict) or set(state) != required:
+                raise ValueError("checkpoint sampler state has an invalid schema")
+            for key in ("epoch", "seed", "next_batch"):
+                if isinstance(state[key], bool) or not isinstance(state[key], int):
+                    raise ValueError(f"checkpoint sampler {key} must be an integer")
+            if state["epoch"] < 0 or state["next_batch"] < 0:
+                raise ValueError("checkpoint sampler epoch and cursor must be non-negative")
+            if not isinstance(state["shuffle"], bool) or not isinstance(state["drop_last"], bool):
+                raise ValueError("checkpoint sampler flags must be boolean")
         if any(not math.isfinite(loss) for loss in checkpoint.losses):
             raise ValueError("checkpoint losses must be finite")
         if not math.isfinite(checkpoint.config.learning_rate) or checkpoint.config.learning_rate <= 0:
