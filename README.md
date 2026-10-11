@@ -61,6 +61,8 @@ ARIA's normal runtime is designed to work without OpenAI, Anthropic, Gemini, hos
 - **Planned** — architecture/dependency exists, implementation has not started.
 - **Validated** — reserved for capabilities backed by reproducible evidence.
 
+See the [implementation audit](docs/IMPLEMENTATION_AUDIT.md) for the source-backed status of each block, verified CI evidence, and remaining gaps.
+
 ---
 
 ## Architecture
