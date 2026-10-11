@@ -63,6 +63,8 @@ class LanguageModelTrainer:
         self.step_count = 0
         self.completed_epochs = 0
         self.sampler_state: dict[str, int | bool] | None = None
+        self.completed_epochs = 0
+        self.sampler_state: dict[str, int | bool] | None = None
 
     def _validate_loss(self, loss: object) -> float:
         value = loss.item()
