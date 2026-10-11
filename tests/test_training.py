@@ -436,3 +436,34 @@ def test_trainer_clears_stale_gradients_after_non_finite_loss() -> None:
 
     assert all(parameter.grad is None for parameter in parameters)
     assert trainer.step_count == 0
+
+
+def test_train_epoch_can_pause_and_resume_same_sampler_order() -> None:
+    dataset = TokenWindowDataset([1, 2, 3, 4, 5, 6, 1, 2, 3], sequence_length=2, stride=1)
+    model = TinyLanguageModel(vocab_size=7, embedding_dim=4, seed=401)
+    trainer = LanguageModelTrainer(
+        model, SGD(model.parameters(), learning_rate=0.01), dataset, batch_size=2
+    )
+
+    first = trainer.train_epoch(shuffle=True, seed=77, max_batches=1)
+    assert len(first) == 1
+    assert trainer.completed_epochs == 0
+    assert trainer.sampler_state is not None
+    assert trainer.sampler_state["next_batch"] == 1
+
+    remainder = trainer.train_epoch(shuffle=True, seed=77)
+    assert len(remainder) == 2
+    assert trainer.completed_epochs == 1
+    assert trainer.sampler_state is None
+
+
+def test_train_epoch_rejects_changed_sampler_configuration_mid_epoch() -> None:
+    dataset = TokenWindowDataset([1, 2, 3, 4, 5, 6, 1, 2, 3], sequence_length=2, stride=1)
+    model = TinyLanguageModel(vocab_size=7, embedding_dim=4, seed=402)
+    trainer = LanguageModelTrainer(
+        model, SGD(model.parameters(), learning_rate=0.01), dataset, batch_size=2
+    )
+    trainer.train_epoch(shuffle=True, seed=77, max_batches=1)
+
+    with pytest.raises(ValueError, match="sampler configuration"):
+        trainer.train_epoch(shuffle=True, seed=78)
