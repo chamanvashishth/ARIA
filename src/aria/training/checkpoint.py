@@ -449,6 +449,16 @@ def restore_training_checkpoint(
         if checkpoint.dataset_stride != trainer.dataset.stride:
             raise ValueError("checkpoint dataset stride does not match trainer dataset")
 
+    if checkpoint.sampler_state is not None:
+        batch_size = checkpoint.config.batch_size
+        example_count = len(trainer.dataset)
+        if checkpoint.sampler_state["drop_last"]:
+            batch_count = example_count // batch_size
+        else:
+            batch_count = (example_count + batch_size - 1) // batch_size
+        if checkpoint.sampler_state["next_batch"] > batch_count:
+            raise ValueError("checkpoint sampler cursor exceeds the epoch batch count")
+
     named_parameters = _named_parameters(model)
     model_parameters = list(named_parameters.values())
     if len(optimizer.parameters) != len(model_parameters) or any(
