@@ -333,7 +333,6 @@ def test_transformer_training_reduces_fixed_corpus_loss_and_keeps_parameters_fin
 
 
 def test_trainer_rejects_non_finite_loss_before_backward_or_update(monkeypatch) -> None:
-    import aria.training.trainer as trainer_module
     from aria.brain import Tensor
 
     dataset = TokenWindowDataset([1, 2, 1, 2], sequence_length=2)
