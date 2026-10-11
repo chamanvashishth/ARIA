@@ -174,6 +174,30 @@ The tokenizer is intentionally simple at this stage. More advanced tokenization 
 
 ---
 
+## Local generation controls
+
+ARIA's autoregressive generator supports temperature sampling, top-k filtering, nucleus (top-p) sampling, repetition penalties, minimum generation length, EOS handling, and explicit stop-token IDs. Top-k filtering is applied before top-p. A repetition penalty is applied to recently generated context tokens; set `repetition_window` to limit its scope. Generation accepts a seed for reproducible sampling.
+
+~~~python
+from aria.inference import generate
+
+token_ids = generate(
+    model,
+    prompt_tokens,
+    max_new_tokens=64,
+    temperature=0.8,
+    top_k=40,
+    top_p=0.9,
+    repetition_penalty=1.1,
+    repetition_window=64,
+    min_new_tokens=2,
+    eos_token_id=258,
+    seed=7,
+)
+~~~
+
+These are decoding controls, not evidence of language quality. Meaningful output still depends on training data, model capacity, optimization, and measured evaluation.
+
 ## Training engine
 
 Block 6 establishes the first complete local training path around the Transformer foundation:
