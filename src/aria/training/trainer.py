@@ -111,7 +111,7 @@ class LanguageModelTrainer:
         self.optimizer.zero_grad()
         logits = self.model.forward(token_ids)
         loss = _log_softmax_loss(logits, targets)
-        loss_value = self._validate_loss(loss)
+        self._validate_loss(loss)
         loss.backward()
         self._validate_gradients()
         self.optimizer.step()
