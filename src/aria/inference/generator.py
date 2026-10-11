@@ -34,9 +34,10 @@ def _softmax(logits: list[float], temperature: float) -> list[float]:
 def _nucleus_candidates(
     logits: list[float],
     top_p: float,
+    temperature: float,
 ) -> tuple[list[int], list[float]]:
     """Return the smallest highest-probability prefix reaching top_p."""
-    probabilities = _softmax(logits, 1.0)
+    probabilities = _softmax(logits, temperature)
     ordered = sorted(range(len(logits)), key=lambda index: probabilities[index], reverse=True)
     selected: list[int] = []
     cumulative = 0.0
@@ -86,7 +87,7 @@ def sample_next_token(
         candidate_logits = [logits[index] for index in candidates]
 
     if top_p < 1.0:
-        nucleus, probabilities = _nucleus_candidates(candidate_logits, top_p)
+        nucleus, probabilities = _nucleus_candidates(candidate_logits, top_p, temperature)
         return candidates[nucleus[_sample(probabilities, rng)]]
 
     probabilities = _softmax(candidate_logits, temperature)
