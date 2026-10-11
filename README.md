@@ -206,6 +206,22 @@ Loss history
 Model-weight checkpoint
 ~~~
 
+### Interrupted-epoch recovery
+
+`LanguageModelTrainer.train_epoch` supports `max_batches` to pause after a controlled number of mini-batches. The trainer records the epoch, shuffle setting, seed, `drop_last` policy, and next batch cursor. A format-v4 checkpoint persists this sampler progress alongside model weights, optimizer learning rate, scheduler configuration, and dataset fingerprint.
+
+Rebuild the same model and dataset, restore the checkpoint, and call `train_epoch` with the same sampler settings to continue the exact remaining batch order. Completed epochs advance `completed_epochs` and clear the active sampler state.
+
+Example:
+
+~~~python
+trainer.train_epoch(shuffle=True, seed=42, max_batches=2)
+save_training_checkpoint(model, optimizer, trainer, config=config, checkpoint_path=path)
+# After rebuilding the same stack and restoring:
+restore_training_checkpoint(path, model, optimizer, trainer)
+trainer.train_epoch(shuffle=True, seed=42)
+~~~
+
 ### Current capabilities
 
 - deterministic token-window datasets
