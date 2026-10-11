@@ -174,8 +174,6 @@ def test_transformer_batched_attention_has_no_cross_sample_leakage() -> None:
 
 
 def test_transformer_batched_loss_and_gradients_match_individual_mean() -> None:
-    from aria.brain import SGD
-
     sequences = [[1, 2, 3], [4, 5, 6]]
     targets = [[2, 3, 4], [5, 6, 7]]
     batched_model = TransformerLanguageModel(
