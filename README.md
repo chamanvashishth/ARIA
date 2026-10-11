@@ -47,6 +47,7 @@ ARIA's normal runtime is designed to work without OpenAI, Anthropic, Gemini, hos
 | Local conversation memory | **Implemented — foundation** |
 | Local RAG | **Implemented — foundation** |
 | Agent / tools | **Implemented — controlled tool registry** |
+| Agent orchestration | **Implemented — approval-gated execution foundation** |
 | Verification | **Implemented — structural checks foundation** |
 | Local API | **Implemented — loopback HTTP foundation** |
 | Local UI | **Implemented — browser interface foundation** |
@@ -532,7 +533,21 @@ else:
     print(result.error)
 ~~~
 
-**Important limitation:** this is a tool execution boundary, not yet an autonomous agent or planner. It does not decide which tool to call, loop over tool results, ask for user approval, sandbox untrusted code, or provide OS-level permission controls. Register only handlers that the application explicitly trusts.
+### Local orchestration foundation
+
+The local `AgentOrchestrator` accepts a plan from an injected planner and executes only explicitly registered tools.
+
+- validates plan IDs, step IDs, tool names, and dependency references before execution
+- orders dependent steps deterministically and rejects cycles
+- requires an approval callback before **every** tool invocation
+- routes every call through `ToolRegistry` argument validation
+- verifies each structured tool result and stops on rejection or failure
+- returns an execution report with per-step outcomes and verification results
+- supports a planner callback that can be backed by ARIA's local model without introducing a remote API dependency
+
+The orchestrator does not execute shell commands, dynamically import tools, or automatically pass untrusted tool output into later arguments.
+
+**Important limitation:** this is an orchestration and approval foundation, not a complete autonomous agent. Plan generation is injected rather than built in; model-generated plans still require a reliable local planner adapter. There is no OS-level sandbox, permission system, automatic result interpolation, or factual verification of tool outputs.
 
 ---
 
@@ -896,6 +911,7 @@ timeline
     Block 15 : Evaluation metrics : Implemented foundation
     Block 16 : Security hardening : Implemented foundation
     Block 17 : Research and optimization : Implemented foundation
+    Block 18 : Approval-gated orchestration : Implemented foundation
 ~~~
 
 ### Block workflow
