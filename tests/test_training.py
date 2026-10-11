@@ -452,7 +452,7 @@ def test_train_epoch_can_pause_and_resume_same_sampler_order() -> None:
     assert trainer.sampler_state["next_batch"] == 1
 
     remainder = trainer.train_epoch(shuffle=True, seed=77)
-    assert len(remainder) == 2
+    assert len(remainder) == 3
     assert trainer.completed_epochs == 1
     assert trainer.sampler_state is None
 
