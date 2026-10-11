@@ -88,6 +88,8 @@ class LanguageModelTrainer:
         step_count_before = self.step_count
         completed_epochs_before = self.completed_epochs
         sampler_state_before = None if self.sampler_state is None else dict(self.sampler_state)
+        completed_epochs_before = self.completed_epochs
+        sampler_state_before = None if self.sampler_state is None else dict(self.sampler_state)
         try:
             return operation()
         except Exception:
@@ -205,8 +207,8 @@ class LanguageModelTrainer:
     ) -> list[TrainingStep]:
         """Train or resume one deterministic epoch.
 
-        max_batches is useful for controlled interruption: progress is recorded
-        after each successful optimizer step and can be checkpointed.
+        max_batches allows controlled interruption between optimizer steps.
+        The sampler cursor advances only after a successful batch update.
         """
         if len(self.dataset) == 0:
             raise ValueError("dataset must contain at least one training example")
@@ -226,9 +228,9 @@ class LanguageModelTrainer:
             }
         else:
             state = self.sampler_state
-            requested = (bool(shuffle), seed, bool(drop_last))
-            stored = (state["shuffle"], state["seed"], state["drop_last"])
-            if requested != stored:
+            if (bool(shuffle), seed, bool(drop_last)) != (
+                state["shuffle"], state["seed"], state["drop_last"]
+            ):
                 raise ValueError("sampler configuration does not match interrupted epoch")
             if epoch is not None and epoch != state["epoch"]:
                 raise ValueError("requested epoch does not match interrupted epoch")
@@ -250,7 +252,6 @@ class LanguageModelTrainer:
         stop = len(batches) if max_batches is None else min(len(batches), cursor + max_batches)
         for batch_index in range(cursor, stop):
             history.append(self.train_batch(batches[batch_index]))
-            # Advance only after a successful transactional optimizer step.
             state["next_batch"] = batch_index + 1
 
         if int(state["next_batch"]) == len(batches):
@@ -267,8 +268,7 @@ class LanguageModelTrainer:
         drop_last: bool = False,
         start_epoch: int | None = None,
     ) -> list[TrainingStep]:
-        """Train complete dataset passes, resuming any checkpointed partial epoch."""
-
+        """Train dataset passes, resuming a checkpointed partial epoch if present."""
         if epochs <= 0:
             raise ValueError("epochs must be positive")
         if start_epoch is not None and start_epoch < 0:
