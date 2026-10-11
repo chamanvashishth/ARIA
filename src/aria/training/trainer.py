@@ -61,6 +61,8 @@ class LanguageModelTrainer:
         self.scheduler = scheduler
         self.batch_size = batch_size
         self.step_count = 0
+        self.completed_epochs = 0
+        self.sampler_state: dict[str, int | bool] | None = None
 
     def _validate_loss(self, loss: object) -> float:
         value = loss.item()
@@ -82,6 +84,8 @@ class LanguageModelTrainer:
         data_before = [parameter.data for parameter in parameters]
         learning_rate_before = self.optimizer.learning_rate
         step_count_before = self.step_count
+        completed_epochs_before = self.completed_epochs
+        sampler_state_before = None if self.sampler_state is None else dict(self.sampler_state)
         try:
             return operation()
         except Exception:
@@ -91,6 +95,8 @@ class LanguageModelTrainer:
             self.optimizer.zero_grad()
             self.optimizer.learning_rate = learning_rate_before
             self.step_count = step_count_before
+            self.completed_epochs = completed_epochs_before
+            self.sampler_state = sampler_state_before
             raise
 
     def train_step(self, index: int) -> TrainingStep:
@@ -189,26 +195,65 @@ class LanguageModelTrainer:
     def train_epoch(
         self,
         *,
-        epoch: int = 0,
+        epoch: int | None = None,
         shuffle: bool = False,
         seed: int = 0,
         drop_last: bool = False,
+        max_batches: int | None = None,
     ) -> list[TrainingStep]:
-        """Train one dataset pass using deterministic sampled mini-batches."""
+        """Train or resume one deterministic epoch.
 
+        max_batches is useful for controlled interruption: progress is recorded
+        after each successful optimizer step and can be checkpointed.
+        """
         if len(self.dataset) == 0:
             raise ValueError("dataset must contain at least one training example")
+        if max_batches is not None and max_batches <= 0:
+            raise ValueError("max_batches must be positive")
+
+        if self.sampler_state is None:
+            selected_epoch = self.completed_epochs if epoch is None else epoch
+            if selected_epoch < 0:
+                raise ValueError("epoch must be non-negative")
+            self.sampler_state = {
+                "epoch": selected_epoch,
+                "shuffle": bool(shuffle),
+                "seed": seed,
+                "drop_last": bool(drop_last),
+                "next_batch": 0,
+            }
+        else:
+            state = self.sampler_state
+            requested = (bool(shuffle), seed, bool(drop_last))
+            stored = (state["shuffle"], state["seed"], state["drop_last"])
+            if requested != stored:
+                raise ValueError("sampler configuration does not match interrupted epoch")
+            if epoch is not None and epoch != state["epoch"]:
+                raise ValueError("requested epoch does not match interrupted epoch")
+
+        state = self.sampler_state
         sampler = TokenBatchSampler(
             self.dataset,
             self.batch_size,
-            shuffle=shuffle,
-            seed=seed,
-            drop_last=drop_last,
+            shuffle=bool(state["shuffle"]),
+            seed=int(state["seed"]),
+            drop_last=bool(state["drop_last"]),
         )
-        history = [
-            self.train_batch(indices)
-            for indices in sampler.batches(epoch=epoch)
-        ]
+        batches = sampler.batches(epoch=int(state["epoch"]))
+        cursor = int(state["next_batch"])
+        if not 0 <= cursor <= len(batches):
+            raise ValueError("sampler checkpoint cursor is out of range")
+
+        history: list[TrainingStep] = []
+        stop = len(batches) if max_batches is None else min(len(batches), cursor + max_batches)
+        for batch_index in range(cursor, stop):
+            history.append(self.train_batch(batches[batch_index]))
+            # Advance only after a successful transactional optimizer step.
+            state["next_batch"] = batch_index + 1
+
+        if int(state["next_batch"]) == len(batches):
+            self.completed_epochs = max(self.completed_epochs, int(state["epoch"]) + 1)
+            self.sampler_state = None
         return history
 
     def train_epochs(
@@ -218,19 +263,23 @@ class LanguageModelTrainer:
         shuffle: bool = False,
         seed: int = 0,
         drop_last: bool = False,
-        start_epoch: int = 0,
+        start_epoch: int | None = None,
     ) -> list[TrainingStep]:
-        """Train for complete dataset passes with reproducible epoch shuffling."""
+        """Train complete dataset passes, resuming any checkpointed partial epoch."""
 
         if epochs <= 0:
             raise ValueError("epochs must be positive")
-        if start_epoch < 0:
+        if start_epoch is not None and start_epoch < 0:
             raise ValueError("start_epoch must be non-negative")
-        history = []
-        for epoch in range(start_epoch, start_epoch + epochs):
+        history: list[TrainingStep] = []
+        for offset in range(epochs):
+            selected_epoch = (
+                None if self.sampler_state is not None
+                else (self.completed_epochs if start_epoch is None else start_epoch + offset)
+            )
             history.extend(
                 self.train_epoch(
-                    epoch=epoch,
+                    epoch=selected_epoch,
                     shuffle=shuffle,
                     seed=seed,
                     drop_last=drop_last,
