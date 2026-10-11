@@ -32,7 +32,7 @@ class TrainingCheckpoint:
     Older metadata-only checkpoints remain loadable with an empty mapping.
     """
 
-    FORMAT_VERSION = 3
+    FORMAT_VERSION = 4
 
     step: int
     losses: list[float]
@@ -43,6 +43,8 @@ class TrainingCheckpoint:
     scheduler_state: dict[str, Any] | None = None
     dataset_fingerprint: str | None = None
     dataset_stride: int | None = None
+    completed_epochs: int = 0
+    sampler_state: dict[str, int | bool] | None = None
 
     def save(self, path: Path) -> None:
         if self.step < 0:
@@ -78,7 +80,7 @@ class TrainingCheckpoint:
     def load(cls, path: Path) -> "TrainingCheckpoint":
         payload = json.loads(path.read_text(encoding="utf-8"))
         version = payload.get("format_version", 0)
-        if version not in (0, 1, 2, cls.FORMAT_VERSION):
+        if version not in (0, 1, 2, 3, cls.FORMAT_VERSION):
             raise ValueError(f"unsupported checkpoint format version: {version}")
         checkpoint = cls(
             step=int(payload["step"]),
@@ -103,6 +105,8 @@ class TrainingCheckpoint:
                 None if payload.get("dataset_stride") is None
                 else int(payload["dataset_stride"])
             ),
+            completed_epochs=int(payload.get("completed_epochs", 0)),
+            sampler_state=payload.get("sampler_state"),
         )
         if checkpoint.step < 0:
             raise ValueError("checkpoint step cannot be negative")
@@ -237,6 +241,8 @@ def save_training_checkpoint(
         scheduler_state=_capture_scheduler_state(trainer.scheduler),
         dataset_fingerprint=_dataset_fingerprint(trainer.dataset),
         dataset_stride=trainer.dataset.stride,
+        completed_epochs=trainer.completed_epochs,
+        sampler_state=(None if trainer.sampler_state is None else dict(trainer.sampler_state)),
     )
     checkpoint.save(checkpoint_path)
     return checkpoint
@@ -468,6 +474,10 @@ def restore_training_checkpoint(
         optimizer.learning_rate = checkpoint.optimizer_learning_rate
     trainer.step_count = checkpoint.step
     trainer.batch_size = checkpoint.config.batch_size
+    trainer.completed_epochs = checkpoint.completed_epochs
+    trainer.sampler_state = (
+        None if checkpoint.sampler_state is None else dict(checkpoint.sampler_state)
+    )
     optimizer.zero_grad()
     return checkpoint
 
