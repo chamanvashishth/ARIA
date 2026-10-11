@@ -27,7 +27,9 @@ def _flatten(data: object) -> list[float]:
         for item in data:
             result.extend(_flatten(item))
         return result
-    return [float(data)]
+    if isinstance(data, (int, float)):
+        return [float(data)]
+    raise TypeError("tensor values must be numeric")
 
 
 def _build(values: Sequence[float], shape: Shape) -> object:
@@ -84,6 +86,12 @@ class Tensor:
     def from_list(cls, data: list[object], requires_grad: bool = False) -> Tensor:
         return cls(data, requires_grad=requires_grad)
 
+    def gradient_values(self) -> list[float]:
+        """Return this tensor's gradient values, failing clearly before backward()."""
+        if self.grad is None:
+            raise RuntimeError("gradient is not available before backward()")
+        return self.grad._values
+
     def _accumulate(self, values: Sequence[float]) -> None:
         incoming = Tensor(_build(values, self.shape))
         self.grad = incoming if self.grad is None else self.grad + incoming
@@ -100,9 +108,9 @@ class Tensor:
 
         def backward() -> None:
             if self.requires_grad:
-                self._accumulate(out.grad._values)
+                self._accumulate(out.gradient_values())
             if rhs.requires_grad:
-                rhs._accumulate(out.grad._values)
+                rhs._accumulate(out.gradient_values())
 
         out._backward = backward
         return out
@@ -119,9 +127,9 @@ class Tensor:
 
         def backward() -> None:
             if self.requires_grad:
-                self._accumulate([g * b for g, b in zip(out.grad._values, rhs._values)])
+                self._accumulate([g * b for g, b in zip(out.gradient_values(), rhs._values)])
             if rhs.requires_grad:
-                rhs._accumulate([g * a for g, a in zip(out.grad._values, self._values)])
+                rhs._accumulate([g * a for g, a in zip(out.gradient_values(), self._values)])
 
         out._backward = backward
         return out
@@ -129,7 +137,7 @@ class Tensor:
     def sum(self) -> Tensor:
         def backward(out: Tensor) -> None:
             if self.requires_grad:
-                scale = out.grad._values[0]
+                scale = out.gradient_values()[0]
                 self._accumulate([scale] * len(self._values))
 
         return Tensor.operation(sum(self._values), parents=(self,), backward=backward)

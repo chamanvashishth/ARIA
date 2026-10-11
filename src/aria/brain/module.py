@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from aria.brain.parameter import Parameter
 
 
 class Module:
     """Base class for ARIA neural components."""
+
+    def forward(self, inputs: Any) -> Any:
+        """Run a forward pass; concrete modules implement their input contract."""
+        raise NotImplementedError(f"{type(self).__name__} must implement forward()")
 
     def parameters(self) -> list[Parameter]:
         params: list[Parameter] = []

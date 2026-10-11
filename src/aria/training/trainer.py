@@ -9,6 +9,7 @@ from aria.brain.language_model import _log_softmax_loss
 from aria.brain.module import Module
 from aria.brain.optim import LearningRateScheduler, SGD
 from aria.evaluation import EvaluationResult, evaluate_language_model
+from aria.brain.tensor import Tensor
 from aria.training.dataset import TokenBatchSampler, TokenWindowDataset
 
 
@@ -63,10 +64,8 @@ class LanguageModelTrainer:
         self.step_count = 0
         self.completed_epochs = 0
         self.sampler_state: dict[str, int | bool] | None = None
-        self.completed_epochs = 0
-        self.sampler_state: dict[str, int | bool] | None = None
 
-    def _validate_loss(self, loss: object) -> float:
+    def _validate_loss(self, loss: Tensor) -> float:
         value = loss.item()
         if not math.isfinite(value):
             raise ValueError("training loss must be finite")
@@ -86,8 +85,6 @@ class LanguageModelTrainer:
         data_before = [parameter.data for parameter in parameters]
         learning_rate_before = self.optimizer.learning_rate
         step_count_before = self.step_count
-        completed_epochs_before = self.completed_epochs
-        sampler_state_before = None if self.sampler_state is None else dict(self.sampler_state)
         completed_epochs_before = self.completed_epochs
         sampler_state_before = None if self.sampler_state is None else dict(self.sampler_state)
         try:

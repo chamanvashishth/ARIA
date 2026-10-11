@@ -34,7 +34,7 @@ def _log_softmax_loss(logits: Tensor, targets: list[int]) -> Tensor:
 
     def backward(out: Tensor) -> None:
         grad = [0.0] * len(values)
-        scale = out.grad._values[0] / time
+        scale = out.gradient_values()[0] / time
         for row, target in enumerate(targets):
             start = row * vocab
             row_values = values[start:start + vocab]

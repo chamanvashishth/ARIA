@@ -40,7 +40,7 @@ class Linear(Module):
         ]
 
         def backward(out: Tensor) -> None:
-            grad = out.grad._values
+            grad = out.gradient_values()
             if x.requires_grad:
                 dx = [
                     sum(grad[row * out_features + col] * wv[k * out_features + col] for col in range(out_features))
@@ -74,7 +74,7 @@ class ReLU(Module):
 
         def backward(out: Tensor) -> None:
             if x.requires_grad:
-                x._accumulate([g if value > 0.0 else 0.0 for g, value in zip(out.grad._values, x._values)])
+                x._accumulate([g if value > 0.0 else 0.0 for g, value in zip(out.gradient_values(), x._values)])
 
         return Tensor.operation(_reshape(values, x.shape), parents=(x,), backward=backward)
 
@@ -115,7 +115,7 @@ class Embedding(Module):
             for row, token_id in enumerate(token_ids):
                 start = token_id * embedding_dim
                 for col in range(embedding_dim):
-                    grad[start + col] += out.grad._values[row * embedding_dim + col]
+                    grad[start + col] += out.gradient_values()[row * embedding_dim + col]
             self.weight._accumulate(grad)
 
         return Tensor.operation(rows, parents=(self.weight,), backward=backward)

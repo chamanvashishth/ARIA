@@ -392,22 +392,22 @@ def _restore_scheduler_state(scheduler, state: dict[str, Any] | None) -> None:
         raise ValueError("checkpoint contains scheduler state but trainer has no scheduler")
     scheduler_type = state.get("type")
     if scheduler_type == "ExponentialDecay" and isinstance(scheduler, ExponentialDecay):
-        restored = ExponentialDecay(
+        restored_exponential = ExponentialDecay(
             gamma=float(state["gamma"]),
             minimum=float(state["minimum"]),
         )
-        scheduler.gamma = restored.gamma
-        scheduler.minimum = restored.minimum
+        scheduler.gamma = restored_exponential.gamma
+        scheduler.minimum = restored_exponential.minimum
         return
     if scheduler_type == "StepDecay" and isinstance(scheduler, StepDecay):
-        restored = StepDecay(
+        restored_step = StepDecay(
             drop_every=int(state["drop_every"]),
             gamma=float(state["gamma"]),
             minimum=float(state["minimum"]),
         )
-        scheduler.drop_every = restored.drop_every
-        scheduler.gamma = restored.gamma
-        scheduler.minimum = restored.minimum
+        scheduler.drop_every = restored_step.drop_every
+        scheduler.gamma = restored_step.gamma
+        scheduler.minimum = restored_step.minimum
         return
     raise ValueError(
         "checkpoint scheduler does not match trainer scheduler "

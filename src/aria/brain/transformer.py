@@ -39,7 +39,7 @@ class RMSNorm(Module):
         hidden = x.shape[-1]
         rows = math.prod(x.shape[:-1])
         xv = x._values
-        out = []
+        out: list[float] = []
         inv_rms = []
         for row in range(rows):
             start = row * hidden
@@ -48,7 +48,7 @@ class RMSNorm(Module):
             out.extend(xv[start + col] * inv_rms[-1] * self.weight._values[col] for col in range(hidden))
 
         def backward(result: Tensor) -> None:
-            grad = result.grad._values
+            grad = result.gradient_values()
             dx = [0.0] * len(xv)
             dw = [0.0] * hidden
             for row in range(rows):
@@ -118,7 +118,7 @@ class CausalSelfAttention(Module):
                 cache.append((b, i, probs))
 
         def backward(result: Tensor) -> None:
-            grad_out = result.grad._values
+            grad_out = result.gradient_values()
             dq = [0.0] * len(q)
             dk = [0.0] * len(k)
             dv = [0.0] * len(v)

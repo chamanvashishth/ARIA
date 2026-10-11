@@ -33,7 +33,7 @@ def _unique_object_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
-def _error(message: str, code: str) -> dict[str, str]:
+def _error(message: str, code: str) -> dict[str, Any]:
     return {"error": {"code": code, "message": message}}
 
 
