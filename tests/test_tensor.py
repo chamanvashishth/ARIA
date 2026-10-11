@@ -113,3 +113,17 @@ def test_linear_without_bias_propagates_input_gradients() -> None:
     assert len(inputs.grad._values) == len(inputs._values)
     assert layer.bias is None
     assert layer.weight.grad is not None
+
+
+def test_gradient_values_requires_backward_and_returns_accumulated_gradient() -> None:
+    from aria.brain.tensor import Tensor
+
+    value = Tensor.scalar(3.0, requires_grad=True)
+    with pytest.raises(RuntimeError, match="gradient is not available"):
+        value.gradient_values()
+
+    result = (value * value).sum()
+    result.backward()
+
+    assert result.gradient_values() == [1.0]
+    assert value.gradient_values() == [6.0]

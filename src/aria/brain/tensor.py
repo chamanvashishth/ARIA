@@ -189,7 +189,7 @@ class Tensor:
         out = Tensor.operation(
             _build(self._values, shape),
             parents=(self,),
-            backward=lambda result: self._accumulate(result.grad._values) if self.requires_grad else None,
+            backward=lambda result: self._accumulate(result.gradient_values()) if self.requires_grad else None,
         )
         return out
 
