@@ -1,7 +1,7 @@
 # ARIA implementation audit
 
 **Audit date:** 2026-10-11  
-**Audited source baseline:** `main` at `f3550fd9f1a9858a2949d25d1dac01493112b5bf`  
+**Audited source baseline:** `main` at `9879b1be6f6b196c14b395abbd99e4a63b0fd496`  
 **Scope:** prior ARIA project discussions, current repository tree and source, README capability claims, tests, and GitHub Actions evidence.
 
 This audit distinguishes implemented foundations from experimental or missing capabilities. A module existing in the repository does not, by itself, mean the complete product capability is finished.
@@ -23,16 +23,16 @@ At the audited source baseline:
 | Python 3.11 tests | Passed |
 | Python 3.12 tests | Passed |
 | Python 3.13 tests | Passed |
-| Test suite | 193 passed |
-| Coverage | 83.06% (80% minimum enforced) |
+| Test suite | 215 passed |
+| Coverage | 83.53% (80% minimum enforced) |
 | Ruff | Passed |
-| Mypy | Passed; zero issues across 37 source files |
+| Mypy | Passed; zero issues across 40 source files |
 | Dependency audit | Passed |
 
 Workflow evidence:
 
-- [Quality and security run #11](https://github.com/chamanvashishth/ARIA/actions/runs/38163974407)
-- [Python test matrix #162](https://github.com/chamanvashishth/ARIA/actions/runs/38163974367)
+- [Quality and security run #13](https://github.com/chamanvashishth/ARIA/actions/runs/38164197385)
+- [Python test matrix #164](https://github.com/chamanvashishth/ARIA/actions/runs/38164197504)
 
 Mypy is a mandatory quality job. It is not configured with `continue-on-error`.
 
