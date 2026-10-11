@@ -214,6 +214,8 @@ class LanguageModelTrainer:
             raise ValueError("dataset must contain at least one training example")
         if max_batches is not None and max_batches <= 0:
             raise ValueError("max_batches must be positive")
+        if isinstance(seed, bool) or not isinstance(seed, int):
+            raise TypeError("seed must be an integer")
 
         if self.sampler_state is None:
             selected_epoch = self.completed_epochs if epoch is None else epoch
