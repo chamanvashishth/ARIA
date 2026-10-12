@@ -5,6 +5,7 @@ output-tile descriptors, not independent hardware dispatches.
 """
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 from time import perf_counter_ns
 from typing import Literal, Sequence
@@ -314,15 +315,13 @@ class ScheduledComputeBackend:
         memory_budget_bytes: int | None = None,
         history_limit: int = 1024,
     ) -> None:
-        from collections import deque
-
         if isinstance(history_limit, bool) or not isinstance(history_limit, int) or history_limit <= 0:
             raise ValueError("history_limit must be a positive integer")
         self.runtime = runtime or ComputeRuntime()
         self.workgroup_size = workgroup_size
         self.memory_budget_bytes = memory_budget_bytes
         self.history_limit = history_limit
-        self._history = deque(maxlen=history_limit)
+        self._history: deque[ComputeCommand] = deque(maxlen=history_limit)
         self._submitted = 0
         self._completed = 0
         self._failed = 0
@@ -368,7 +367,7 @@ class ScheduledComputeBackend:
             memory_budget_bytes=self.memory_budget_bytes,
             workgroup_size=self.workgroup_size,
         )
-        command_id = queue.submit_matmul(
+        queue.submit_matmul(
             left,
             right,
             command_id=f"model-matmul-{self._submitted + 1:08d}",
