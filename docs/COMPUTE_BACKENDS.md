@@ -54,4 +54,4 @@ Calling requires_grad_(True) again on a model using VNPU makes its next projecti
 
 ## Verification
 
-Tests compare VGPU forward values and gradients against VCPU, exercise Linear and model-level backend injection, verify the VNPU inference-only guard, check frozen TinyLanguageModel and TransformerLanguageModel instances, and validate successful/failed runtime profiling. Run `python scripts/benchmark_compute.py --size` is not a supported option; use `--rows`, `--inner`, and `--columns` to set workload dimensions.
+Tests compare VGPU forward values and gradients against VCPU, exercise Linear and model-level backend injection, verify the VNPU inference-only guard, check frozen TinyLanguageModel and TransformerLanguageModel instances, and validate successful/failed runtime profiling. Run `python scripts/benchmark_compute.py` for the default deterministic workload. Use `--rows`, `--inner`, and `--columns` to set matrix dimensions.

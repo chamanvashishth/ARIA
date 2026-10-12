@@ -1,7 +1,7 @@
 # ARIA implementation audit
 
 **Audit date:** 2026-10-12  
-**Audited source baseline:** pending Block 20 CI verification  
+**Audited source baseline:** `main` at `6fa8dd92a909dfc3bd2fcd5ca40007a0cf693c3a`  
 **Scope:** prior ARIA project discussions, current repository tree and source, README capability claims, tests, and GitHub Actions evidence.
 
 This audit distinguishes implemented foundations from experimental or missing capabilities. A module existing in the repository does not, by itself, mean the complete product capability is finished.
@@ -23,16 +23,16 @@ At the audited source baseline:
 | Python 3.11 tests | Passed |
 | Python 3.12 tests | Passed |
 | Python 3.13 tests | Passed |
-| Test suite | 227 passed |
-| Coverage | 83.76% (80% minimum enforced) |
+| Test suite | 230 passed |
+| Coverage | 83.80% (80% minimum enforced) |
 | Ruff | Passed |
 | Mypy | Passed; zero issues across 40 source files |
 | Dependency audit | Passed |
 
 Workflow evidence:
 
-- [Quality and security run #17](https://github.com/chamanvashishth/ARIA/actions/runs/38203490252)
-- [Python test matrix #168](https://github.com/chamanvashishth/ARIA/actions/runs/38203490153)
+- [Quality and security run #19](https://github.com/chamanvashishth/ARIA/actions/runs/38203902073)
+- [Python test matrix #170](https://github.com/chamanvashishth/ARIA/actions/runs/38203901692)
 
 Mypy is a mandatory quality job. It is not configured with `continue-on-error`.
 
@@ -61,6 +61,7 @@ Mypy is a mandatory quality job. It is not configured with `continue-on-error`.
 | Compute runtime and profiling (20) | Implemented foundation | `compute/backends.py`; opt-in per-matmul timing, shapes, success/failure records, deterministic cross-backend benchmark and numerical-error report; no scheduler or hardware execution |
 | Agent orchestration (18) | Implemented foundation | `agent/orchestrator.py`; dependency-aware plans, mandatory per-step approval, registered-tool execution, structural result verification and execution reports |
 | Software compute devices (19) | Implemented and integrated foundation | `compute/backends.py`, `brain/tensor.py`, `brain/layers.py`; VCPU/VGPU matrix multiplication is integrated into Tensor autodiff and Linear/model projections; VNPU is frozen inference-only |
+| Compute runtime profiling (20) | Implemented foundation | `compute/backends.py`; opt-in per-matmul timing and outcome records, plus `scripts/benchmark_compute.py` for deterministic latency and numerical-error comparison against VCPU |
 
 ## Verified missing or incomplete requirements
 
@@ -68,7 +69,7 @@ Mypy is a mandatory quality job. It is not configured with `continue-on-error`.
 
 The repository exposes VCPU, VGPU and VNPU software backends through `aria.compute`. VCPU is the pure-Python reference; VGPU uses tiled host-CPU loops; VNPU uses symmetric int8 quantization and integer-style accumulation. VCPU and VGPU are integrated with `Tensor.matmul` reverse-mode gradients and `Linear`, and the backend can be injected into TinyLanguageModel and TransformerLanguageModel projections. VNPU is intentionally inference-only and rejects gradient-tracked operands; models must be frozen with `requires_grad_(False)`. All three remain host-CPU emulators with no physical acceleration.
 
-Remaining work: add command/workgroup scheduling and evaluate backend behavior on representative models. The new matrix benchmark measures latency and numerical error on a deterministic synthetic workload; it is not a representative model benchmark and does not establish performance targets. Attention softmax and its custom backward pass remain Python operations. No physical GPU/NPU is required or claimed.
+The runtime now offers opt-in profiling for matrix operations, and `scripts/benchmark_compute.py` reports latency and numerical error against VCPU on deterministic synthetic matrices. This is diagnostic evidence only, not a representative model benchmark or a performance guarantee. Remaining work: command/workgroup scheduling and evaluation on representative model workloads. Attention softmax and its custom backward pass remain Python operations. No physical GPU/NPU is required or claimed.
 
 ### 2. Autonomous planning — not implemented
 
@@ -104,7 +105,7 @@ Current evaluation measures next-token behavior on caller-supplied examples and 
 
 ## Recommended implementation order
 
-1. **Compute expansion:** define command/workgroup scheduling and evaluate backend behavior on representative models.
+1. **Compute expansion:** define command/workgroup scheduling and evaluate backend behavior on representative model workloads.
 2. **Local planner adapter:** accept structured plans from the local model, parse them strictly, reject malformed or unsupported tool requests, and retain the mandatory approval gate.
 3. **Agent roles and QA:** define a small set of typed, testable roles; avoid creating agents without distinct responsibilities and acceptance criteria.
 4. **Memory and RAG integration:** add local semantic indexing and provenance-preserving retrieval; evaluate relevance before injecting context into prompts.
