@@ -45,7 +45,9 @@ Calling requires_grad_(True) again on a model using VNPU makes its next projecti
 - No CUDA, Metal, DirectML, OpenCL, or physical GPU/NPU execution.
 - Runtime profiling is opt-in and records each matrix operation's backend, operand shapes, duration, and outcome; profiles are held in memory until cleared.
 - `python scripts/benchmark_compute.py` compares latency and numerical error against the VCPU reference on deterministic synthetic matrices.
-- No asynchronous command queues or workgroup scheduler.
+- `CommandQueue` provides FIFO submissions, dependencies on earlier commands, bounded pending capacity, estimated-memory reservations, and logical output workgroup plans.
+- `ComputeScheduler` runs ready commands synchronously in submission order, records completed/failed/blocked states, and blocks dependents after prerequisite failures. Workgroups are planning metadata; the backend still receives one complete matrix operation.
+- No asynchronous dispatch, parallel worker pool, or physical hardware scheduling.
 - No automatic device discovery or hardware fallback.
 - No performance advantage is claimed; VGPU tiling is an algorithmic simulation.
 - VNPU quantization is per-matrix symmetric scaling; it is not a calibrated deployment quantizer.
@@ -54,4 +56,4 @@ Calling requires_grad_(True) again on a model using VNPU makes its next projecti
 
 ## Verification
 
-Tests compare VGPU forward values and gradients against VCPU, exercise Linear and model-level backend injection, verify the VNPU inference-only guard, check frozen TinyLanguageModel and TransformerLanguageModel instances, and validate successful/failed runtime profiling. Run `python scripts/benchmark_compute.py` for the default deterministic workload. Use `--rows`, `--inner`, and `--columns` to set matrix dimensions.
+Tests compare VGPU forward values and gradients against VCPU, exercise Linear and model-level backend injection, verify the VNPU inference-only guard, check frozen TinyLanguageModel and TransformerLanguageModel instances, validate successful/failed runtime profiling, and cover queue dependencies, failure propagation, workgroup coverage, queue limits and memory accounting. Run `python scripts/benchmark_compute.py` for the default deterministic workload. Use `--rows`, `--inner`, and `--columns` to set matrix dimensions.

@@ -173,6 +173,8 @@ Block 19 integrates the dependency-free compute backends with ARIA's neural engi
 
 The runtime now supports opt-in matrix-operation profiling (`ComputeRuntime(..., profiling=True)`) with operand shapes, elapsed nanoseconds, success/failure state, and error type. Run `python scripts/benchmark_compute.py` to compare latency and numerical error for the three backends on the same deterministic matrix workload. The report includes environment metadata and explicitly labels all devices as host-CPU emulators. These timings are diagnostic, not portable performance claims.
 
+A synchronous command scheduler is also available through `CommandQueue` and `ComputeScheduler`. It provides FIFO execution, dependencies, logical output workgroup planning, pending-command limits, estimated-memory reservations, and queued/running/completed/failed/blocked states. Workgroups are planning metadata; commands still execute as whole matrix operations on the selected host-CPU backend. See `docs/COMPUTE_BACKENDS.md` for details.
+
 ## Tokenizer
 
 ARIA currently uses a deterministic UTF-8 byte-level tokenizer.

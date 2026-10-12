@@ -1,7 +1,7 @@
 # ARIA implementation audit
 
 **Audit date:** 2026-10-12  
-**Audited source baseline:** `main` at `6fa8dd92a909dfc3bd2fcd5ca40007a0cf693c3a`  
+**Audited source baseline:** pending Block 21 CI verification  
 **Scope:** prior ARIA project discussions, current repository tree and source, README capability claims, tests, and GitHub Actions evidence.
 
 This audit distinguishes implemented foundations from experimental or missing capabilities. A module existing in the repository does not, by itself, mean the complete product capability is finished.
@@ -61,7 +61,8 @@ Mypy is a mandatory quality job. It is not configured with `continue-on-error`.
 | Compute runtime and profiling (20) | Implemented foundation | `compute/backends.py`; opt-in per-matmul timing, shapes, success/failure records, deterministic cross-backend benchmark and numerical-error report; no scheduler or hardware execution |
 | Agent orchestration (18) | Implemented foundation | `agent/orchestrator.py`; dependency-aware plans, mandatory per-step approval, registered-tool execution, structural result verification and execution reports |
 | Software compute devices (19) | Implemented and integrated foundation | `compute/backends.py`, `brain/tensor.py`, `brain/layers.py`; VCPU/VGPU matrix multiplication is integrated into Tensor autodiff and Linear/model projections; VNPU is frozen inference-only |
-| Compute runtime profiling (20) | Implemented foundation | `compute/backends.py`; opt-in per-matmul timing and outcome records, plus `scripts/benchmark_compute.py` for deterministic latency and numerical-error comparison against VCPU |
+| Compute runtime and profiling (20) | Implemented foundation | `compute/backends.py`; opt-in per-matmul timing and outcome records, plus `scripts/benchmark_compute.py` for deterministic latency and numerical-error comparison against VCPU |
+| Virtual compute scheduler (21) | Implemented synchronous foundation | `compute/scheduler.py`; FIFO command queue, dependencies, logical output workgroups, queue capacity, estimated-memory reservations, command state tracking and dependency failure propagation; no async or parallel hardware dispatch |
 
 ## Verified missing or incomplete requirements
 
@@ -69,7 +70,7 @@ Mypy is a mandatory quality job. It is not configured with `continue-on-error`.
 
 The repository exposes VCPU, VGPU and VNPU software backends through `aria.compute`. VCPU is the pure-Python reference; VGPU uses tiled host-CPU loops; VNPU uses symmetric int8 quantization and integer-style accumulation. VCPU and VGPU are integrated with `Tensor.matmul` reverse-mode gradients and `Linear`, and the backend can be injected into TinyLanguageModel and TransformerLanguageModel projections. VNPU is intentionally inference-only and rejects gradient-tracked operands; models must be frozen with `requires_grad_(False)`. All three remain host-CPU emulators with no physical acceleration.
 
-The runtime now offers opt-in profiling for matrix operations, and `scripts/benchmark_compute.py` reports latency and numerical error against VCPU on deterministic synthetic matrices. This is diagnostic evidence only, not a representative model benchmark or a performance guarantee. Remaining work: command/workgroup scheduling and evaluation on representative model workloads. Attention softmax and its custom backward pass remain Python operations. No physical GPU/NPU is required or claimed.
+The runtime now offers opt-in profiling for matrix operations, and `scripts/benchmark_compute.py` reports latency and numerical error against VCPU on deterministic synthetic matrices. This is diagnostic evidence only, not a representative model benchmark or a performance guarantee. The synchronous scheduler now plans logical output workgroups and manages FIFO command dependencies, queue capacity, estimated-memory reservations, and command states. Workgroups are metadata only; the backend executes each full matrix operation synchronously. Remaining work: asynchronous dispatch, true parallel workers, and evaluation on representative model workloads. Attention softmax and its custom backward pass remain Python operations. No physical GPU/NPU is required or claimed.
 
 ### 2. Autonomous planning — not implemented
 
@@ -105,7 +106,7 @@ Current evaluation measures next-token behavior on caller-supplied examples and 
 
 ## Recommended implementation order
 
-1. **Compute expansion:** define command/workgroup scheduling and evaluate backend behavior on representative model workloads.
+1. **Compute expansion:** add optional worker execution only after defining concurrency safety, cancellation semantics, and resource ownership; evaluate backend behavior on representative model workloads.
 2. **Local planner adapter:** accept structured plans from the local model, parse them strictly, reject malformed or unsupported tool requests, and retain the mandatory approval gate.
 3. **Agent roles and QA:** define a small set of typed, testable roles; avoid creating agents without distinct responsibilities and acceptance criteria.
 4. **Memory and RAG integration:** add local semantic indexing and provenance-preserving retrieval; evaluate relevance before injecting context into prompts.

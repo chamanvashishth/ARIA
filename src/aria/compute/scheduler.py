@@ -1,0 +1,285 @@
+"""Deterministic command queues and workgroup planning for ARIA compute.
+
+This is a synchronous host-CPU orchestration layer. Workgroups are logical
+output-tile descriptors, not independent hardware dispatches.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from time import perf_counter_ns
+from typing import Literal, Sequence
+
+from aria.compute.backends import ComputeRuntime, Matrix
+
+CommandState = Literal["queued", "running", "completed", "failed", "blocked"]
+_TERMINAL = frozenset({"completed", "failed", "blocked"})
+
+
+@dataclass(frozen=True)
+class Workgroup:
+    workgroup_id: str
+    row_start: int
+    row_stop: int
+    column_start: int
+    column_stop: int
+
+
+@dataclass(frozen=True)
+class ComputeCommand:
+    command_id: str
+    operation: str
+    dependencies: tuple[str, ...]
+    state: CommandState
+    workgroups: tuple[Workgroup, ...]
+    reserved_memory_bytes: int
+    submitted_at_ns: int
+    started_at_ns: int | None = None
+    completed_at_ns: int | None = None
+    result: tuple[tuple[float, ...], ...] | None = None
+    error: str | None = None
+
+
+@dataclass(frozen=True)
+class SchedulerStats:
+    submitted: int
+    queued: int
+    running: int
+    completed: int
+    failed: int
+    blocked: int
+    reserved_memory_bytes: int
+    peak_reserved_memory_bytes: int
+    planned_workgroups: int
+
+
+@dataclass
+class _CommandRecord:
+    command_id: str
+    left: tuple[tuple[int | float, ...], ...]
+    right: tuple[tuple[int | float, ...], ...]
+    dependencies: tuple[str, ...]
+    workgroups: tuple[Workgroup, ...]
+    reserved_memory_bytes: int
+    submitted_at_ns: int
+    state: CommandState = "queued"
+    started_at_ns: int | None = None
+    completed_at_ns: int | None = None
+    result: tuple[tuple[float, ...], ...] | None = None
+    error: str | None = None
+
+    def snapshot(self) -> ComputeCommand:
+        return ComputeCommand(
+            command_id=self.command_id,
+            operation="matmul",
+            dependencies=self.dependencies,
+            state=self.state,
+            workgroups=self.workgroups,
+            reserved_memory_bytes=self.reserved_memory_bytes,
+            submitted_at_ns=self.submitted_at_ns,
+            started_at_ns=self.started_at_ns,
+            completed_at_ns=self.completed_at_ns,
+            result=self.result,
+            error=self.error,
+        )
+
+
+def _dimensions(matrix: Matrix, name: str) -> tuple[int, int]:
+    if not isinstance(matrix, Sequence) or isinstance(matrix, (str, bytes)) or not matrix:
+        raise ValueError(f"{name} must be a non-empty matrix")
+    if any(not isinstance(row, Sequence) or isinstance(row, (str, bytes)) for row in matrix):
+        raise TypeError(f"{name} rows must be sequences")
+    columns = len(matrix[0])
+    if columns == 0 or any(len(row) != columns for row in matrix):
+        raise ValueError(f"{name} must be rectangular and non-empty")
+    return len(matrix), columns
+
+
+def _plan_workgroups(
+    command_id: str, rows: int, columns: int, tile_size: int
+) -> tuple[Workgroup, ...]:
+    groups = []
+    for row_start in range(0, rows, tile_size):
+        for column_start in range(0, columns, tile_size):
+            ordinal = len(groups)
+            groups.append(
+                Workgroup(
+                    workgroup_id=f"{command_id}:wg-{ordinal:04d}",
+                    row_start=row_start,
+                    row_stop=min(row_start + tile_size, rows),
+                    column_start=column_start,
+                    column_stop=min(column_start + tile_size, columns),
+                )
+            )
+    return tuple(groups)
+
+
+class CommandQueue:
+    """FIFO queue with earlier-command dependencies and resource reservations."""
+
+    def __init__(
+        self,
+        *,
+        max_pending_commands: int = 128,
+        memory_budget_bytes: int | None = None,
+        workgroup_size: int = 16,
+    ) -> None:
+        if isinstance(max_pending_commands, bool) or not isinstance(max_pending_commands, int) or max_pending_commands <= 0:
+            raise ValueError("max_pending_commands must be a positive integer")
+        if memory_budget_bytes is not None and (
+            isinstance(memory_budget_bytes, bool)
+            or not isinstance(memory_budget_bytes, int)
+            or memory_budget_bytes <= 0
+        ):
+            raise ValueError("memory_budget_bytes must be a positive integer or None")
+        if isinstance(workgroup_size, bool) or not isinstance(workgroup_size, int) or workgroup_size <= 0:
+            raise ValueError("workgroup_size must be a positive integer")
+
+        self.max_pending_commands = max_pending_commands
+        self.memory_budget_bytes = memory_budget_bytes
+        self.workgroup_size = workgroup_size
+        self._commands: dict[str, _CommandRecord] = {}
+        self._next_id = 1
+        self._reserved_memory_bytes = 0
+        self._peak_reserved_memory_bytes = 0
+
+    @property
+    def commands(self) -> tuple[ComputeCommand, ...]:
+        return tuple(record.snapshot() for record in self._commands.values())
+
+    @property
+    def reserved_memory_bytes(self) -> int:
+        return self._reserved_memory_bytes
+
+    @property
+    def peak_reserved_memory_bytes(self) -> int:
+        return self._peak_reserved_memory_bytes
+
+    def get(self, command_id: str) -> ComputeCommand:
+        try:
+            return self._commands[command_id].snapshot()
+        except KeyError as error:
+            raise KeyError(f"unknown command: {command_id}") from error
+
+    def submit_matmul(
+        self,
+        left: Matrix,
+        right: Matrix,
+        *,
+        depends_on: Sequence[str] = (),
+        command_id: str | None = None,
+    ) -> str:
+        left_rows, inner = _dimensions(left, "left operand")
+        right_rows, columns = _dimensions(right, "right operand")
+        if inner != right_rows:
+            raise ValueError(
+                f"matrix dimensions do not match: {left_rows}x{inner} cannot multiply {right_rows}x{columns}"
+            )
+
+        active = sum(record.state not in _TERMINAL for record in self._commands.values())
+        if active >= self.max_pending_commands:
+            raise RuntimeError("command queue capacity exceeded")
+
+        dependencies = tuple(depends_on)
+        if len(set(dependencies)) != len(dependencies):
+            raise ValueError("command dependencies must be unique")
+        if command_id is None:
+            while f"cmd-{self._next_id:06d}" in self._commands:
+                self._next_id += 1
+            selected_id = f"cmd-{self._next_id:06d}"
+            self._next_id += 1
+        else:
+            if not isinstance(command_id, str) or not command_id:
+                raise ValueError("command_id must be a non-empty string")
+            selected_id = command_id
+        if selected_id in self._commands:
+            raise ValueError(f"duplicate command_id: {selected_id}")
+        if selected_id in dependencies:
+            raise ValueError("a command cannot depend on itself")
+        missing = [item for item in dependencies if item not in self._commands]
+        if missing:
+            raise ValueError(f"dependencies must reference earlier commands: {missing}")
+
+        memory_bytes = 8 * (left_rows * inner + right_rows * columns + left_rows * columns)
+        requested = self._reserved_memory_bytes + memory_bytes
+        if self.memory_budget_bytes is not None and requested > self.memory_budget_bytes:
+            raise MemoryError(
+                f"command memory reservation exceeds queue budget: {requested} > {self.memory_budget_bytes} bytes"
+            )
+
+        left_copy = tuple(tuple(value for value in row) for row in left)
+        right_copy = tuple(tuple(value for value in row) for row in right)
+        record = _CommandRecord(
+            command_id=selected_id,
+            left=left_copy,
+            right=right_copy,
+            dependencies=dependencies,
+            workgroups=_plan_workgroups(
+                selected_id, left_rows, columns, self.workgroup_size
+            ),
+            reserved_memory_bytes=memory_bytes,
+            submitted_at_ns=perf_counter_ns(),
+        )
+        self._commands[selected_id] = record
+        self._reserved_memory_bytes = requested
+        self._peak_reserved_memory_bytes = max(self._peak_reserved_memory_bytes, requested)
+        return selected_id
+
+    def _release(self, record: _CommandRecord) -> None:
+        self._reserved_memory_bytes -= record.reserved_memory_bytes
+        if self._reserved_memory_bytes < 0:
+            raise RuntimeError("internal scheduler memory accounting underflow")
+
+
+class ComputeScheduler:
+    """Execute ready commands synchronously in deterministic submission order."""
+
+    def __init__(self, runtime: ComputeRuntime | None = None) -> None:
+        self.runtime = runtime or ComputeRuntime()
+
+    def run(self, queue: CommandQueue) -> tuple[ComputeCommand, ...]:
+        for record in queue._commands.values():
+            if record.state != "queued":
+                continue
+            dependencies = [queue._commands[item] for item in record.dependencies]
+            failed = next(
+                (item for item in dependencies if item.state in {"failed", "blocked"}),
+                None,
+            )
+            if failed is not None:
+                record.state = "blocked"
+                record.error = f"dependency {failed.command_id} ended in state {failed.state}"
+                record.completed_at_ns = perf_counter_ns()
+                queue._release(record)
+                continue
+            if any(item.state != "completed" for item in dependencies):
+                continue
+
+            record.state = "running"
+            record.started_at_ns = perf_counter_ns()
+            try:
+                output = self.runtime.matmul(record.left, record.right)
+                record.result = tuple(tuple(value for value in row) for row in output)
+                record.state = "completed"
+            except Exception as error:
+                record.state = "failed"
+                record.error = f"{type(error).__name__}: {error}"
+            finally:
+                record.completed_at_ns = perf_counter_ns()
+                queue._release(record)
+
+        return queue.commands
+
+    @staticmethod
+    def stats(queue: CommandQueue) -> SchedulerStats:
+        states = [record.state for record in queue._commands.values()]
+        return SchedulerStats(
+            submitted=len(states),
+            queued=states.count("queued"),
+            running=states.count("running"),
+            completed=states.count("completed"),
+            failed=states.count("failed"),
+            blocked=states.count("blocked"),
+            reserved_memory_bytes=queue.reserved_memory_bytes,
+            peak_reserved_memory_bytes=queue.peak_reserved_memory_bytes,
+            planned_workgroups=sum(len(item.workgroups) for item in queue._commands.values()),
+        )
