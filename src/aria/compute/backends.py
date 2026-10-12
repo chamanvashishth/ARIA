@@ -8,6 +8,7 @@ physical accelerator access or hardware acceleration.
 from __future__ import annotations
 
 import math
+import time
 from dataclasses import dataclass
 from typing import Literal, Protocol, Sequence
 
@@ -15,6 +16,7 @@ from typing import Literal, Protocol, Sequence
 DeviceKind = Literal["vcpu", "vgpu", "vnpu"]
 Matrix = Sequence[Sequence[int | float]]
 _MatrixValues = list[list[float]]
+MatrixShape = tuple[int, int]
 
 
 @dataclass(frozen=True)
@@ -30,6 +32,22 @@ class BackendInfo:
     supports_autodiff: bool = False
 
 
+@dataclass(frozen=True)
+class MatmulProfile:
+    """One measured runtime matrix multiplication.
+
+    Shapes are None when an operand is malformed and its dimensions cannot be
+    inspected safely. elapsed_ns measures the backend call only.
+    """
+
+    device: DeviceKind
+    left_shape: MatrixShape | None
+    right_shape: MatrixShape | None
+    elapsed_ns: int
+    succeeded: bool
+    error_type: str | None = None
+
+
 class ComputeBackend(Protocol):
     """Interface shared by ARIA's software compute backends."""
 
@@ -39,6 +57,18 @@ class ComputeBackend(Protocol):
 
     def matmul(self, left: Matrix, right: Matrix) -> _MatrixValues:
         ...
+
+
+def _matrix_shape(values: Matrix) -> MatrixShape | None:
+    """Return a rectangular matrix shape without raising for malformed input."""
+    if not isinstance(values, Sequence) or isinstance(values, (str, bytes)) or not values:
+        return None
+    if any(not isinstance(row, Sequence) or isinstance(row, (str, bytes)) for row in values):
+        return None
+    width = len(values[0])
+    if width == 0 or any(len(row) != width for row in values):
+        return None
+    return len(values), width
 
 
 def _normalize_matrix(values: Matrix, name: str) -> _MatrixValues:
@@ -193,9 +223,19 @@ class VirtualNPUBackend:
 
 
 class ComputeRuntime:
-    """Select and expose one explicit software compute backend."""
+    """Select one software backend and optionally collect execution profiles.
 
-    def __init__(self, device: DeviceKind = "vcpu", *, tile_size: int = 16) -> None:
+    Profiling is opt-in so the default execution path does not pay for timing
+    or retain per-operation records.
+    """
+
+    def __init__(
+        self,
+        device: DeviceKind = "vcpu",
+        *,
+        tile_size: int = 16,
+        profiling: bool = False,
+    ) -> None:
         if device == "vcpu":
             self.backend: ComputeBackend = VirtualCPUBackend()
         elif device == "vgpu":
@@ -204,10 +244,21 @@ class ComputeRuntime:
             self.backend = VirtualNPUBackend()
         else:
             raise ValueError(f"unsupported compute device: {device}")
+        self.profiling = profiling
+        self._profiles: list[MatmulProfile] = []
 
     @property
     def info(self) -> BackendInfo:
         return self.backend.info
+
+    @property
+    def profiles(self) -> tuple[MatmulProfile, ...]:
+        """Return an immutable snapshot of collected operation profiles."""
+        return tuple(self._profiles)
+
+    def clear_profiles(self) -> None:
+        """Discard collected profiles without changing backend configuration."""
+        self._profiles.clear()
 
     @staticmethod
     def available_devices() -> tuple[BackendInfo, ...]:
@@ -218,5 +269,35 @@ class ComputeRuntime:
         )
 
     def matmul(self, left: Matrix, right: Matrix) -> _MatrixValues:
-        """Multiply two matrices using the selected software backend."""
-        return self.backend.matmul(left, right)
+        """Multiply matrices and, when enabled, record duration and outcome."""
+        if not self.profiling:
+            return self.backend.matmul(left, right)
+
+        left_shape = _matrix_shape(left)
+        right_shape = _matrix_shape(right)
+        started = time.perf_counter_ns()
+        try:
+            result = self.backend.matmul(left, right)
+        except Exception as error:
+            self._profiles.append(
+                MatmulProfile(
+                    device=self.info.device,
+                    left_shape=left_shape,
+                    right_shape=right_shape,
+                    elapsed_ns=time.perf_counter_ns() - started,
+                    succeeded=False,
+                    error_type=type(error).__name__,
+                )
+            )
+            raise
+
+        self._profiles.append(
+            MatmulProfile(
+                device=self.info.device,
+                left_shape=left_shape,
+                right_shape=right_shape,
+                elapsed_ns=time.perf_counter_ns() - started,
+                succeeded=True,
+            )
+        )
+        return result

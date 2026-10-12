@@ -43,6 +43,8 @@ Calling requires_grad_(True) again on a model using VNPU makes its next projecti
 ## Limitations
 
 - No CUDA, Metal, DirectML, OpenCL, or physical GPU/NPU execution.
+- Runtime profiling is opt-in and records each matrix operation's backend, operand shapes, duration, and outcome; profiles are held in memory until cleared.
+- `python scripts/benchmark_compute.py` compares latency and numerical error against the VCPU reference on deterministic synthetic matrices.
 - No asynchronous command queues or workgroup scheduler.
 - No automatic device discovery or hardware fallback.
 - No performance advantage is claimed; VGPU tiling is an algorithmic simulation.
@@ -52,4 +54,4 @@ Calling requires_grad_(True) again on a model using VNPU makes its next projecti
 
 ## Verification
 
-Tests compare VGPU forward values and gradients against VCPU, exercise Linear and model-level backend injection, verify the VNPU inference-only guard, and check frozen TinyLanguageModel and TransformerLanguageModel instances.
+Tests compare VGPU forward values and gradients against VCPU, exercise Linear and model-level backend injection, verify the VNPU inference-only guard, check frozen TinyLanguageModel and TransformerLanguageModel instances, and validate successful/failed runtime profiling. Run `python scripts/benchmark_compute.py --size` is not a supported option; use `--rows`, `--inner`, and `--columns` to set workload dimensions.

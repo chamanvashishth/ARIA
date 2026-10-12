@@ -4,6 +4,7 @@ import pytest
 
 from aria.compute import (
     ComputeRuntime,
+    MatmulProfile,
     VirtualCPUBackend,
     VirtualGPUBackend,
     VirtualNPUBackend,
@@ -95,3 +96,48 @@ def test_compute_backends_validate_matrix_inputs(left, right, error, message) ->
     for backend in (VirtualCPUBackend(), VirtualGPUBackend(), VirtualNPUBackend()):
         with pytest.raises(error, match=message):
             backend.matmul(left, right)
+
+
+def test_runtime_profiles_successful_operations_when_enabled() -> None:
+    runtime = ComputeRuntime("vcpu", profiling=True)
+
+    assert runtime.matmul([[1, 2]], [[3], [4]]) == [[11.0]]
+    assert runtime.profiles == (
+        MatmulProfile(
+            device="vcpu",
+            left_shape=(1, 2),
+            right_shape=(2, 1),
+            elapsed_ns=runtime.profiles[0].elapsed_ns,
+            succeeded=True,
+        ),
+    )
+    assert runtime.profiles[0].elapsed_ns >= 0
+    assert runtime.profiles[0].error_type is None
+
+
+def test_runtime_profiles_failed_operations_and_reraises_error() -> None:
+    runtime = ComputeRuntime("vgpu", profiling=True)
+
+    with pytest.raises(ValueError, match="matrix dimensions do not match"):
+        runtime.matmul([[1, 2]], [[3]])
+
+    assert len(runtime.profiles) == 1
+    profile = runtime.profiles[0]
+    assert profile.device == "vgpu"
+    assert profile.left_shape == (1, 2)
+    assert profile.right_shape == (1, 1)
+    assert profile.succeeded is False
+    assert profile.error_type == "ValueError"
+    assert profile.elapsed_ns >= 0
+
+
+def test_runtime_profiling_is_opt_in_and_profiles_can_be_cleared() -> None:
+    runtime = ComputeRuntime("vcpu")
+    runtime.matmul([[2]], [[5]])
+    assert runtime.profiles == ()
+
+    profiled = ComputeRuntime("vcpu", profiling=True)
+    profiled.matmul([[2]], [[5]])
+    assert len(profiled.profiles) == 1
+    profiled.clear_profiles()
+    assert profiled.profiles == ()

@@ -171,6 +171,8 @@ Block 19 integrates the dependency-free compute backends with ARIA's neural engi
 
 **Important limitation:** all three devices are software emulators and execute on the host CPU. They do not provide physical GPU/NPU access or hardware acceleration. The kernels are integrated into Linear and the TinyLanguageModel/TransformerLanguageModel projection layers. Transformer attention score/value matrix multiplications also use the selected backend; attention's softmax and custom backward logic and embedding lookups remain Python implementations. No speedup is claimed; all backends still execute on the host CPU.
 
+The runtime now supports opt-in matrix-operation profiling (`ComputeRuntime(..., profiling=True)`) with operand shapes, elapsed nanoseconds, success/failure state, and error type. Run `python scripts/benchmark_compute.py` to compare latency and numerical error for the three backends on the same deterministic matrix workload. The report includes environment metadata and explicitly labels all devices as host-CPU emulators. These timings are diagnostic, not portable performance claims.
+
 ## Tokenizer
 
 ARIA currently uses a deterministic UTF-8 byte-level tokenizer.
@@ -931,6 +933,7 @@ timeline
     Block 17 : Research and optimization : Implemented foundation
     Block 18 : Approval-gated orchestration : Implemented foundation
     Block 19 : Integrated software compute backends : Implemented foundation
+    Block 20 : Compute profiling and benchmark : Implemented foundation
 ~~~
 
 ### Block workflow

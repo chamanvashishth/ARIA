@@ -1,7 +1,7 @@
 # ARIA implementation audit
 
 **Audit date:** 2026-10-12  
-**Audited source baseline:** `main` at `3311d4d25ffb6cb66ebae03200c7c3799776752c`  
+**Audited source baseline:** pending Block 20 CI verification  
 **Scope:** prior ARIA project discussions, current repository tree and source, README capability claims, tests, and GitHub Actions evidence.
 
 This audit distinguishes implemented foundations from experimental or missing capabilities. A module existing in the repository does not, by itself, mean the complete product capability is finished.
@@ -10,7 +10,7 @@ This audit distinguishes implemented foundations from experimental or missing ca
 
 ARIA has a working, dependency-light Python foundation for a small trainable neural model, training and checkpoint recovery, local inference, runtime lifecycle, basic memory, lexical retrieval, validated tools, structural verification, a local API, a browser UI, and evaluation utilities.
 
-The Transformer, inference, runtime, memory, RAG, API, UI, and orchestration components are foundations rather than production-ready systems. The repository does not yet contain a fully autonomous planner, a semantic memory stack, a sandboxed execution environment, a integrated software-emulated VCPU/VGPU/VNPU compute layer, or a complete end-to-end research assistant.
+The Transformer, inference, runtime, memory, RAG, API, UI, and orchestration components are foundations rather than production-ready systems. The repository does not yet contain a fully autonomous planner, a semantic memory stack, a sandboxed execution environment, a production hardware-accelerated compute layer, or a complete end-to-end research assistant.
 
 The user's independence constraint is preserved: the intended runtime must not depend on hosted model APIs, API keys, cloud inference, hosted embeddings, or mandatory accelerator hardware.
 
@@ -57,7 +57,8 @@ Mypy is a mandatory quality job. It is not configured with `continue-on-error`.
 | Browser UI (14) | Implemented foundation | `ui/index.html`; static local chat interface, no accounts, streaming or persistent chat UI |
 | Evaluation (15) | Implemented foundation | `evaluation/core.py`; next-token loss, perplexity, accuracy, parameter health and gradient checks |
 | Security hardening (16) | Partial foundation | API input bounds, local binding, response headers, explicit tools and dependency audit; no sandbox, auth, rate limiting or OS-level permissions |
-| Research and optimization (17) | Partial foundation | `scripts/benchmark_inference.py`, `scripts/profile_transformer.py`; scripts exist, but no representative benchmark suite or validated performance targets |
+| Research and optimization (17) | Partial foundation | `scripts/benchmark_inference.py`, `scripts/profile_transformer.py`; diagnostic scripts exist, but no representative production benchmark suite or validated performance targets |
+| Compute runtime and profiling (20) | Implemented foundation | `compute/backends.py`; opt-in per-matmul timing, shapes, success/failure records, deterministic cross-backend benchmark and numerical-error report; no scheduler or hardware execution |
 | Agent orchestration (18) | Implemented foundation | `agent/orchestrator.py`; dependency-aware plans, mandatory per-step approval, registered-tool execution, structural result verification and execution reports |
 | Software compute devices (19) | Implemented and integrated foundation | `compute/backends.py`, `brain/tensor.py`, `brain/layers.py`; VCPU/VGPU matrix multiplication is integrated into Tensor autodiff and Linear/model projections; VNPU is frozen inference-only |
 
@@ -67,7 +68,7 @@ Mypy is a mandatory quality job. It is not configured with `continue-on-error`.
 
 The repository exposes VCPU, VGPU and VNPU software backends through `aria.compute`. VCPU is the pure-Python reference; VGPU uses tiled host-CPU loops; VNPU uses symmetric int8 quantization and integer-style accumulation. VCPU and VGPU are integrated with `Tensor.matmul` reverse-mode gradients and `Linear`, and the backend can be injected into TinyLanguageModel and TransformerLanguageModel projections. VNPU is intentionally inference-only and rejects gradient-tracked operands; models must be frozen with `requires_grad_(False)`. All three remain host-CPU emulators with no physical acceleration.
 
-Remaining work: add command/workgroup scheduling, benchmark numerical error and performance, and evaluate backend behavior on representative models. Attention softmax and its custom backward pass remain Python operations. No physical GPU/NPU is required or claimed.
+Remaining work: add command/workgroup scheduling and evaluate backend behavior on representative models. The new matrix benchmark measures latency and numerical error on a deterministic synthetic workload; it is not a representative model benchmark and does not establish performance targets. Attention softmax and its custom backward pass remain Python operations. No physical GPU/NPU is required or claimed.
 
 ### 2. Autonomous planning — not implemented
 
@@ -103,7 +104,7 @@ Current evaluation measures next-token behavior on caller-supplied examples and 
 
 ## Recommended implementation order
 
-1. **Compute expansion:** define command/workgroup scheduling and benchmark numerical error and performance across representative models.
+1. **Compute expansion:** define command/workgroup scheduling and evaluate backend behavior on representative models.
 2. **Local planner adapter:** accept structured plans from the local model, parse them strictly, reject malformed or unsupported tool requests, and retain the mandatory approval gate.
 3. **Agent roles and QA:** define a small set of typed, testable roles; avoid creating agents without distinct responsibilities and acceptance criteria.
 4. **Memory and RAG integration:** add local semantic indexing and provenance-preserving retrieval; evaluate relevance before injecting context into prompts.
