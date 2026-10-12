@@ -46,11 +46,12 @@ class Linear(Module):
         projected = flattened.matmul(self.weight, backend=self.backend)
         if self.bias is not None:
             bias = self.bias
+            pre_bias = projected
 
             def add_bias(out: Tensor) -> None:
                 gradient = out.gradient_values()
-                if projected.requires_grad:
-                    projected._accumulate(gradient)
+                if pre_bias.requires_grad:
+                    pre_bias._accumulate(gradient)
                 if bias.requires_grad:
                     bias._accumulate([
                         sum(gradient[row * out_features + col] for row in range(rows))

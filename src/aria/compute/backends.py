@@ -122,6 +122,7 @@ class VirtualGPUBackend:
             name="ARIA Virtual GPU Emulator",
             execution=f"host-cpu-tiled-emulation:{self.tile_size}",
             numeric_mode="python-float",
+            supports_autodiff=True,
         )
 
     def matmul(self, left: Matrix, right: Matrix) -> _MatrixValues:
