@@ -39,8 +39,6 @@ def test_scheduled_backend_matches_direct_transformer_and_records_commands() -> 
 
 
 def test_scheduled_backend_preserves_autodiff_for_vcpu_and_vgpu() -> None:
-    from aria.brain import Parameter
-
     for device in ("vcpu", "vgpu"):
         backend = ScheduledComputeBackend(ComputeRuntime(device), workgroup_size=1)
         model = _model(backend)
