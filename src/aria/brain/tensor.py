@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from math import prod
 from typing import Callable, Sequence
 
+from aria.compute.backends import ComputeBackend, VirtualCPUBackend
+
 
 Shape = tuple[int, ...]
 
@@ -133,6 +135,64 @@ class Tensor:
 
         out._backward = backward
         return out
+
+
+    def matmul(self, other: Tensor, *, backend: ComputeBackend | None = None) -> Tensor:
+        """Multiply two rank-2 tensors with backend-aware reverse-mode gradients.
+
+        VCPU and VGPU support autodiff. VNPU is quantized inference-only and
+        rejects operands that require gradients.
+        """
+        if len(self.shape) != 2 or len(other.shape) != 2:
+            raise ValueError("matmul operands must both be 2-D tensors")
+        rows, inner = self.shape
+        other_inner, columns = other.shape
+        if inner != other_inner:
+            raise ValueError(
+                f"matmul dimensions do not match: {self.shape} cannot multiply {other.shape}"
+            )
+
+        selected_backend = backend if backend is not None else VirtualCPUBackend()
+        if not selected_backend.info.supports_autodiff and (
+            self.requires_grad or other.requires_grad
+        ):
+            raise RuntimeError(
+                f"{selected_backend.info.device} backend is inference-only and "
+                "cannot be used with tensors that require gradients; freeze model "
+                "parameters with Module.requires_grad_(False) for inference"
+            )
+
+        left_values = [
+            self._values[row * inner:(row + 1) * inner]
+            for row in range(rows)
+        ]
+        right_values = [
+            other._values[row * columns:(row + 1) * columns]
+            for row in range(other_inner)
+        ]
+        output_values = selected_backend.matmul(left_values, right_values)
+
+        def backward(out: Tensor) -> None:
+            gradient = [
+                out.gradient_values()[row * columns:(row + 1) * columns]
+                for row in range(rows)
+            ]
+            if self.requires_grad:
+                right_transposed = [
+                    [right_values[row][column] for row in range(other_inner)]
+                    for column in range(columns)
+                ]
+                left_gradient = selected_backend.matmul(gradient, right_transposed)
+                self._accumulate([value for row in left_gradient for value in row])
+            if other.requires_grad:
+                left_transposed = [
+                    [left_values[row][column] for row in range(rows)]
+                    for column in range(inner)
+                ]
+                right_gradient = selected_backend.matmul(left_transposed, gradient)
+                other._accumulate([value for row in right_gradient for value in row])
+
+        return Tensor.operation(output_values, parents=(self, other), backward=backward)
 
     def sum(self) -> Tensor:
         def backward(out: Tensor) -> None:

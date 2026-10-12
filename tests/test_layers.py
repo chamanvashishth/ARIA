@@ -1,3 +1,5 @@
+import math
+
 import pytest
 
 from aria.brain import Embedding, Linear, Parameter, ReLU, Sequential, Tensor
@@ -113,3 +115,43 @@ def test_embedding_accumulates_repeated_token_rows_in_backward() -> None:
         [0.0, 0.0],
         [2.0, 2.0],
     ]
+
+
+
+@pytest.mark.parametrize("backend_name", ["vcpu", "vgpu"])
+def test_linear_backend_forward_and_gradients(backend_name: str) -> None:
+    from aria.compute import ComputeRuntime
+
+    layer = Linear(2, 2, seed=202, backend=ComputeRuntime(backend_name))
+    inputs = Parameter([[0.5, -1.0], [2.0, 0.25]])
+    loss = layer.forward(inputs).sum()
+    loss.backward()
+
+    assert inputs.grad is not None
+    assert layer.weight.grad is not None
+    assert layer.bias is not None and layer.bias.grad is not None
+    assert all(math.isfinite(value) for value in inputs.grad._values)
+    assert all(math.isfinite(value) for value in layer.weight.grad._values)
+
+
+def test_linear_preserves_leading_dimensions_with_backend() -> None:
+    from aria.compute import VirtualGPUBackend
+
+    layer = Linear(2, 3, seed=203, backend=VirtualGPUBackend(tile_size=2))
+    output = layer.forward(Tensor([[[1.0, 2.0], [3.0, 4.0]]]))
+    assert output.shape == (1, 2, 3)
+
+
+def test_linear_vnpu_is_forward_only_and_requires_frozen_parameters() -> None:
+    from aria.compute import VirtualNPUBackend
+
+    layer = Linear(2, 2, seed=204, backend=VirtualNPUBackend())
+    inputs = Tensor([[0.25, -0.5]])
+    with pytest.raises(RuntimeError, match="inference-only"):
+        layer.forward(inputs)
+
+    layer.requires_grad_(False)
+    output = layer.forward(inputs)
+    assert output.shape == (1, 2)
+    assert all(math.isfinite(value) for value in output._values)
+    assert output.requires_grad is False

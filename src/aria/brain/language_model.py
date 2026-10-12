@@ -7,6 +7,7 @@ import math
 from aria.brain.layers import Embedding, Linear
 from aria.brain.module import Module
 from aria.brain.tensor import Tensor
+from aria.compute.backends import ComputeBackend
 
 
 def _log_softmax_loss(logits: Tensor, targets: list[int]) -> Tensor:
@@ -61,11 +62,12 @@ class TinyLanguageModel(Module):
         embedding_dim: int,
         *,
         seed: int | None = None,
+        backend: ComputeBackend | None = None,
     ) -> None:
         if vocab_size <= 0 or embedding_dim <= 0:
             raise ValueError("model dimensions must be positive")
         self.embedding = Embedding(vocab_size, embedding_dim, seed=seed)
-        self.vocabulary = Linear(embedding_dim, vocab_size, seed=seed)
+        self.vocabulary = Linear(embedding_dim, vocab_size, seed=seed, backend=backend)
 
     def forward(self, token_ids: list[int]) -> Tensor:
         hidden = self.embedding.forward(token_ids)

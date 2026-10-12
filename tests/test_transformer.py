@@ -349,3 +349,46 @@ def test_transformer_language_model_all_parameter_gradients_match_finite_differe
         len(parameter._values) for parameter in model.parameters()
     )
     assert report.max_absolute_error < 3e-5
+
+
+
+def test_transformer_injects_vgpu_into_all_linear_projections() -> None:
+    from aria.compute import VirtualGPUBackend
+
+    model = TransformerLanguageModel(
+        vocab_size=7,
+        hidden_size=4,
+        intermediate_size=8,
+        num_layers=1,
+        max_sequence_length=4,
+        seed=401,
+        backend=VirtualGPUBackend(tile_size=2),
+    )
+    assert model.lm_head.backend.info.device == "vgpu"
+    assert model.layers[0].attention.query.backend.info.device == "vgpu"
+    assert model.layers[0].feed_forward.up.backend.info.device == "vgpu"
+
+    loss = model.loss_batch([[1, 2], [3, 4]], [[2, 3], [4, 5]])
+    loss.backward()
+    assert model.lm_head.weight.grad is not None
+
+
+def test_transformer_vnpu_runs_only_after_model_parameters_are_frozen() -> None:
+    from aria.compute import VirtualNPUBackend
+
+    model = TransformerLanguageModel(
+        vocab_size=7,
+        hidden_size=4,
+        intermediate_size=8,
+        num_layers=1,
+        max_sequence_length=4,
+        seed=402,
+        backend=VirtualNPUBackend(),
+    )
+    with pytest.raises(RuntimeError, match="inference-only"):
+        model.forward([1, 2])
+
+    model.requires_grad_(False)
+    logits = model.forward([1, 2])
+    assert logits.shape == (2, 7)
+    assert logits.requires_grad is False

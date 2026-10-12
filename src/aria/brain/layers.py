@@ -9,18 +9,28 @@ from typing import Sequence
 from aria.brain.module import Module
 from aria.brain.parameter import Parameter
 from aria.brain.tensor import Tensor
+from aria.compute.backends import ComputeBackend, VirtualCPUBackend
 
 
 class Linear(Module):
     """A fully connected layer y = xW + b with gradient propagation."""
 
-    def __init__(self, in_features: int, out_features: int, *, bias: bool = True, seed: int | None = None) -> None:
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        *,
+        bias: bool = True,
+        seed: int | None = None,
+        backend: ComputeBackend | None = None,
+    ) -> None:
         if in_features <= 0 or out_features <= 0:
             raise ValueError("layer dimensions must be positive")
         rng = random.Random(seed)
         scale = math.sqrt(2.0 / in_features)
         self.weight = Parameter([[rng.uniform(-scale, scale) for _ in range(out_features)] for _ in range(in_features)])
         self.bias = Parameter([0.0] * out_features) if bias else None
+        self.backend = backend if backend is not None else VirtualCPUBackend()
 
     def forward(self, x: Tensor) -> Tensor:
         if len(x.shape) < 2:
@@ -31,38 +41,35 @@ class Linear(Module):
         if in_features != self.weight.shape[0]:
             raise ValueError("Linear input dimension does not match weight")
         out_features = self.weight.shape[1]
-        xv, wv = x._values, self.weight._values
-        values = [
-            sum(xv[row * in_features + k] * wv[k * out_features + col] for k in range(in_features))
-            + (self.bias._values[col] if self.bias is not None else 0.0)
-            for row in range(rows)
-            for col in range(out_features)
-        ]
 
-        def backward(out: Tensor) -> None:
-            grad = out.gradient_values()
-            if x.requires_grad:
-                dx = [
-                    sum(grad[row * out_features + col] * wv[k * out_features + col] for col in range(out_features))
-                    for row in range(rows)
-                    for k in range(in_features)
-                ]
-                x._accumulate(dx)
-            if self.weight.requires_grad:
-                dw = [
-                    sum(xv[row * in_features + k] * grad[row * out_features + col] for row in range(rows))
-                    for k in range(in_features)
-                    for col in range(out_features)
-                ]
-                self.weight._accumulate(dw)
-            if self.bias is not None and self.bias.requires_grad:
-                self.bias._accumulate([
-                    sum(grad[row * out_features + col] for row in range(rows))
-                    for col in range(out_features)
-                ])
+        flattened = x.reshape((rows, in_features))
+        projected = flattened.matmul(self.weight, backend=self.backend)
+        if self.bias is not None:
+            bias = self.bias
 
-        parents = (x, self.weight, *((self.bias,) if self.bias is not None else ()))
-        return Tensor.operation(_reshape(values, (*leading_shape, out_features)), parents=parents, backward=backward)
+            def add_bias(out: Tensor) -> None:
+                gradient = out.gradient_values()
+                if projected.requires_grad:
+                    projected._accumulate(gradient)
+                if bias.requires_grad:
+                    bias._accumulate([
+                        sum(gradient[row * out_features + col] for row in range(rows))
+                        for col in range(out_features)
+                    ])
+
+            projected = Tensor.operation(
+                _reshape(
+                    [
+                        projected._values[row * out_features + col] + bias._values[col]
+                        for row in range(rows)
+                        for col in range(out_features)
+                    ],
+                    (rows, out_features),
+                ),
+                parents=(projected, bias),
+                backward=add_bias,
+            )
+        return projected.reshape((*leading_shape, out_features))
 
 
 

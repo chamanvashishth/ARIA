@@ -92,6 +92,7 @@ class VirtualCPUBackend:
             name="ARIA Virtual CPU",
             execution="pure-python-reference",
             numeric_mode="python-float",
+            supports_autodiff=True,
         )
 
     def matmul(self, left: Matrix, right: Matrix) -> _MatrixValues:

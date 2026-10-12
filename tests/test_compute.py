@@ -63,7 +63,9 @@ def test_virtual_devices_are_explicitly_marked_as_emulators() -> None:
     assert gpu.execution.startswith("host-cpu-tiled-emulation")
     assert npu.execution == "host-cpu-int8-emulation"
     assert all(not item.hardware_acceleration for item in (cpu, gpu, npu))
-    assert all(not item.supports_autodiff for item in (cpu, gpu, npu))
+    assert cpu.supports_autodiff is True
+    assert gpu.supports_autodiff is True
+    assert npu.supports_autodiff is False
 
 
 @pytest.mark.parametrize("device", ["unknown", "cuda", "metal"])

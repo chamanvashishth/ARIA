@@ -8,6 +8,7 @@ import random
 from aria.brain.layers import Embedding, Linear
 from aria.brain.module import Module
 from aria.brain.tensor import Tensor
+from aria.compute.backends import ComputeBackend
 
 
 def _reshape(values: list[float], shape: tuple[int, ...]) -> object:
@@ -73,11 +74,17 @@ class RMSNorm(Module):
 class CausalSelfAttention(Module):
     """Single-head causal self-attention."""
 
-    def __init__(self, hidden_size: int, *, seed: int | None = None) -> None:
+    def __init__(
+        self, hidden_size: int, *, seed: int | None = None, backend: ComputeBackend | None = None
+    ) -> None:
         self.hidden_size = hidden_size
-        self.query = Linear(hidden_size, hidden_size, seed=seed)
-        self.key = Linear(hidden_size, hidden_size, seed=None if seed is None else seed + 1)
-        self.value = Linear(hidden_size, hidden_size, seed=None if seed is None else seed + 2)
+        self.query = Linear(hidden_size, hidden_size, seed=seed, backend=backend)
+        self.key = Linear(
+            hidden_size, hidden_size, seed=None if seed is None else seed + 1, backend=backend
+        )
+        self.value = Linear(
+            hidden_size, hidden_size, seed=None if seed is None else seed + 2, backend=backend
+        )
         self.scale = 1.0 / math.sqrt(hidden_size)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -149,11 +156,20 @@ class CausalSelfAttention(Module):
 class FeedForward(Module):
     """Two-layer MLP used inside a Transformer block."""
 
-    def __init__(self, hidden_size: int, intermediate_size: int, *, seed: int | None = None) -> None:
+    def __init__(
+        self,
+        hidden_size: int,
+        intermediate_size: int,
+        *,
+        seed: int | None = None,
+        backend: ComputeBackend | None = None,
+    ) -> None:
         from aria.brain.layers import ReLU
-        self.up = Linear(hidden_size, intermediate_size, seed=seed)
+        self.up = Linear(hidden_size, intermediate_size, seed=seed, backend=backend)
         self.activation = ReLU()
-        self.down = Linear(intermediate_size, hidden_size, seed=None if seed is None else seed + 1)
+        self.down = Linear(
+            intermediate_size, hidden_size, seed=None if seed is None else seed + 1, backend=backend
+        )
 
     def forward(self, x: Tensor) -> Tensor:
         return self.down.forward(self.activation.forward(self.up.forward(x)))
@@ -162,11 +178,20 @@ class FeedForward(Module):
 class TransformerBlock(Module):
     """Pre-norm decoder block with causal self-attention and MLP."""
 
-    def __init__(self, hidden_size: int, intermediate_size: int, *, seed: int | None = None) -> None:
+    def __init__(
+        self,
+        hidden_size: int,
+        intermediate_size: int,
+        *,
+        seed: int | None = None,
+        backend: ComputeBackend | None = None,
+    ) -> None:
         self.norm1 = RMSNorm(hidden_size)
-        self.attention = CausalSelfAttention(hidden_size, seed=seed)
+        self.attention = CausalSelfAttention(hidden_size, seed=seed, backend=backend)
         self.norm2 = RMSNorm(hidden_size)
-        self.feed_forward = FeedForward(hidden_size, intermediate_size, seed=seed)
+        self.feed_forward = FeedForward(
+            hidden_size, intermediate_size, seed=seed, backend=backend
+        )
 
     def forward(self, x: Tensor) -> Tensor:
         attended = self.attention.forward(self.norm1.forward(x))
@@ -186,6 +211,7 @@ class TransformerLanguageModel(Module):
         max_sequence_length: int = 128,
         *,
         seed: int | None = None,
+        backend: ComputeBackend | None = None,
     ) -> None:
         if min(vocab_size, hidden_size, intermediate_size, num_layers, max_sequence_length) <= 0:
             raise ValueError("model dimensions must be positive")
@@ -196,11 +222,22 @@ class TransformerLanguageModel(Module):
         rng = random.Random(seed)
         self.position_embedding = Embedding(max_sequence_length, hidden_size, seed=rng.randrange(1_000_000))
         self.layers = [
-            TransformerBlock(hidden_size, intermediate_size, seed=rng.randrange(1_000_000))
+            TransformerBlock(
+                hidden_size,
+                intermediate_size,
+                seed=rng.randrange(1_000_000),
+                backend=backend,
+            )
             for _ in range(num_layers)
         ]
         self.norm = RMSNorm(hidden_size)
-        self.lm_head = Linear(hidden_size, vocab_size, bias=False, seed=rng.randrange(1_000_000))
+        self.lm_head = Linear(
+            hidden_size,
+            vocab_size,
+            bias=False,
+            seed=rng.randrange(1_000_000),
+            backend=backend,
+        )
 
     def forward(self, token_ids: list[int]) -> Tensor:
         if not token_ids:

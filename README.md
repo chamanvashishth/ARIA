@@ -62,7 +62,7 @@ ARIA's normal runtime is designed to work without OpenAI, Anthropic, Gemini, hos
 - **Planned** — architecture/dependency exists, implementation has not started.
 - **Validated** — reserved for capabilities backed by reproducible evidence.
 
-See the [implementation audit](docs/IMPLEMENTATION_AUDIT.md) for the source-backed status of each block, verified CI evidence, and remaining gaps.
+See the [implementation audit](docs/IMPLEMENTATION_AUDIT.md) for the source-backed status of each block, verified CI evidence, and remaining gaps. The [compute backend guide](docs/COMPUTE_BACKENDS.md) explains VCPU/VGPU/VNPU integration and its limitations.
 
 ---
 
@@ -167,7 +167,7 @@ Block 19 introduces an explicit, dependency-free compute backend interface.
 - input shape, type, and finite-value validation
 - numerical-equivalence tests for the tiled backend and tolerance tests for quantized output
 
-**Important limitation:** all three devices are software emulators and execute on the host CPU. They do not provide physical GPU/NPU access or hardware acceleration. These kernels are currently standalone matrix-multiplication primitives; they are not yet wired into Tensor autodiff, model training, or the inference engine.
+**Important limitation:** all three devices are software emulators and execute on the host CPU. They do not provide physical GPU/NPU access or hardware acceleration. The kernels are integrated into Linear and the TinyLanguageModel/TransformerLanguageModel projection layers. Attention's hand-written score/value kernels and embedding lookups remain their existing Python implementations. No speedup is claimed; all backends still execute on the host CPU.
 
 ## Tokenizer
 

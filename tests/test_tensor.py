@@ -127,3 +127,50 @@ def test_gradient_values_requires_backward_and_returns_accumulated_gradient() ->
 
     assert result.gradient_values() == [1.0]
     assert value.gradient_values() == [6.0]
+
+
+
+def test_tensor_matmul_forward_and_reverse_mode_gradients() -> None:
+    from aria.compute import VirtualCPUBackend
+
+    left = Parameter([[1.0, 2.0], [3.0, 4.0]])
+    right = Parameter([[5.0, 6.0], [7.0, 8.0]])
+    output = left.matmul(right, backend=VirtualCPUBackend())
+
+    assert output.to_list() == [[19.0, 22.0], [43.0, 50.0]]
+    output.sum().backward()
+    assert left.grad is not None
+    assert left.grad.to_list() == [[11.0, 15.0], [11.0, 15.0]]
+    assert right.grad is not None
+    assert right.grad.to_list() == [[4.0, 4.0], [6.0, 6.0]]
+
+
+def test_tensor_matmul_vgpu_gradients_match_cpu_reference() -> None:
+    from aria.compute import VirtualCPUBackend, VirtualGPUBackend
+
+    left_data = [[0.5, -1.0, 2.0], [1.5, 0.25, -0.5]]
+    right_data = [[1.0, 2.0], [-2.0, 0.5], [0.25, -1.0]]
+    cpu_left, cpu_right = Parameter(left_data), Parameter(right_data)
+    gpu_left, gpu_right = Parameter(left_data), Parameter(right_data)
+    cpu_loss = cpu_left.matmul(cpu_right, backend=VirtualCPUBackend()).sum()
+    gpu_loss = gpu_left.matmul(gpu_right, backend=VirtualGPUBackend(tile_size=1)).sum()
+    cpu_loss.backward()
+    gpu_loss.backward()
+
+    assert gpu_loss.item() == pytest.approx(cpu_loss.item(), abs=1e-12)
+    assert gpu_left.gradient_values() == pytest.approx(cpu_left.gradient_values())
+    assert gpu_right.gradient_values() == pytest.approx(cpu_right.gradient_values())
+
+
+def test_tensor_matmul_rejects_invalid_shapes() -> None:
+    with pytest.raises(ValueError, match="both be 2-D"):
+        Tensor([1.0, 2.0]).matmul(Tensor([[1.0], [2.0]]))
+    with pytest.raises(ValueError, match="dimensions do not match"):
+        Tensor([[1.0, 2.0]]).matmul(Tensor([[1.0, 2.0]]))
+
+
+def test_tensor_matmul_vnpu_rejects_gradient_tracking() -> None:
+    from aria.compute import VirtualNPUBackend
+
+    with pytest.raises(RuntimeError, match="inference-only"):
+        Parameter([[1.0]]).matmul(Tensor([[2.0]]), backend=VirtualNPUBackend())

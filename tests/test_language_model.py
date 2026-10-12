@@ -41,3 +41,27 @@ def test_invalid_target_is_rejected() -> None:
     model = TinyLanguageModel(vocab_size=4, embedding_dim=2)
     with pytest.raises(IndexError):
         model.loss([1], [4])
+
+
+
+def test_tiny_language_model_uses_injected_compute_backend() -> None:
+    from aria.compute import VirtualGPUBackend
+
+    model = TinyLanguageModel(vocab_size=5, embedding_dim=3, seed=301, backend=VirtualGPUBackend())
+    logits = model.forward([1, 2, 3])
+    assert logits.shape == (3, 5)
+
+    loss = model.loss([1, 2, 3], [2, 3, 4])
+    loss.backward()
+    assert model.vocabulary.weight.grad is not None
+
+
+def test_tiny_language_model_vnpu_supports_frozen_inference_only() -> None:
+    from aria.compute import VirtualNPUBackend
+
+    model = TinyLanguageModel(vocab_size=5, embedding_dim=3, seed=302, backend=VirtualNPUBackend())
+    model.requires_grad_(False)
+    logits = model.forward([1, 2, 3])
+
+    assert logits.shape == (3, 5)
+    assert logits.requires_grad is False

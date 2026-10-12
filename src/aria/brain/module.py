@@ -29,6 +29,12 @@ class Module:
                         params.extend(item.parameters())
         return params
 
+    def requires_grad_(self, requires_grad: bool) -> Module:
+        """Enable or disable gradient tracking for every parameter in this module."""
+        for parameter in self.parameters():
+            parameter.requires_grad = requires_grad
+        return self
+
     def zero_grad(self) -> None:
         for parameter in self.parameters():
             parameter.zero_grad()
