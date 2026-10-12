@@ -48,7 +48,7 @@ ARIA's normal runtime is designed to work without OpenAI, Anthropic, Gemini, hos
 | Local RAG | **Implemented — foundation** |
 | Agent / tools | **Implemented — controlled tool registry** |
 | Agent orchestration | **Implemented — approval-gated execution foundation** |
-| Software compute devices | **Implemented — CPU reference and virtual GPU/NPU emulation** |
+| Software compute devices | **Integrated — VCPU/VGPU autodiff, VNPU frozen inference** |
 | Verification | **Implemented — structural checks foundation** |
 | Local API | **Implemented — loopback HTTP foundation** |
 | Local UI | **Implemented — browser interface foundation** |
@@ -118,12 +118,14 @@ The current brain is intentionally small and inspectable rather than optimized p
   - elementwise operations
   - reductions
   - reverse-mode autodiff
+  - backend-aware 2-D matrix multiplication
   - gradient accumulation
 - Parameter
   - trainable model values
 - Module
   - recursive parameter discovery
   - gradient reset
+  - explicit parameter freezing for inference-only backends
 - Linear
 - ReLU
 - Embedding
@@ -167,7 +169,7 @@ Block 19 introduces an explicit, dependency-free compute backend interface.
 - input shape, type, and finite-value validation
 - numerical-equivalence tests for the tiled backend and tolerance tests for quantized output
 
-**Important limitation:** all three devices are software emulators and execute on the host CPU. They do not provide physical GPU/NPU access or hardware acceleration. The kernels are integrated into Linear and the TinyLanguageModel/TransformerLanguageModel projection layers. Attention's hand-written score/value kernels and embedding lookups remain their existing Python implementations. No speedup is claimed; all backends still execute on the host CPU.
+**Important limitation:** all three devices are software emulators and execute on the host CPU. They do not provide physical GPU/NPU access or hardware acceleration. The kernels are integrated into Linear and the TinyLanguageModel/TransformerLanguageModel projection layers. Transformer attention score/value matrix multiplications also use the selected backend; attention's softmax and custom backward logic and embedding lookups remain Python implementations. No speedup is claimed; all backends still execute on the host CPU.
 
 ## Tokenizer
 

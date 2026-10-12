@@ -365,6 +365,7 @@ def test_transformer_injects_vgpu_into_all_linear_projections() -> None:
         backend=VirtualGPUBackend(tile_size=2),
     )
     assert model.lm_head.backend.info.device == "vgpu"
+    assert model.layers[0].attention.backend.info.device == "vgpu"
     assert model.layers[0].attention.query.backend.info.device == "vgpu"
     assert model.layers[0].feed_forward.up.backend.info.device == "vgpu"
 

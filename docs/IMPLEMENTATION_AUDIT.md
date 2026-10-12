@@ -67,7 +67,7 @@ Mypy is a mandatory quality job. It is not configured with `continue-on-error`.
 
 The repository exposes VCPU, VGPU and VNPU software backends through `aria.compute`. VCPU is the pure-Python reference; VGPU uses tiled host-CPU loops; VNPU uses symmetric int8 quantization and integer-style accumulation. VCPU and VGPU are integrated with `Tensor.matmul` reverse-mode gradients and `Linear`, and the backend can be injected into TinyLanguageModel and TransformerLanguageModel projections. VNPU is intentionally inference-only and rejects gradient-tracked operands; models must be frozen with `requires_grad_(False)`. All three remain host-CPU emulators with no physical acceleration.
 
-Remaining work: route Transformer attention score/value kernels through the backend, add command/workgroup scheduling, benchmark numerical error and performance, and evaluate backend behavior on representative models. No physical GPU/NPU is required or claimed.
+Remaining work: add command/workgroup scheduling, benchmark numerical error and performance, and evaluate backend behavior on representative models. Attention softmax and its custom backward pass remain Python operations. No physical GPU/NPU is required or claimed.
 
 ### 2. Autonomous planning — not implemented
 
@@ -103,7 +103,7 @@ Current evaluation measures next-token behavior on caller-supplied examples and 
 
 ## Recommended implementation order
 
-1. **Compute expansion:** route Transformer attention score/value kernels through the backend, define command/workgroup scheduling, and benchmark numerical error and performance.
+1. **Compute expansion:** define command/workgroup scheduling and benchmark numerical error and performance across representative models.
 2. **Local planner adapter:** accept structured plans from the local model, parse them strictly, reject malformed or unsupported tool requests, and retain the mandatory approval gate.
 3. **Agent roles and QA:** define a small set of typed, testable roles; avoid creating agents without distinct responsibilities and acceptance criteria.
 4. **Memory and RAG integration:** add local semantic indexing and provenance-preserving retrieval; evaluate relevance before injecting context into prompts.

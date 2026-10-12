@@ -8,7 +8,7 @@ import random
 from aria.brain.layers import Embedding, Linear
 from aria.brain.module import Module
 from aria.brain.tensor import Tensor
-from aria.compute.backends import ComputeBackend
+from aria.compute.backends import ComputeBackend, VirtualCPUBackend
 
 
 def _reshape(values: list[float], shape: tuple[int, ...]) -> object:
@@ -85,6 +85,7 @@ class CausalSelfAttention(Module):
         self.value = Linear(
             hidden_size, hidden_size, seed=None if seed is None else seed + 2, backend=backend
         )
+        self.backend = backend if backend is not None else VirtualCPUBackend()
         self.scale = 1.0 / math.sqrt(hidden_size)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -108,19 +109,26 @@ class CausalSelfAttention(Module):
                 # Compute only the visible causal prefix. Building masked entries
                 # for future positions wastes allocations and softmax work at every step.
                 query_start = offset + i * hidden
+                query_row = [q[query_start + d] for d in range(hidden)]
+                key_columns = [
+                    [k[offset + j * hidden + d] for j in range(i + 1)]
+                    for d in range(hidden)
+                ]
                 scores = [
-                    sum(q[query_start + d] * k[offset + j * hidden + d] for d in range(hidden))
-                    * self.scale
-                    for j in range(i + 1)
+                    score * self.scale
+                    for score in self.backend.matmul([query_row], key_columns)[0]
                 ]
                 maximum = max(scores)
                 exp_scores = [math.exp(score - maximum) for score in scores]
                 normalizer = sum(exp_scores)
                 probs = [score / normalizer for score in exp_scores]
-                for d in range(hidden):
-                    outputs[query_start + d] = sum(
-                        probs[j] * v[offset + j * hidden + d] for j in range(i + 1)
-                    )
+                visible_values = [
+                    [v[offset + j * hidden + d] for d in range(hidden)]
+                    for j in range(i + 1)
+                ]
+                outputs[query_start:query_start + hidden] = self.backend.matmul(
+                    [probs], visible_values
+                )[0]
                 # Cache only probabilities that can contribute to this query.
                 cache.append((b, i, probs))
 

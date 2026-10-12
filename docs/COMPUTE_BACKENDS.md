@@ -16,7 +16,7 @@ Tensor.matmul(other, backend=...) accepts two rank-2 tensors and creates a rever
 
 Linear uses this primitive for its projection and retains bias-gradient behavior. Leading dimensions are flattened for matrix multiplication and restored on output. The injected backend is propagated through TinyLanguageModel's vocabulary projection and all Transformer Linear projections (Q/K/V, feed-forward and LM head).
 
-Transformer attention score and probability/value kernels, embedding lookups, normalization and activation operations remain their existing Python implementations. Backend selection does not mean every model operation runs on the selected device.
+Transformer attention score and probability/value matrix multiplications also use the selected backend. Attention softmax and its custom backward logic, embedding lookups, normalization and activation operations remain Python implementations. Backend selection does not mean every model operation runs on the selected device.
 
 ## Training and inference policy
 
@@ -48,7 +48,7 @@ Calling requires_grad_(True) again on a model using VNPU makes its next projecti
 - No performance advantage is claimed; VGPU tiling is an algorithmic simulation.
 - VNPU quantization is per-matrix symmetric scaling; it is not a calibrated deployment quantizer.
 - Optimizer/trainer integration is intended for VCPU/VGPU. VNPU should only be used for frozen forward passes.
-- Transformer attention's internal score/value products are not yet routed through the backend.
+- Attention softmax and custom backward calculations remain Python loops; only its score and probability/value matrix products use the selected backend.
 
 ## Verification
 
