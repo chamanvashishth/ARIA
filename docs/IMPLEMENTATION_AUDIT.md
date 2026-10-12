@@ -1,7 +1,7 @@
 # ARIA implementation audit
 
-**Audit date:** 2026-10-11  
-**Audited source baseline:** `main` at `9879b1be6f6b196c14b395abbd99e4a63b0fd496`  
+**Audit date:** 2026-10-12  
+**Audited source baseline:** `main` at `3311d4d25ffb6cb66ebae03200c7c3799776752c`  
 **Scope:** prior ARIA project discussions, current repository tree and source, README capability claims, tests, and GitHub Actions evidence.
 
 This audit distinguishes implemented foundations from experimental or missing capabilities. A module existing in the repository does not, by itself, mean the complete product capability is finished.
@@ -10,7 +10,7 @@ This audit distinguishes implemented foundations from experimental or missing ca
 
 ARIA has a working, dependency-light Python foundation for a small trainable neural model, training and checkpoint recovery, local inference, runtime lifecycle, basic memory, lexical retrieval, validated tools, structural verification, a local API, a browser UI, and evaluation utilities.
 
-The Transformer, inference, runtime, memory, RAG, API, UI, and orchestration components are foundations rather than production-ready systems. The repository does not yet contain a fully autonomous planner, a semantic memory stack, a sandboxed execution environment, a virtual CPU/GPU/NPU compute layer, or a complete end-to-end research assistant.
+The Transformer, inference, runtime, memory, RAG, API, UI, and orchestration components are foundations rather than production-ready systems. The repository does not yet contain a fully autonomous planner, a semantic memory stack, a sandboxed execution environment, a integrated software-emulated VCPU/VGPU/VNPU compute layer, or a complete end-to-end research assistant.
 
 The user's independence constraint is preserved: the intended runtime must not depend on hosted model APIs, API keys, cloud inference, hosted embeddings, or mandatory accelerator hardware.
 
@@ -23,16 +23,16 @@ At the audited source baseline:
 | Python 3.11 tests | Passed |
 | Python 3.12 tests | Passed |
 | Python 3.13 tests | Passed |
-| Test suite | 215 passed |
-| Coverage | 83.53% (80% minimum enforced) |
+| Test suite | 227 passed |
+| Coverage | 83.76% (80% minimum enforced) |
 | Ruff | Passed |
 | Mypy | Passed; zero issues across 40 source files |
 | Dependency audit | Passed |
 
 Workflow evidence:
 
-- [Quality and security run #13](https://github.com/chamanvashishth/ARIA/actions/runs/38164197385)
-- [Python test matrix #164](https://github.com/chamanvashishth/ARIA/actions/runs/38164197504)
+- [Quality and security run #17](https://github.com/chamanvashishth/ARIA/actions/runs/38203490252)
+- [Python test matrix #168](https://github.com/chamanvashishth/ARIA/actions/runs/38203490153)
 
 Mypy is a mandatory quality job. It is not configured with `continue-on-error`.
 
@@ -41,8 +41,8 @@ Mypy is a mandatory quality job. It is not configured with `continue-on-error`.
 | Area / historical block | Status | Repository evidence and qualification |
 |---|---|---|
 | Package and project skeleton (0) | Implemented | `pyproject.toml`, `src/aria/`, CLI entry point |
-| Tensor and reverse-mode autodiff (1) | Implemented foundation | `brain/tensor.py`; scalar and elementwise operations, gradients, reshape and finite-difference tests |
-| Neural layers (2) | Implemented foundation | `brain/layers.py`; Linear, ReLU, Embedding and Sequential |
+| Tensor and reverse-mode autodiff (1) | Implemented foundation | `brain/tensor.py`; scalar/elementwise operations, rank-2 backend-aware matrix multiplication, VCPU/VGPU reverse-mode gradients, reshape and finite-difference tests |
+| Neural layers (2) | Implemented foundation | `brain/layers.py`; backend-injected Linear projections, ReLU, Embedding and Sequential; model-wide parameter freezing for inference-only execution |
 | Tokenizer (3) | Implemented foundation | `tokenizer/core.py`; deterministic byte tokenizer |
 | Trainable language-model core (4) | Implemented foundation | `brain/language_model.py`; next-token loss and trainable embedding/projection model |
 | Decoder Transformer (5) | Experimental | `brain/transformer.py`; causal attention and Transformer blocks exist, but language quality and production performance are not validated |

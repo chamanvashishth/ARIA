@@ -160,7 +160,7 @@ It is **not yet claimed** to be production-ready, performant, or language-qualit
 
 ## Software compute devices
 
-Block 19 introduces an explicit, dependency-free compute backend interface.
+Block 19 integrates the dependency-free compute backends with ARIA's neural engine.
 
 - **VCPU:** pure-Python floating-point reference matrix multiplication.
 - **VGPU:** tiled matrix multiplication simulated with host-CPU loops.
@@ -930,7 +930,7 @@ timeline
     Block 16 : Security hardening : Implemented foundation
     Block 17 : Research and optimization : Implemented foundation
     Block 18 : Approval-gated orchestration : Implemented foundation
-    Block 19 : Software compute devices : Emulation foundation
+    Block 19 : Integrated software compute backends : Implemented foundation
 ~~~
 
 ### Block workflow
