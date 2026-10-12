@@ -16,6 +16,8 @@ from aria.compute.scheduler import (
     CommandState,
     ComputeCommand,
     ComputeScheduler,
+    ScheduledComputeBackend,
+    ScheduledExecutionStats,
     SchedulerStats,
     Workgroup,
 )
@@ -31,6 +33,8 @@ __all__ = [
     "DeviceKind",
     "MatmulProfile",
     "Matrix",
+    "ScheduledComputeBackend",
+    "ScheduledExecutionStats",
     "SchedulerStats",
     "VirtualCPUBackend",
     "VirtualGPUBackend",

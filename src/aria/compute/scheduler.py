@@ -283,3 +283,108 @@ class ComputeScheduler:
             peak_reserved_memory_bytes=queue.peak_reserved_memory_bytes,
             planned_workgroups=sum(len(item.workgroups) for item in queue._commands.values()),
         )
+
+
+@dataclass(frozen=True)
+class ScheduledExecutionStats:
+    """Aggregate counters for model operations routed through a scheduled backend."""
+
+    submitted: int
+    completed: int
+    failed: int
+    peak_reserved_memory_bytes: int
+    planned_workgroups: int
+
+
+class ScheduledComputeBackend:
+    """Synchronous scheduler adapter implementing the neural ComputeBackend protocol.
+
+    Each requested matrix multiplication is submitted and completed before this
+    method returns, because downstream tensor operations need its output. This
+    integrates the scheduler with Linear and attention without changing the
+    Tensor autodiff graph: backward matrix products pass through this adapter too.
+    The adapter keeps only a bounded history of immutable command snapshots.
+    """
+
+    def __init__(
+        self,
+        runtime: ComputeRuntime | None = None,
+        *,
+        workgroup_size: int = 16,
+        memory_budget_bytes: int | None = None,
+        history_limit: int = 1024,
+    ) -> None:
+        from collections import deque
+
+        if isinstance(history_limit, bool) or not isinstance(history_limit, int) or history_limit <= 0:
+            raise ValueError("history_limit must be a positive integer")
+        self.runtime = runtime or ComputeRuntime()
+        self.workgroup_size = workgroup_size
+        self.memory_budget_bytes = memory_budget_bytes
+        self.history_limit = history_limit
+        self._history = deque(maxlen=history_limit)
+        self._submitted = 0
+        self._completed = 0
+        self._failed = 0
+        self._peak_reserved_memory_bytes = 0
+        self._planned_workgroups = 0
+
+    @property
+    def info(self):
+        """Expose the wrapped backend's capabilities unchanged."""
+        return self.runtime.info
+
+    @property
+    def commands(self) -> tuple[ComputeCommand, ...]:
+        """Return the most recent immutable scheduler command snapshots."""
+        return tuple(self._history)
+
+    @property
+    def stats(self) -> SchedulerStats:
+        return SchedulerStats(
+            submitted=self._submitted,
+            queued=0,
+            running=0,
+            completed=self._completed,
+            failed=self._failed,
+            blocked=0,
+            reserved_memory_bytes=0,
+            peak_reserved_memory_bytes=self._peak_reserved_memory_bytes,
+            planned_workgroups=self._planned_workgroups,
+        )
+
+    def clear_history(self) -> None:
+        """Clear retained command snapshots and reset aggregate counters."""
+        self._history.clear()
+        self._submitted = 0
+        self._completed = 0
+        self._failed = 0
+        self._peak_reserved_memory_bytes = 0
+        self._planned_workgroups = 0
+
+    def matmul(self, left: Matrix, right: Matrix) -> list[list[float]]:
+        queue = CommandQueue(
+            max_pending_commands=1,
+            memory_budget_bytes=self.memory_budget_bytes,
+            workgroup_size=self.workgroup_size,
+        )
+        command_id = queue.submit_matmul(
+            left,
+            right,
+            command_id=f"model-matmul-{self._submitted + 1:08d}",
+        )
+        self._submitted += 1
+        command = ComputeScheduler(self.runtime).run(queue)[0]
+        self._history.append(command)
+        self._planned_workgroups += len(command.workgroups)
+        self._peak_reserved_memory_bytes = max(
+            self._peak_reserved_memory_bytes, command.reserved_memory_bytes
+        )
+        if command.state != "completed" or command.result is None:
+            self._failed += 1
+            raise RuntimeError(
+                f"scheduled matrix multiplication {command.command_id} "
+                f"ended in state {command.state}: {command.error or 'no result'}"
+            )
+        self._completed += 1
+        return [list(row) for row in command.result]
