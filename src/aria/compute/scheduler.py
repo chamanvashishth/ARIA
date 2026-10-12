@@ -97,7 +97,7 @@ def _dimensions(matrix: Matrix, name: str) -> tuple[int, int]:
 def _plan_workgroups(
     command_id: str, rows: int, columns: int, tile_size: int
 ) -> tuple[Workgroup, ...]:
-    groups = []
+    groups: list[Workgroup] = []
     for row_start in range(0, rows, tile_size):
         for column_start in range(0, columns, tile_size):
             ordinal = len(groups)
