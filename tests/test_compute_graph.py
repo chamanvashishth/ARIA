@@ -335,3 +335,22 @@ def test_cross_entropy_tensor_trace_executes_and_backpropagates() -> None:
     assert sum(logits.gradient_values()[:3]) == pytest.approx(0.0, abs=1e-10)
     assert sum(logits.gradient_values()[3:]) == pytest.approx(0.0, abs=1e-10)
 
+def test_transformer_training_loss_executes_through_compute_graph() -> None:
+    from aria.brain import TransformerLanguageModel
+
+    model = TransformerLanguageModel(
+        vocab_size=7,
+        hidden_size=4,
+        intermediate_size=8,
+        num_layers=1,
+        max_sequence_length=3,
+        seed=101,
+    )
+    loss = model.loss_batch([[1, 2]], [[2, 3]])
+
+    execution = loss.graph_trace().execute()
+    assert execution.output_values == pytest.approx(loss.item(), abs=1e-8)
+
+    execution.backward()
+    assert all(parameter.grad is not None for parameter in model.parameters())
+
