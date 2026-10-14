@@ -1,8 +1,7 @@
 """Explicit dependency graphs for ARIA's software compute runtime.
 
-The first graph engine intentionally supports matrix multiplication nodes only.
-It executes on the selected host-CPU backend; worker threads provide scheduling
-concurrency, not physical GPU/NPU acceleration.
+Graph operations execute on the host CPU. Matrix multiplication may use the
+selected software backend; elementwise operations use Python implementations.
 """
 from __future__ import annotations
 
@@ -14,6 +13,9 @@ from typing import Literal, Mapping, Sequence, cast
 from aria.compute.backends import ComputeRuntime, Matrix
 
 GraphState = Literal["completed", "failed", "blocked"]
+GraphValue = float | int | tuple[object, ...] | list[object]
+GraphInput = GraphValue | "NodeRef"
+GraphOperation = Literal["matmul", "add", "multiply", "relu", "sum"]
 
 
 @dataclass(frozen=True)
@@ -23,25 +25,29 @@ class NodeRef:
     node_id: str
 
 
-GraphInput = Matrix | NodeRef
-
-
 @dataclass(frozen=True)
 class GraphNode:
-    """One immutable matrix operation and its symbolic inputs."""
+    """One immutable operation and its symbolic or literal inputs."""
 
     node_id: str
-    operation: Literal["matmul"]
-    left: GraphInput
-    right: GraphInput
+    operation: GraphOperation
+    inputs: tuple[GraphInput, ...]
 
     @property
     def dependencies(self) -> tuple[str, ...]:
-        return tuple(
-            item.node_id
-            for item in (self.left, self.right)
-            if isinstance(item, NodeRef)
-        )
+        return tuple(item.node_id for item in self.inputs if isinstance(item, NodeRef))
+
+    @property
+    def left(self) -> GraphInput:
+        """Compatibility accessor for the first operand."""
+        return self.inputs[0]
+
+    @property
+    def right(self) -> GraphInput:
+        """Compatibility accessor for the second operand."""
+        if len(self.inputs) < 2:
+            raise AttributeError("unary graph nodes do not have a right operand")
+        return self.inputs[1]
 
 
 @dataclass(frozen=True)
@@ -59,12 +65,12 @@ class GraphNodeMetric:
 class GraphExecutionResult:
     """Successful node outputs plus per-node execution diagnostics."""
 
-    outputs: Mapping[str, tuple[tuple[float, ...], ...]]
+    outputs: Mapping[str, object]
     node_metrics: tuple[GraphNodeMetric, ...]
     elapsed_ns: int
 
-    def output(self, node: str | NodeRef) -> tuple[tuple[float, ...], ...]:
-        """Return a node's immutable matrix result."""
+    def output(self, node: str | NodeRef) -> object:
+        """Return a node's immutable result."""
         node_id = node.node_id if isinstance(node, NodeRef) else node
         try:
             return self.outputs[node_id]
@@ -72,11 +78,51 @@ class GraphExecutionResult:
             raise KeyError(f"no successful output for graph node: {node_id}") from error
 
 
-class ComputeGraph:
-    """Build and execute a validated directed acyclic matrix-operation graph.
+def _freeze(value: object) -> GraphValue:
+    if isinstance(value, bool) or not isinstance(value, (int, float, list, tuple)):
+        raise TypeError("graph values must contain only numeric scalars")
+    if isinstance(value, (int, float)):
+        return value
+    return tuple(_freeze(item) for item in value)
 
-    Graph references may point forward to nodes added later. Validation checks
-    every reference and detects cycles before any computation starts.
+
+def _shape(value: GraphValue) -> tuple[int, ...]:
+    if not isinstance(value, (tuple, list)):
+        return ()
+    if not value:
+        return (0,)
+    child = _shape(value[0])
+    if any(_shape(item) != child for item in value):
+        raise ValueError("graph tensors must be rectangular")
+    return (len(value),) + child
+
+
+def _map_binary(left: GraphValue, right: GraphValue, operation: str) -> GraphValue:
+    if _shape(left) != _shape(right):
+        raise ValueError(f"shape mismatch: {_shape(left)} != {_shape(right)}")
+    if isinstance(left, (tuple, list)) and isinstance(right, (tuple, list)):
+        return tuple(_map_binary(a, b, operation) for a, b in zip(left, right))
+    a, b = float(left), float(right)
+    return a + b if operation == "add" else a * b
+
+
+def _map_relu(value: GraphValue) -> GraphValue:
+    if isinstance(value, (tuple, list)):
+        return tuple(_map_relu(item) for item in value)
+    return max(0.0, float(value))
+
+
+def _sum_values(value: GraphValue) -> float:
+    if isinstance(value, (tuple, list)):
+        return sum(_sum_values(item) for item in value)
+    return float(value)
+
+
+class ComputeGraph:
+    """Build and execute a validated directed acyclic operation graph.
+
+    Supports matmul, shape-matched add/multiply, ReLU, and sum. References may
+    point forward to nodes added later. Failed nodes block only their dependents.
     """
 
     def __init__(self, name: str = "compute-graph") -> None:
@@ -90,44 +136,51 @@ class ComputeGraph:
         """Return nodes in insertion order."""
         return tuple(self._nodes.values())
 
-    def matmul(self, node_id: str, left: GraphInput, right: GraphInput) -> NodeRef:
-        """Add a matrix multiplication and return its symbolic output reference."""
+    def _add(self, node_id: str, operation: GraphOperation, *inputs: object) -> NodeRef:
         if not isinstance(node_id, str) or not node_id.strip():
             raise ValueError("node_id must be a non-empty string")
         if node_id in self._nodes:
             raise ValueError(f"duplicate graph node: {node_id}")
-        frozen_inputs: list[GraphInput] = []
-        for operand_name, operand in (("left", left), ("right", right)):
-            if isinstance(operand, NodeRef):
-                if not operand.node_id:
-                    raise ValueError(f"{operand_name} node reference must not be empty")
-                frozen_inputs.append(operand)
-                continue
-            if (
-                not isinstance(operand, Sequence)
-                or isinstance(operand, (str, bytes))
-                or not operand
-            ):
-                raise ValueError(f"{operand_name} operand must be a non-empty matrix")
-            if any(
-                not isinstance(row, Sequence) or isinstance(row, (str, bytes))
-                for row in operand
-            ):
-                raise TypeError(f"{operand_name} matrix rows must be sequences")
-            frozen_inputs.append(tuple(tuple(value for value in row) for row in operand))
-        self._nodes[node_id] = GraphNode(
-            node_id, "matmul", frozen_inputs[0], frozen_inputs[1]
-        )
+        expected = 1 if operation in {"relu", "sum"} else 2
+        if len(inputs) != expected:
+            raise ValueError(f"{operation} requires {expected} input(s)")
+        frozen: list[GraphInput] = []
+        for value in inputs:
+            if isinstance(value, NodeRef):
+                if not value.node_id:
+                    raise ValueError("node reference must not be empty")
+                frozen.append(value)
+            else:
+                frozen.append(_freeze(value))
+        self._nodes[node_id] = GraphNode(node_id, operation, tuple(frozen))
         return NodeRef(node_id)
+
+    def matmul(self, node_id: str, left: object, right: object) -> NodeRef:
+        """Add a rank-two matrix multiplication."""
+        return self._add(node_id, "matmul", left, right)
+
+    def add(self, node_id: str, left: object, right: object) -> NodeRef:
+        """Add two values with identical shapes."""
+        return self._add(node_id, "add", left, right)
+
+    def multiply(self, node_id: str, left: object, right: object) -> NodeRef:
+        """Multiply two values elementwise with identical shapes."""
+        return self._add(node_id, "multiply", left, right)
+
+    def relu(self, node_id: str, value: object) -> NodeRef:
+        """Apply ReLU elementwise."""
+        return self._add(node_id, "relu", value)
+
+    def sum(self, node_id: str, value: object) -> NodeRef:
+        """Reduce all elements to one scalar."""
+        return self._add(node_id, "sum", value)
 
     def validate(self) -> tuple[str, ...]:
         """Validate references and return a deterministic topological ordering."""
         for node in self._nodes.values():
             missing = [ref for ref in node.dependencies if ref not in self._nodes]
             if missing:
-                raise ValueError(
-                    f"node {node.node_id!r} references unknown nodes: {missing}"
-                )
+                raise ValueError(f"node {node.node_id!r} references unknown nodes: {missing}")
 
         temporary: set[str] = set()
         permanent: set[str] = set()
@@ -150,21 +203,17 @@ class ComputeGraph:
         return tuple(ordered)
 
     @staticmethod
-    def _resolve(operand: GraphInput, outputs: Mapping[str, list[list[float]]]):
-        if isinstance(operand, NodeRef):
-            return outputs[operand.node_id]
-        return operand
+    def _resolve(value: GraphInput, outputs: Mapping[str, object]) -> GraphValue:
+        resolved = outputs[value.node_id] if isinstance(value, NodeRef) else value
+        return cast(GraphValue, resolved)
 
     @staticmethod
-    def _estimate_memory(left: Matrix, right: Matrix) -> int:
-        try:
-            rows, inner = len(left), len(left[0])
-            right_rows, columns = len(right), len(right[0])
-            if inner != right_rows:
-                return 0
-            return 8 * (rows * inner + right_rows * columns + rows * columns)
-        except (IndexError, TypeError):
-            return 0
+    def _estimate_memory(values: tuple[GraphValue, ...], output: GraphValue | None = None) -> int:
+        def count(value: GraphValue) -> int:
+            if isinstance(value, (tuple, list)):
+                return sum(count(item) for item in value)
+            return 1
+        return 8 * (sum(count(value) for value in values) + (count(output) if output is not None else 0))
 
     def execute(
         self,
@@ -172,57 +221,60 @@ class ComputeGraph:
         *,
         max_workers: int = 1,
     ) -> GraphExecutionResult:
-        """Execute ready nodes in bounded parallel waves and retain node metrics.
-
-        A failed node blocks only its dependents. Independent branches continue,
-        and the result reports failures rather than discarding successful work.
-        """
+        """Execute independent ready nodes in bounded parallel waves."""
         if isinstance(max_workers, bool) or not isinstance(max_workers, int) or max_workers <= 0:
             raise ValueError("max_workers must be a positive integer")
         order = self.validate()
         selected_runtime = runtime or ComputeRuntime("vcpu")
         started = perf_counter_ns()
-        outputs: dict[str, list[list[float]]] = {}
+        outputs: dict[str, object] = {}
         states: dict[str, GraphState] = {}
         metrics: dict[str, GraphNodeMetric] = {}
         pending = set(order)
 
-        def run_node(left: Matrix, right: Matrix):
+        def run_node(node: GraphNode, values: tuple[GraphValue, ...]):
             node_started = perf_counter_ns()
             try:
-                value = selected_runtime.matmul(left, right)
-                immutable = tuple(tuple(float(item) for item in row) for row in value)
-                return immutable, perf_counter_ns() - node_started, None
+                if node.operation == "matmul":
+                    left, right = values
+                    if len(_shape(left)) != 2 or len(_shape(right)) != 2:
+                        raise ValueError("matmul operands must both be 2-D matrices")
+                    result: GraphValue = tuple(
+                        tuple(float(item) for item in row)
+                        for row in selected_runtime.matmul(
+                            cast(Matrix, left), cast(Matrix, right)
+                        )
+                    )
+                elif node.operation in {"add", "multiply"}:
+                    result = _map_binary(values[0], values[1], node.operation)
+                elif node.operation == "relu":
+                    result = _map_relu(values[0])
+                else:
+                    result = _sum_values(values[0])
+                return result, perf_counter_ns() - node_started, None
             except Exception as error:
                 return None, perf_counter_ns() - node_started, f"{type(error).__name__}: {error}"
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             while pending:
-                newly_blocked = [
-                    node_id
-                    for node_id in order
-                    if node_id in pending
-                    and any(
+                blocked = [
+                    node_id for node_id in order
+                    if node_id in pending and any(
                         states.get(dep) in {"failed", "blocked"}
                         for dep in self._nodes[node_id].dependencies
                     )
                 ]
-                for node_id in newly_blocked:
+                for node_id in blocked:
                     states[node_id] = "blocked"
                     metrics[node_id] = GraphNodeMetric(
-                        node_id=node_id,
-                        state="blocked",
-                        elapsed_ns=0,
-                        estimated_memory_bytes=0,
-                        error="one or more dependencies did not complete",
+                        node_id, "blocked", 0, 0,
+                        "one or more dependencies did not complete",
                     )
                     pending.remove(node_id)
 
                 ready = [
-                    node_id
-                    for node_id in order
-                    if node_id in pending
-                    and all(
+                    node_id for node_id in order
+                    if node_id in pending and all(
                         states.get(dep) == "completed"
                         for dep in self._nodes[node_id].dependencies
                     )
@@ -235,34 +287,29 @@ class ComputeGraph:
                 futures = {}
                 for node_id in ready:
                     node = self._nodes[node_id]
-                    left = self._resolve(node.left, outputs)
-                    right = self._resolve(node.right, outputs)
-                    futures[executor.submit(run_node, left, right)] = (
-                        node_id,
-                        self._estimate_memory(left, right),
-                    )
+                    values = tuple(self._resolve(item, outputs) for item in node.inputs)
+                    futures[executor.submit(run_node, node, values)] = (node_id, values)
                     pending.remove(node_id)
 
                 for future in as_completed(futures):
-                    node_id, memory_bytes = futures[future]
+                    node_id, values = futures[future]
                     value, elapsed_ns, error = future.result()
                     if error is None and value is not None:
-                        outputs[node_id] = [list(row) for row in value]
+                        outputs[node_id] = value
                         states[node_id] = "completed"
                         metrics[node_id] = GraphNodeMetric(
-                            node_id, "completed", elapsed_ns, memory_bytes
+                            node_id, "completed", elapsed_ns,
+                            self._estimate_memory(values, cast(GraphValue, value)),
                         )
                     else:
                         states[node_id] = "failed"
                         metrics[node_id] = GraphNodeMetric(
-                            node_id, "failed", elapsed_ns, memory_bytes, error
+                            node_id, "failed", elapsed_ns,
+                            self._estimate_memory(values), error,
                         )
 
         return GraphExecutionResult(
-            outputs={
-                node_id: tuple(tuple(row) for row in value)
-                for node_id, value in outputs.items()
-            },
+            outputs=outputs,
             node_metrics=tuple(metrics[node_id] for node_id in order),
             elapsed_ns=perf_counter_ns() - started,
         )

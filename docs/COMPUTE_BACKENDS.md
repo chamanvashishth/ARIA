@@ -120,9 +120,9 @@ for metric in result.node_metrics:
     print(metric.node_id, metric.state, metric.elapsed_ns)
 ~~~
 
-This is an explicit graph API; it does not automatically trace or fuse existing eager Tensor/Transformer calls. All current kernels still execute on the host CPU. Thread scheduling does not guarantee speedups for CPU-bound Python loops, and memory values are estimates rather than process-memory measurements.
+This graph evaluator executes the supported operations in topological dependency order and can run independent ready nodes in bounded worker threads. A failed node blocks its dependents while independent branches continue. It is still an explicit graph API: it does not automatically capture or rerun existing eager Tensor/Transformer calls, and it does not provide graph fusion. All operations execute on the host CPU. Thread scheduling does not guarantee speedups for CPU-bound Python loops, and memory values are estimates rather than process-memory measurements.
 
-## Tensor/autograd graph tracing (Block 27)
+## Tensor/autograd graph tracing and reverse-mode execution (Blocks 27–28)
 
 Every Tensor retains an operation label (leaf, matmul, add, multiply, sum, reshape, relu, or custom) alongside the parent links used by reverse-mode autodiff. Call tensor.graph_trace() to get an immutable, inspectable TensorGraphTrace in topological order, including node shapes, dependency IDs, gradient requirements and whether a backward callback exists. The trace can be validated and queried for operation counts.
 
@@ -145,7 +145,7 @@ print(left.gradient_values())
 
 Tensor.backward() now delegates to TensorGraphTrace.backward(). The trace retains the in-memory tensor nodes, validates their topological dependencies, resets only intermediate gradients, seeds the scalar output gradient, and invokes backward callbacks in reverse topological order. Shared parameters receive accumulated gradients from every dependent branch; leaf gradients continue accumulating across backward() calls until zero_grad().
 
-Forward operations remain eager: Tensor operations calculate their values immediately, and the trace is built from those recorded dependencies. This block does not route elementwise, activation, reshape, or Tensor forward kernels through ComputeGraph's matrix-multiplication scheduler. No graph fusion or hardware acceleration is implied.
+Forward Tensor operations remain eager: Tensor operations calculate their values immediately, and the trace is built from those recorded dependencies. The general-purpose ComputeGraph evaluator in Block 29 is currently a separate explicit API; it does not yet replace Tensor's eager forward operations or automatically execute Linear/Transformer layers. No graph fusion or hardware acceleration is implied.
 
 ~~~python
 from aria.brain import Parameter, Tensor

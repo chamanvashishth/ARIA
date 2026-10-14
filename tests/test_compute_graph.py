@@ -106,8 +106,8 @@ def test_graph_rejects_duplicate_ids_and_invalid_inputs() -> None:
     graph.matmul("same", [[1]], [[2]])
     with pytest.raises(ValueError, match="duplicate"):
         graph.matmul("same", [[1]], [[2]])
-    with pytest.raises(ValueError, match="non-empty matrix"):
-        graph.matmul("empty", [], [[1]])
+    with pytest.raises(TypeError, match="numeric scalars"):
+        graph.add("bad", [[1]], [["nope"]])
     with pytest.raises(ValueError, match="graph name"):
         ComputeGraph(" ")
 
@@ -121,3 +121,33 @@ def test_graph_validates_workers_and_matrix_shapes_at_execution() -> None:
     result = graph.execute()
     assert result.node_metrics[0].state == "failed"
     assert "dimensions do not match" in result.node_metrics[0].error
+
+
+def test_graph_executes_elementwise_chain_and_reduction() -> None:
+    graph = ComputeGraph("elementwise")
+    added = graph.add("add", [[1, -2], [3, 4]], [[2, 5], [-1, 6]])
+    multiplied = graph.multiply("multiply", added, [[2, 2], [3, 1]])
+    activated = graph.relu("relu", multiplied)
+    total = graph.sum("sum", activated)
+
+    result = graph.execute(max_workers=3)
+
+    assert result.output(added) == ((3, 3), (2, 10))
+    assert result.output(multiplied) == ((6.0, 6.0), (6.0, 10.0))
+    assert result.output(activated) == ((6.0, 6.0), (6.0, 10.0))
+    assert result.output(total) == 28.0
+    assert all(metric.state == "completed" for metric in result.node_metrics)
+
+
+def test_graph_rejects_shape_mismatch_and_invalid_matmul_rank() -> None:
+    mismatch = ComputeGraph()
+    ref = mismatch.add("add", [[1, 2]], [[1]])
+    result = mismatch.execute()
+    assert result.node_metrics[0].state == "failed"
+    assert "shape mismatch" in result.node_metrics[0].error
+
+    rank = ComputeGraph()
+    rank.matmul("bad-rank", [1, 2], [[1], [2]])
+    result = rank.execute()
+    assert result.node_metrics[0].state == "failed"
+    assert "2-D" in result.node_metrics[0].error
