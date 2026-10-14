@@ -105,7 +105,7 @@ def _map_binary(left: GraphValue, right: GraphValue, operation: str) -> GraphVal
         raise ValueError(f"shape mismatch: {_shape(left)} != {_shape(right)}")
     if isinstance(left, (tuple, list)) and isinstance(right, (tuple, list)):
         return tuple(_map_binary(a, b, operation) for a, b in zip(left, right))
-    a, b = float(left), float(right)
+    a, b = float(cast(float | int, left)), float(cast(float | int, right))
     return a + b if operation == "add" else a * b
 
 
@@ -214,7 +214,7 @@ class ComputeGraph:
     def _estimate_memory(values: tuple[GraphValue, ...], output: GraphValue | None = None) -> int:
         def count(value: GraphValue) -> int:
             if isinstance(value, (tuple, list)):
-                return fsum(count(item) for item in value)
+                return int(fsum(count(item) for item in value))
             return 1
         return 8 * (sum(count(value) for value in values) + (count(output) if output is not None else 0))
 
