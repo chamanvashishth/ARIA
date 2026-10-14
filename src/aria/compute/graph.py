@@ -196,7 +196,7 @@ def _causal_attention(
     batch_raw, time_raw = cast(tuple[GraphValue, ...], batch_time)
     if isinstance(batch_raw, (tuple, list)) or isinstance(time_raw, (tuple, list)):
         raise ValueError("causal attention batch metadata must be integers")
-    batch_number, time_number = cast(float | int, batch_raw), cast(float | int, time_raw)
+    batch_number, time_number = batch_raw, time_raw
     if int(batch_number) != batch_number or int(time_number) != time_number:
         raise ValueError("causal attention batch metadata must be integers")
     batch, time = int(batch_number), int(time_number)
@@ -207,7 +207,7 @@ def _causal_attention(
     def flatten(item: GraphValue) -> list[float]:
         if isinstance(item, (tuple, list)):
             return [number for child in item for number in flatten(child)]
-        return [float(cast(float | int, item))]
+        return [float(item)]
 
     q, k, v = flatten(query), flatten(key), flatten(value)
     output = [0.0] * len(q)
@@ -247,7 +247,7 @@ def _cross_entropy(logits: GraphValue, targets: GraphValue) -> GraphValue:
         target = int(raw_target)
         if not 0 <= target < vocab:
             raise IndexError(f"target token out of range: {target}")
-        row = [float(value) for value in cast(tuple[GraphValue, ...], logit_rows[row_index])]
+        row = [float(cast(float | int, value)) for value in cast(tuple[GraphValue, ...], logit_rows[row_index])]
         maximum = max(row)
         losses.append(maximum + log(sum(exp(value - maximum) for value in row)) - row[target])
     return sum(losses) / rows
