@@ -37,14 +37,17 @@ model = TransformerLanguageModel(
     intermediate_size=32,
     backend=scheduled,
 )
-logits = model.forward([10, 11, 12])
-print(scheduled.stats)
+with scheduled.execution_context("inference") as execution:
+    logits = model.forward([10, 11, 12])
+print(execution.stats)
 print(scheduled.commands[-1])
 ~~~
 
-Each matrix product is submitted and completed synchronously before the caller continues, because the next tensor operation needs the result. This preserves the existing Tensor computation graph: VCPU/VGPU backward matrix products also pass through the adapter. VNPU still rejects gradient-tracked tensors and is usable only after freezing all model parameters with `model.requires_grad_(False)`.
+The execution context scopes counters, elapsed time, command IDs and peak estimated matrix-buffer reservations to one model call. Contexts are thread-local, cannot be nested on the same thread, and are always cleaned up on exit, including exceptions. The adapter's global command history and aggregate counters are protected for concurrent callers. History remains bounded and can be reset with `clear_history()`.
 
-The adapter creates a small queue per operation and retains a bounded history of immutable command snapshots. `clear_history()` resets the history and aggregate counters. Its memory estimate is scheduler accounting metadata, not a measurement of actual Python process memory. Workgroups describe logical output tiles; they are not independently dispatched.
+Cancellation is cooperative: calling `execution.cancel()` causes the next matrix operation to fail before it is submitted. A Python matrix kernel already running cannot be interrupted. The scope reports submitted/completed/failed/cancelled counts and elapsed nanoseconds. Memory figures are scheduler estimates, not process-memory measurements. Workgroups describe logical output tiles; they are not independently dispatched.
+
+Each matrix product is submitted and completed synchronously before the caller continues, because the next tensor operation needs the result. This preserves the existing Tensor computation graph: VCPU/VGPU backward matrix products also pass through the adapter. VNPU remains inference-only and requires all model parameters to be frozen with `model.requires_grad_(False)`.
 
 Run the end-to-end model diagnostic:
 
@@ -84,7 +87,8 @@ Calling requires_grad_(True) again on a model using VNPU makes its next projecti
 - `CommandQueue` provides FIFO submissions, dependencies on earlier commands, bounded pending capacity, estimated-memory reservations, and logical output workgroup plans.
 - `ComputeScheduler` runs ready commands synchronously in submission order, records completed/failed/blocked states, and blocks dependents after prerequisite failures.
 - `ScheduledComputeBackend` connects this queue to neural forward and backward matrix operations, executing one complete matrix command synchronously per backend call.
-- No asynchronous dispatch, parallel worker pool, or physical hardware scheduling.
+- `ScheduledExecutionContext` adds per-model-call lifecycle tracking, thread-local scope ownership, cooperative between-kernel cancellation, elapsed-time and resource summaries, and exception-safe cleanup.
+- No asynchronous dispatch, parallel worker pool, preemptive kernel cancellation, or physical hardware scheduling.
 - No automatic device discovery or hardware fallback.
 - No performance advantage is claimed; VGPU tiling is an algorithmic simulation.
 - VNPU quantization is per-matrix symmetric scaling; it is not a calibrated deployment quantizer.
@@ -93,4 +97,4 @@ Calling requires_grad_(True) again on a model using VNPU makes its next projecti
 
 ## Verification
 
-Tests compare VGPU forward values and gradients against VCPU, exercise Linear and model-level backend injection, verify the VNPU inference-only guard, check frozen TinyLanguageModel and TransformerLanguageModel instances, validate successful/failed runtime profiling, and cover queue dependencies, failure propagation, workgroup coverage, queue limits and memory accounting. Scheduler integration tests compare full Transformer outputs with the direct path, check VCPU/VGPU backpropagation, validate VNPU freezing, enforce memory budgets and bound command history.
+Tests compare VGPU forward values and gradients against VCPU, exercise Linear and model-level backend injection, verify the VNPU inference-only guard, check frozen TinyLanguageModel and TransformerLanguageModel instances, validate successful/failed runtime profiling, and cover queue dependencies, failure propagation, workgroup coverage, queue limits and memory accounting. Scheduler integration tests compare full Transformer outputs with the direct path, check VCPU/VGPU backpropagation, validate VNPU freezing, enforce memory budgets, bound command history, test scoped lifecycle cleanup, cooperative cancellation and concurrent thread-local contexts.

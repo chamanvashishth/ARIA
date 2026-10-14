@@ -6,7 +6,9 @@ output-tile descriptors, not independent hardware dispatches.
 from __future__ import annotations
 
 from collections import deque
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
+from threading import Event, Lock, local
 from time import perf_counter_ns
 from typing import Literal, Sequence
 
@@ -288,23 +290,116 @@ class ComputeScheduler:
 
 @dataclass(frozen=True)
 class ScheduledExecutionStats:
-    """Aggregate counters for model operations routed through a scheduled backend."""
+    """Immutable aggregate measurements for one model execution scope."""
 
+    execution_id: str
     submitted: int
     completed: int
     failed: int
+    cancelled: int
+    elapsed_ns: int
     peak_reserved_memory_bytes: int
     planned_workgroups: int
+    command_ids: tuple[str, ...]
+    active: bool
+
+
+class ScheduledExecutionContext(AbstractContextManager["ScheduledExecutionContext"]):
+    """Own one model call's lifecycle, cancellation signal and resource summary.
+
+    Cancellation is cooperative and checked between synchronous matrix kernels.
+    It cannot interrupt a Python matrix multiplication that is already running.
+    """
+
+    def __init__(self, backend: "ScheduledComputeBackend", execution_id: str) -> None:
+        self.backend = backend
+        self.execution_id = execution_id
+        self._cancel_event = Event()
+        self._entered = False
+        self._active = False
+        self._started_at_ns: int | None = None
+        self._finished_at_ns: int | None = None
+        self._submitted = 0
+        self._completed = 0
+        self._failed = 0
+        self._cancelled = 0
+        self._peak_reserved_memory_bytes = 0
+        self._planned_workgroups = 0
+        self._command_ids: list[str] = []
+
+    def __enter__(self) -> "ScheduledExecutionContext":
+        if self._entered:
+            raise RuntimeError("execution context cannot be entered more than once")
+        if getattr(self.backend._local, "execution", None) is not None:
+            raise RuntimeError("nested scheduled execution contexts are not supported")
+        self._entered = True
+        self._active = True
+        self._started_at_ns = perf_counter_ns()
+        self.backend._local.execution = self
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        self._active = False
+        self._finished_at_ns = perf_counter_ns()
+        if getattr(self.backend._local, "execution", None) is self:
+            del self.backend._local.execution
+        return False
+
+    def cancel(self) -> None:
+        """Request cancellation before the next scheduled matrix operation."""
+        self._cancel_event.set()
+
+    @property
+    def cancelled(self) -> bool:
+        return self._cancel_event.is_set()
+
+    @property
+    def stats(self) -> ScheduledExecutionStats:
+        end = self._finished_at_ns
+        if end is None:
+            end = perf_counter_ns()
+        start = self._started_at_ns or end
+        return ScheduledExecutionStats(
+            execution_id=self.execution_id,
+            submitted=self._submitted,
+            completed=self._completed,
+            failed=self._failed,
+            cancelled=self._cancelled,
+            elapsed_ns=max(0, end - start),
+            peak_reserved_memory_bytes=self._peak_reserved_memory_bytes,
+            planned_workgroups=self._planned_workgroups,
+            command_ids=tuple(self._command_ids),
+            active=self._active,
+        )
+
+    def _record_submitted(self, command_id: str) -> None:
+        self._submitted += 1
+        self._command_ids.append(command_id)
+
+    def _record_command(self, command: ComputeCommand) -> None:
+        self._planned_workgroups += len(command.workgroups)
+        self._peak_reserved_memory_bytes = max(
+            self._peak_reserved_memory_bytes, command.reserved_memory_bytes
+        )
+        if command.state == "completed":
+            self._completed += 1
+        else:
+            self._failed += 1
+
+    def _record_failure(self) -> None:
+        self._failed += 1
+
+    def _record_cancelled(self) -> None:
+        self._cancelled += 1
 
 
 class ScheduledComputeBackend:
     """Synchronous scheduler adapter implementing the neural ComputeBackend protocol.
 
-    Each requested matrix multiplication is submitted and completed before this
-    method returns, because downstream tensor operations need its output. This
-    integrates the scheduler with Linear and attention without changing the
-    Tensor autodiff graph: backward matrix products pass through this adapter too.
-    The adapter keeps only a bounded history of immutable command snapshots.
+    Use execution_context() around a model forward/generation call to collect
+    per-execution counters, timings and estimated memory use. Cancellation is
+    checked between kernels. Matrix kernels remain synchronous and cannot be
+    interrupted once running.
     """
 
     def __init__(
@@ -327,6 +422,10 @@ class ScheduledComputeBackend:
         self._failed = 0
         self._peak_reserved_memory_bytes = 0
         self._planned_workgroups = 0
+        self._lock = Lock()
+        self._local = local()
+        self._next_execution_id = 1
+        self._next_command_id = 1
 
     @property
     def info(self):
@@ -336,54 +435,93 @@ class ScheduledComputeBackend:
     @property
     def commands(self) -> tuple[ComputeCommand, ...]:
         """Return the most recent immutable scheduler command snapshots."""
-        return tuple(self._history)
+        with self._lock:
+            return tuple(self._history)
 
     @property
     def stats(self) -> SchedulerStats:
-        return SchedulerStats(
-            submitted=self._submitted,
-            queued=0,
-            running=0,
-            completed=self._completed,
-            failed=self._failed,
-            blocked=0,
-            reserved_memory_bytes=0,
-            peak_reserved_memory_bytes=self._peak_reserved_memory_bytes,
-            planned_workgroups=self._planned_workgroups,
-        )
+        with self._lock:
+            return SchedulerStats(
+                submitted=self._submitted,
+                queued=0,
+                running=0,
+                completed=self._completed,
+                failed=self._failed,
+                blocked=0,
+                reserved_memory_bytes=0,
+                peak_reserved_memory_bytes=self._peak_reserved_memory_bytes,
+                planned_workgroups=self._planned_workgroups,
+            )
+
+    def execution_context(self, label: str | None = None) -> ScheduledExecutionContext:
+        """Create an execution scope; label becomes a readable execution ID prefix."""
+        if label is not None and (
+            not isinstance(label, str) or not label.strip() or any(ch.isspace() for ch in label)
+        ):
+            raise ValueError("execution label must be a non-empty token without whitespace")
+        with self._lock:
+            ordinal = self._next_execution_id
+            self._next_execution_id += 1
+        prefix = label or "execution"
+        return ScheduledExecutionContext(self, f"{prefix}-{ordinal:06d}")
 
     def clear_history(self) -> None:
         """Clear retained command snapshots and reset aggregate counters."""
-        self._history.clear()
-        self._submitted = 0
-        self._completed = 0
-        self._failed = 0
-        self._peak_reserved_memory_bytes = 0
-        self._planned_workgroups = 0
+        with self._lock:
+            self._history.clear()
+            self._submitted = 0
+            self._completed = 0
+            self._failed = 0
+            self._peak_reserved_memory_bytes = 0
+            self._planned_workgroups = 0
 
     def matmul(self, left: Matrix, right: Matrix) -> list[list[float]]:
+        context = getattr(self._local, "execution", None)
+        if context is not None and context.cancelled:
+            context._record_cancelled()
+            raise RuntimeError(f"scheduled execution {context.execution_id} was cancelled")
+
+        with self._lock:
+            ordinal = self._next_command_id
+            self._next_command_id += 1
+        execution_prefix = context.execution_id if context is not None else "model"
+        command_id = f"{execution_prefix}-matmul-{ordinal:08d}"
         queue = CommandQueue(
             max_pending_commands=1,
             memory_budget_bytes=self.memory_budget_bytes,
             workgroup_size=self.workgroup_size,
         )
-        queue.submit_matmul(
-            left,
-            right,
-            command_id=f"model-matmul-{self._submitted + 1:08d}",
-        )
-        self._submitted += 1
+        try:
+            queue.submit_matmul(left, right, command_id=command_id)
+        except Exception:
+            if context is not None:
+                context._record_failure()
+            with self._lock:
+                self._failed += 1
+            raise
+
+        if context is not None:
+            context._record_submitted(command_id)
+        with self._lock:
+            self._submitted += 1
+
         command = ComputeScheduler(self.runtime).run(queue)[0]
-        self._history.append(command)
-        self._planned_workgroups += len(command.workgroups)
-        self._peak_reserved_memory_bytes = max(
-            self._peak_reserved_memory_bytes, command.reserved_memory_bytes
-        )
+        with self._lock:
+            self._history.append(command)
+            self._planned_workgroups += len(command.workgroups)
+            self._peak_reserved_memory_bytes = max(
+                self._peak_reserved_memory_bytes, command.reserved_memory_bytes
+            )
+            if command.state == "completed" and command.result is not None:
+                self._completed += 1
+            else:
+                self._failed += 1
+        if context is not None:
+            context._record_command(command)
+
         if command.state != "completed" or command.result is None:
-            self._failed += 1
             raise RuntimeError(
                 f"scheduled matrix multiplication {command.command_id} "
                 f"ended in state {command.state}: {command.error or 'no result'}"
             )
-        self._completed += 1
         return [list(row) for row in command.result]
