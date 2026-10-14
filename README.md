@@ -136,6 +136,7 @@ The current brain is intentionally small and inspectable rather than optimized p
 - residual Transformer blocks
 - vocabulary projection
 - next-token cross-entropy
+- graph-native forward execution for Embedding, RMSNorm, causal attention, and cross-entropy
 - local SGD
 
 ### Transformer status
