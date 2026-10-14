@@ -1,6 +1,6 @@
 import pytest
 
-from aria.compute import ComputeRuntime
+from aria.compute import ComputeRuntime, ScheduledComputeBackend
 from aria.compute.scheduler import CommandQueue, ComputeScheduler
 
 
@@ -148,3 +148,110 @@ def test_scheduler_uses_selected_compute_runtime() -> None:
 def test_queue_validates_matrix_shapes(left, right, message) -> None:
     with pytest.raises(ValueError, match=message):
         CommandQueue().submit_matmul(left, right)
+
+
+def test_scheduled_backend_batches_independent_products() -> None:
+    backend = ScheduledComputeBackend(workgroup_size=1)
+    results = backend.matmul_batch(
+        (
+            ([[1.0, 2.0]], [[3.0], [4.0]]),
+            ([[2.0]], [[5.0]]),
+            ([[1.0], [2.0]], [[2.0, 0.0]]),
+        )
+    )
+
+    assert results == ([[11.0]], [[10.0]], [[2.0, 0.0], [4.0, 0.0]])
+    assert backend.stats.submitted == 3
+    assert backend.stats.completed == 3
+    assert len(backend.commands) == 3
+
+
+def test_scheduled_backend_batch_reserves_memory_for_all_operations() -> None:
+    backend = ScheduledComputeBackend(memory_budget_bytes=40)
+    with pytest.raises(MemoryError, match="exceeds queue budget"):
+        backend.matmul_batch(
+            (
+                ([[1.0, 2.0]], [[3.0], [4.0]]),
+                ([[1.0, 2.0]], [[3.0], [4.0]]),
+            )
+        )
+
+    assert backend.stats.submitted == 0
+    assert backend.stats.failed == 1
+
+
+def test_scheduled_backend_batch_validates_dependency_indices() -> None:
+    backend = ScheduledComputeBackend()
+    with pytest.raises(ValueError, match="earlier batch indices"):
+        backend.matmul_batch(
+            (
+                ([[1.0]], [[2.0]]),
+                ([[2.0]], [[3.0]]),
+            ),
+            dependencies=((), (1,)),
+        )
+    assert backend.stats.submitted == 0
+
+
+def test_scheduled_backend_batch_executes_dependencies_in_order() -> None:
+    backend = ScheduledComputeBackend()
+    results = backend.matmul_batch(
+        (
+            ([[1.0]], [[2.0]]),
+            ([[3.0]], [[4.0]]),
+            ([[5.0]], [[6.0]]),
+        ),
+        dependencies=((), (0,), (1,)),
+    )
+
+    assert results == ([[2.0]], [[12.0]], [[30.0]])
+    assert backend.commands[1].dependencies == (backend.commands[0].command_id,)
+    assert backend.commands[2].dependencies == (backend.commands[1].command_id,)
+
+
+def test_scheduled_backend_batch_propagates_runtime_failures() -> None:
+    class FailingRuntime:
+        def __init__(self) -> None:
+            self._runtime = ComputeRuntime("vcpu")
+            self.info = self._runtime.info
+
+        def matmul(self, left, right):
+            if left[0][0] == 2.0:
+                raise ArithmeticError("deliberate test failure")
+            return self._runtime.matmul(left, right)
+
+    backend = ScheduledComputeBackend(runtime=FailingRuntime())  # type: ignore[arg-type]
+    with pytest.raises(RuntimeError, match="ended in state failed"):
+        backend.matmul_batch(
+            (
+                ([[1.0]], [[2.0]]),
+                ([[2.0]], [[3.0]]),
+                ([[4.0]], [[5.0]]),
+            ),
+            dependencies=((), (0,), (1,)),
+        )
+
+    assert [command.state for command in backend.commands] == [
+        "completed",
+        "failed",
+        "blocked",
+    ]
+    assert backend.stats.completed == 1
+    assert backend.stats.failed == 2
+
+
+def test_execution_context_tracks_whole_batch_memory_and_commands() -> None:
+    backend = ScheduledComputeBackend(workgroup_size=1)
+    with backend.execution_context("batch") as execution:
+        results = backend.matmul_batch(
+            (
+                ([[1.0, 2.0]], [[3.0], [4.0]]),
+                ([[2.0, 3.0]], [[4.0], [5.0]]),
+            )
+        )
+
+    assert results == ([[11.0]], [[23.0]])
+    assert execution.stats.submitted == 2
+    assert execution.stats.completed == 2
+    assert execution.stats.peak_reserved_memory_bytes == 48
+    assert len(execution.stats.command_ids) == 2
