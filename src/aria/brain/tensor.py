@@ -217,33 +217,8 @@ class Tensor:
 
 
     def backward(self) -> None:
-        if self.shape != ():
-            raise ValueError("backward() requires a scalar tensor")
-        if not self.requires_grad:
-            raise ValueError("cannot backpropagate from a tensor without gradients")
-
-        topo: list[Tensor] = []
-        seen: set[int] = set()
-
-        def visit(node: Tensor) -> None:
-            if id(node) in seen:
-                return
-            seen.add(id(node))
-            for parent in node._parents:
-                visit(parent)
-            topo.append(node)
-
-        visit(self)
-        # Intermediate gradients belong to this traversal, while leaf gradients
-        # intentionally accumulate across backward() calls until zero_grad().
-        for node in topo:
-            if node._parents:
-                node.grad = None
-        self.grad = Tensor.scalar(1.0)
-
-        for node in reversed(topo):
-            if node._backward is not None:
-                node._backward()
+        """Run reverse-mode autodiff through this tensor's recorded graph."""
+        self.graph_trace().backward()
 
     def zero_grad(self) -> None:
         self.grad = None

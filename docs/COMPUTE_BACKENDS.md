@@ -87,7 +87,7 @@ Calling requires_grad_(True) again on a model using VNPU makes its next projecti
 - `python scripts/benchmark_compute.py` compares latency and numerical error against the VCPU reference on deterministic synthetic matrices.
 - `CommandQueue` provides FIFO submissions, dependencies on earlier commands, bounded pending capacity, estimated-memory reservations, and logical output workgroup plans.
 - `ComputeScheduler` runs ready commands synchronously in submission order, records completed/failed/blocked states, and blocks dependents after prerequisite failures.
-- `ScheduledComputeBackend` connects this queue to neural forward and backward matrix operations. `matmul_batch()` submits several products to one shared queue, applies dependency ordering and a whole-batch memory budget, and executes synchronously; ordinary eager Tensor calls use the same path as one-item batches.
+- `ScheduledComputeBackend` connects this queue to neural forward and backward matrix operations. `matmul_batch()` submits several products into one shared queue, applies dependency ordering and a whole-batch memory budget, and executes synchronously; ordinary eager Tensor calls use the same path as one-item batches.
 - `python scripts/benchmark_compute_batch.py` compares individual calls, a one-worker shared queue, and a four-worker shared queue on identical deterministic VCPU workloads. It reports numerical equivalence and diagnostic latency; Python threads do not guarantee a speedup for CPU-bound kernels.
 - `ScheduledExecutionContext` adds per-model-call lifecycle tracking, thread-local scope ownership, cooperative between-kernel cancellation, elapsed-time and resource summaries, and exception-safe cleanup.
 - The optional worker pool uses Python threads for independent commands. It is synchronous from the caller's perspective and does not guarantee speedups for CPU-bound Python kernels. Cancellation only applies before a command starts; running kernels cannot be preempted.
@@ -101,14 +101,13 @@ Calling requires_grad_(True) again on a model using VNPU makes its next projecti
 
 Tests compare VGPU forward values and gradients against VCPU, exercise Linear and model-level backend injection, verify the VNPU inference-only guard, check frozen TinyLanguageModel and TransformerLanguageModel instances, validate successful/failed runtime profiling, and cover queue dependencies, failure propagation, workgroup coverage, queue limits and memory accounting. Scheduler integration tests compare full Transformer outputs with the direct path, check VCPU/VGPU backpropagation, validate VNPU freezing, enforce memory budgets, bound command history, test scoped lifecycle cleanup, cooperative cancellation and concurrent thread-local contexts.
 
-
 ## Compute graph engine (Block 26)
 
 ComputeGraph represents matrix multiplication as explicit nodes connected by NodeRef values. References may point to nodes added later; validate() checks unknown references and detects cycles before execution. The engine currently supports matrix multiplication nodes only.
 
 execute(runtime, max_workers=...) schedules independent ready nodes in bounded thread-pool waves. A downstream node starts only after its inputs have completed. A failed node blocks its dependents while independent branches continue. The returned GraphExecutionResult contains successful immutable outputs, per-node completion/failure/blocking state, elapsed time and estimated matrix-buffer bytes.
 
-\`\`\`python
+~~~python
 from aria.compute import ComputeGraph
 
 graph = ComputeGraph("two-stage-projection")
@@ -119,18 +118,16 @@ result = graph.execute(max_workers=2)
 print(result.output(logits))
 for metric in result.node_metrics:
     print(metric.node_id, metric.state, metric.elapsed_ns)
-\`\`\`
+~~~
 
 This is an explicit graph API; it does not automatically trace or fuse existing eager Tensor/Transformer calls. All current kernels still execute on the host CPU. Thread scheduling does not guarantee speedups for CPU-bound Python loops, and memory values are estimates rather than process-memory measurements.
 
-
 ## Tensor/autograd graph tracing (Block 27)
 
-Every Tensor retains an operation label (leaf, matmul, add, multiply, sum, reshape, relu, or custom) alongside the parent links used by reverse-mode autodiff. Call tensor.graph_trace() to get an immutable TensorGraphTrace in topological order, including node shapes, dependency IDs, gradient requirements and whether a backward callback exists. The trace can be validated and queried for operation counts.
+Every Tensor retains an operation label (leaf, matmul, add, multiply, sum, reshape, relu, or custom) alongside the parent links used by reverse-mode autodiff. Call tensor.graph_trace() to get an immutable, inspectable TensorGraphTrace in topological order, including node shapes, dependency IDs, gradient requirements and whether a backward callback exists. The trace can be validated and queried for operation counts.
 
-```python
-from aria.brain import Parameter, ReLU
-from aria.compute import VirtualCPUBackend
+~~~python
+from aria.brain import Parameter, ReLU, VirtualCPUBackend
 
 left = Parameter([[1.0, 2.0]])
 right = Parameter([[3.0], [4.0]])
@@ -142,6 +139,19 @@ assert trace.validate()
 print(trace.operation_counts)
 loss.backward()
 print(left.gradient_values())
-```
+~~~
 
-The trace is an inspection/diagnostics bridge over the existing eager Tensor autograd graph. It does not re-run or schedule Tensor operations through ComputeGraph yet; forward execution and reverse-mode gradient propagation remain in Tensor's eager engine. Custom layer operations are labelled custom unless explicitly tagged. No graph fusion or acceleration is implied.
+## Graph-driven reverse-mode autodiff (Block 28)
+
+Tensor.backward() now delegates to TensorGraphTrace.backward(). The trace retains the in-memory tensor nodes, validates their topological dependencies, resets only intermediate gradients, seeds the scalar output gradient, and invokes backward callbacks in reverse topological order. Shared parameters receive accumulated gradients from every dependent branch; leaf gradients continue accumulating across backward() calls until zero_grad().
+
+Forward operations remain eager: Tensor operations calculate their values immediately, and the trace is built from those recorded dependencies. This block does not route elementwise, activation, reshape, or Tensor forward kernels through ComputeGraph's matrix-multiplication scheduler. No graph fusion or hardware acceleration is implied.
+
+~~~python
+from aria.brain import Parameter
+
+weight = Parameter([[2.0, 3.0]])
+loss = ((weight * weight) + (weight * 2.0)).sum()
+loss.graph_trace().backward()
+print(weight.gradient_values())  # [6.0, 8.0]
+~~~

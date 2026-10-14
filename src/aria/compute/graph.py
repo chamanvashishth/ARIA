@@ -7,7 +7,7 @@ concurrency, not physical GPU/NPU acceleration.
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from time import perf_counter_ns
 from typing import Literal, Mapping, Sequence
 
@@ -268,7 +268,6 @@ class ComputeGraph:
         )
 
 
-
 @dataclass(frozen=True)
 class TensorGraphNode:
     """A read-only view of one node in an existing Tensor autograd graph."""
@@ -283,14 +282,16 @@ class TensorGraphNode:
 
 @dataclass(frozen=True)
 class TensorGraphTrace:
-    """Immutable topological trace of an existing Tensor computation graph.
+    """Topological trace and reverse-mode executor for an eager Tensor graph.
 
-    This bridge inspects eager Tensor operations without executing them again.
-    Tensor.backward() remains the authoritative reverse-mode gradient engine.
+    Forward tensor values are still computed eagerly by Tensor operations.
+    This trace provides the shared dependency order used for reverse traversal;
+    it does not dispatch tensor kernels through ComputeGraph.
     """
 
     nodes: tuple[TensorGraphNode, ...]
     output_id: str
+    _tensors: tuple[object, ...] = field(default=(), repr=False, compare=False)
 
     @classmethod
     def from_tensor(cls, output: object) -> "TensorGraphTrace":
@@ -323,7 +324,11 @@ class TensorGraphTrace:
             )
             for node in ordered
         )
-        return cls(nodes=nodes, output_id=identifiers[id(output)])
+        return cls(
+            nodes=nodes,
+            output_id=identifiers[id(output)],
+            _tensors=tuple(ordered),
+        )
 
     @property
     def operation_counts(self) -> Mapping[str, int]:
@@ -344,3 +349,35 @@ class TensorGraphTrace:
                 return False
             seen.add(node.node_id)
         return self.output_id in seen
+
+    def backward(self) -> None:
+        """Propagate scalar-output gradients in reverse topological order.
+
+        Intermediate gradients are reset for each traversal; leaf gradients
+        continue accumulating until their owners call zero_grad().
+        """
+        from aria.brain.tensor import Tensor
+
+        if not self._tensors or len(self._tensors) != len(self.nodes):
+            raise RuntimeError("this trace does not contain an executable tensor graph")
+        if not self.validate():
+            raise ValueError("cannot execute an invalid tensor graph")
+        tensors = self._tensors
+        output = tensors[-1]
+        if not isinstance(output, Tensor):
+            raise TypeError("tensor graph contains an invalid node")
+        if output.shape != ():
+            raise ValueError("backward() requires a scalar tensor")
+        if not output.requires_grad:
+            raise ValueError("cannot backpropagate from a tensor without gradients")
+
+        for node in tensors:
+            if not isinstance(node, Tensor):
+                raise TypeError("tensor graph contains an invalid node")
+            if node._parents:
+                node.grad = None
+        output.grad = Tensor.scalar(1.0)
+
+        for node in reversed(tensors):
+            if node._backward is not None:
+                node._backward()

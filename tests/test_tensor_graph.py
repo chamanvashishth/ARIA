@@ -45,6 +45,27 @@ def test_tensor_graph_trace_does_not_change_backward_gradients() -> None:
     assert value.grad.to_list() == [[4.0, -6.0]]
 
 
+def test_tensor_graph_trace_backward_accumulates_shared_parameter_paths() -> None:
+    value = Parameter([[2.0, 3.0]])
+    loss = ((value * value) + (value * 2.0)).sum()
+
+    loss.graph_trace().backward()
+
+    assert value.grad is not None
+    assert value.grad.to_list() == [[6.0, 8.0]]
+
+
+def test_tensor_backward_uses_graph_executor_and_keeps_leaf_accumulation() -> None:
+    value = Parameter([[2.0, 3.0]])
+    loss = (value * value).sum()
+
+    loss.backward()
+    loss.backward()
+
+    assert value.grad is not None
+    assert value.grad.to_list() == [[8.0, 12.0]]
+
+
 def test_tensor_graph_trace_rejects_non_tensor_output() -> None:
     from aria.compute import TensorGraphTrace
     with pytest.raises(TypeError, match="must be a Tensor"):
