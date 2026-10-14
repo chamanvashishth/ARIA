@@ -191,7 +191,7 @@ class ComputeGraph:
             raise ValueError("node_id must be a non-empty string")
         if node_id in self._nodes:
             raise ValueError(f"duplicate graph node: {node_id}")
-        expected = 1 if operation in {"relu", "sum"} else 2
+        expected = 1 if operation in {"relu", "sum", "reshape"} else 2
         if len(inputs) != expected:
             raise ValueError(f"{operation} requires {expected} input(s)")
         frozen: list[GraphInput] = []

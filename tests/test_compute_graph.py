@@ -190,8 +190,9 @@ def test_tensor_trace_execution_rejects_custom_operations_explicitly() -> None:
     from aria.brain.parameter import Parameter
 
     value = Parameter([[1.0, 2.0]])
-    custom = value.reshape((1, 2))
-    with pytest.raises(NotImplementedError, match="reshape"):
+    from aria.brain.tensor import Tensor
+    custom = Tensor.operation([[1.0, 2.0]], parents=(value,), backward=lambda _: None)
+    with pytest.raises(NotImplementedError, match="custom"):
         custom.graph_trace().execute()
 
 
