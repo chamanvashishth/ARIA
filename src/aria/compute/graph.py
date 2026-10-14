@@ -185,13 +185,21 @@ def _embedding(weight: GraphValue, token_ids: GraphValue) -> GraphValue:
     return tuple(output)
 
 
-def _causal_attention(query: GraphValue, key: GraphValue, value: GraphValue) -> GraphValue:
+def _causal_attention(
+    query: GraphValue, key: GraphValue, value: GraphValue, batch_time: GraphValue
+) -> GraphValue:
     shape = _shape(query)
-    if shape != _shape(key) or shape != _shape(value) or len(shape) not in (2, 3):
-        raise ValueError("causal attention expects matching [time, hidden] or [batch, time, hidden] tensors")
-    batch, time, hidden = (1, *shape) if len(shape) == 2 else shape
-    if batch <= 0 or time <= 0 or hidden <= 0:
-        raise ValueError("causal attention dimensions must be positive")
+    if shape != _shape(key) or shape != _shape(value) or len(shape) != 2:
+        raise ValueError("causal attention expects matching flattened [batch * time, hidden] tensors")
+    if len(_shape(batch_time)) != 1 or len(cast(tuple[GraphValue, ...], batch_time)) != 2:
+        raise ValueError("causal attention batch metadata must contain [batch, time]")
+    batch_raw, time_raw = cast(tuple[GraphValue, ...], batch_time)
+    if int(batch_raw) != batch_raw or int(time_raw) != time_raw:
+        raise ValueError("causal attention batch metadata must be integers")
+    batch, time = int(batch_raw), int(time_raw)
+    hidden = shape[-1]
+    if batch <= 0 or time <= 0 or hidden <= 0 or shape[0] != batch * time:
+        raise ValueError("causal attention dimensions are invalid")
 
     def flatten(item: GraphValue) -> list[float]:
         if isinstance(item, (tuple, list)):
@@ -218,7 +226,7 @@ def _causal_attention(query: GraphValue, key: GraphValue, value: GraphValue) -> 
                     probabilities[step] * v[offset + step * hidden + dim]
                     for step in range(position + 1)
                 )
-    return _reshape_value(tuple(output), shape)
+    return _reshape_value(tuple(output), (batch, time, hidden) if batch > 1 else (time, hidden))
 
 
 def _cross_entropy(logits: GraphValue, targets: GraphValue) -> GraphValue:
@@ -296,7 +304,7 @@ class ComputeGraph:
             raise ValueError("node_id must be a non-empty string")
         if node_id in self._nodes:
             raise ValueError(f"duplicate graph node: {node_id}")
-        expected = 1 if operation in {"relu", "sum", "reshape"} else 3 if operation in {"rms_norm", "causal_attention"} else 2
+        expected = 1 if operation in {"relu", "sum", "reshape"} else 4 if operation == "causal_attention" else 3 if operation == "rms_norm" else 2
         if len(inputs) != expected:
             raise ValueError(f"{operation} requires {expected} input(s)")
         frozen: list[GraphInput] = []
@@ -352,10 +360,10 @@ class ComputeGraph:
         return self._add(node_id, "rms_norm", value, weight, epsilon)
 
     def causal_attention(
-        self, node_id: str, query: object, key: object, value: object
+        self, node_id: str, query: object, key: object, value: object, batch_time: object
     ) -> NodeRef:
         """Execute single-head causal attention over time, independently per batch."""
-        return self._add(node_id, "causal_attention", query, key, value)
+        return self._add(node_id, "causal_attention", query, key, value, batch_time)
 
     def cross_entropy(self, node_id: str, logits: object, targets: object) -> NodeRef:
         """Compute mean stable next-token cross-entropy."""
@@ -446,7 +454,7 @@ class ComputeGraph:
                 elif node.operation == "rms_norm":
                     result = _rms_norm(values[0], values[1], values[2])
                 elif node.operation == "causal_attention":
-                    result = _causal_attention(values[0], values[1], values[2])
+                    result = _causal_attention(values[0], values[1], values[2], values[3])
                 elif node.operation == "cross_entropy":
                     result = _cross_entropy(values[0], values[1])
                 else:
@@ -666,7 +674,7 @@ class TensorGraphTrace:
             elif node.operation == "rms_norm":
                 reference = graph.rms_norm(node.node_id, inputs[0], inputs[1], inputs[2])
             elif node.operation == "causal_attention":
-                reference = graph.causal_attention(node.node_id, inputs[0], inputs[1], inputs[2])
+                reference = graph.causal_attention(node.node_id, inputs[0], inputs[1], inputs[2], inputs[3])
             elif node.operation == "cross_entropy":
                 reference = graph.cross_entropy(node.node_id, inputs[0], inputs[1])
             else:
