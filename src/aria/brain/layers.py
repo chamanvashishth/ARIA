@@ -113,26 +113,35 @@ class Embedding(Module):
         self.weight = Parameter([[rng.uniform(-scale, scale) for _ in range(embedding_dim)] for _ in range(num_embeddings)])
 
     def forward(self, token_ids: Sequence[int]) -> Tensor:
+        ids = list(token_ids)
         rows = []
-        for token_id in token_ids:
+        for token_id in ids:
+            if isinstance(token_id, bool) or not isinstance(token_id, int):
+                raise TypeError("token IDs must be integers")
             if not 0 <= token_id < self.weight.shape[0]:
                 raise IndexError(f"token id out of range: {token_id}")
             start = token_id * self.weight.shape[1]
             rows.append(self.weight._values[start:start + self.weight.shape[1]])
 
         embedding_dim = self.weight.shape[1]
+        graph_ids = Tensor(ids)
 
         def backward(out: Tensor) -> None:
             if not self.weight.requires_grad:
                 return
             grad = [0.0] * len(self.weight._values)
-            for row, token_id in enumerate(token_ids):
+            for row, token_id in enumerate(ids):
                 start = token_id * embedding_dim
                 for col in range(embedding_dim):
                     grad[start + col] += out.gradient_values()[row * embedding_dim + col]
             self.weight._accumulate(grad)
 
-        return Tensor.operation(rows, parents=(self.weight,), backward=backward)
+        return Tensor.operation(
+            rows,
+            parents=(self.weight, graph_ids),
+            backward=backward,
+            operation="embedding",
+        )
 
 
 class Sequential(Module):
