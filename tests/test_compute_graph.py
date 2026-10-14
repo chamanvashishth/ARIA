@@ -10,7 +10,7 @@ def test_graph_executes_chain_and_returns_immutable_outputs() -> None:
     result = graph.execute()
 
     assert result.output(first) == ((11.0,),)
-    assert result.output("second") == ((22.0,),)
+    assert result.output(second) == ((22.0,),)
     assert [item.state for item in result.node_metrics] == ["completed", "completed"]
     assert all(item.elapsed_ns >= 0 for item in result.node_metrics)
     assert all(item.estimated_memory_bytes > 0 for item in result.node_metrics)

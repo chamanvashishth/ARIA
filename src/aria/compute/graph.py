@@ -96,7 +96,7 @@ class ComputeGraph:
             raise ValueError("node_id must be a non-empty string")
         if node_id in self._nodes:
             raise ValueError(f"duplicate graph node: {node_id}")
-        frozen_inputs = []
+        frozen_inputs: list[GraphInput] = []
         for operand_name, operand in (("left", left), ("right", right)):
             if isinstance(operand, NodeRef):
                 if not operand.node_id:
