@@ -346,7 +346,7 @@ def test_transformer_training_loss_executes_through_compute_graph() -> None:
         max_sequence_length=3,
         seed=101,
     )
-    loss = model.loss_batch([[1, 2]], [[2, 3]])
+    loss = model.loss_batch([[1, 2], [3, 4]], [[2, 3], [4, 5]])
 
     execution = loss.graph_trace().execute()
     assert execution.output_values == pytest.approx(loss.item(), abs=1e-8)
