@@ -157,7 +157,7 @@ def _bias_add(matrix: GraphValue, bias: GraphValue) -> GraphValue:
     if any(len(cast(tuple[GraphValue, ...], row)) != len(bias_values) for row in rows):
         raise ValueError("bias width must match matrix columns")
     return tuple(
-        tuple(float(value) + float(bias_values[column]) for column, value in enumerate(cast(tuple[GraphValue, ...], row)))
+        tuple(float(cast(float | int, value)) + float(cast(float | int, bias_values[column])) for column, value in enumerate(cast(tuple[GraphValue, ...], row)))
         for row in rows
     )
 

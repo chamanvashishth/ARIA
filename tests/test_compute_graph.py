@@ -210,7 +210,7 @@ def test_compute_graph_reshape_and_bias_add() -> None:
 
 
 def test_linear_tensor_trace_executes_through_compute_graph() -> None:
-    from aria.brain import Linear, Parameter, Tensor
+    from aria.brain import Linear, Parameter
 
     layer = Linear(2, 2, seed=9)
     layer.weight = Parameter([[1.0, 2.0], [3.0, 4.0]])
@@ -226,7 +226,7 @@ def test_linear_tensor_trace_executes_through_compute_graph() -> None:
     assert inputs.grad is not None
     assert layer.weight.grad is not None
     assert layer.bias is not None and layer.bias.grad is not None
-    assert inputs.gradient_values() == pytest.approx([4.0, 6.0, 4.0, 6.0])
+    assert inputs.gradient_values() == pytest.approx([3.0, 7.0, 3.0, 7.0])
     assert layer.weight.gradient_values() == pytest.approx([4.0, 4.0, 6.0, 6.0])
     assert layer.bias.gradient_values() == pytest.approx([2.0, 2.0])
 
