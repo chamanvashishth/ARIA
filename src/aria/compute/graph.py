@@ -7,13 +7,14 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from math import fsum
 from time import perf_counter_ns
-from typing import Literal, Mapping, Sequence, cast
+from typing import Literal, Mapping, cast
 
 from aria.compute.backends import ComputeRuntime, Matrix
 
 GraphState = Literal["completed", "failed", "blocked"]
-GraphValue = float | int | tuple[object, ...] | list[object]
+GraphValue = float | int | tuple["GraphValue", ...] | list["GraphValue"]
 GraphOperation = Literal["matmul", "add", "multiply", "relu", "sum"]
 
 
@@ -116,7 +117,7 @@ def _map_relu(value: GraphValue) -> GraphValue:
 
 def _sum_values(value: GraphValue) -> float:
     if isinstance(value, (tuple, list)):
-        return sum(_sum_values(item) for item in value)
+        return fsum(_sum_values(item) for item in value)
     return float(value)
 
 
@@ -213,7 +214,7 @@ class ComputeGraph:
     def _estimate_memory(values: tuple[GraphValue, ...], output: GraphValue | None = None) -> int:
         def count(value: GraphValue) -> int:
             if isinstance(value, (tuple, list)):
-                return sum(count(item) for item in value)
+                return fsum(count(item) for item in value)
             return 1
         return 8 * (sum(count(value) for value in values) + (count(output) if output is not None else 0))
 

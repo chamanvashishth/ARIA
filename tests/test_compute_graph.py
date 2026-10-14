@@ -141,7 +141,7 @@ def test_graph_executes_elementwise_chain_and_reduction() -> None:
 
 def test_graph_rejects_shape_mismatch_and_invalid_matmul_rank() -> None:
     mismatch = ComputeGraph()
-    ref = mismatch.add("add", [[1, 2]], [[1]])
+    mismatch.add("add", [[1, 2]], [[1]])
     result = mismatch.execute()
     assert result.node_metrics[0].state == "failed"
     assert "shape mismatch" in result.node_metrics[0].error
