@@ -51,6 +51,7 @@ class SchedulerStats:
     completed: int
     failed: int
     blocked: int
+    cancelled: int
     reserved_memory_bytes: int
     peak_reserved_memory_bytes: int
     planned_workgroups: int
