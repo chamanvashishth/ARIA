@@ -165,7 +165,7 @@ class CausalSelfAttention(Module):
         output_shape = (batch, time, hidden) if batched else (time, hidden)
         return Tensor.operation(
             _reshape(outputs, output_shape),
-            parents=(q_tensor, k_tensor, v_tensor),
+            parents=(q_tensor, k_tensor, v_tensor, Tensor([batch, time])),
             backward=backward,
             operation="causal_attention",
         )
