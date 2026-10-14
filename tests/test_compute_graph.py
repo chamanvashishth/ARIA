@@ -155,7 +155,8 @@ def test_graph_rejects_shape_mismatch_and_invalid_matmul_rank() -> None:
 
 
 def test_tensor_trace_executes_supported_ops_through_compute_graph() -> None:
-    from aria.brain.tensor import Parameter, Tensor
+    from aria.brain.tensor import Tensor
+    from aria.brain.parameter import Parameter
 
     left = Parameter([[1.0, -2.0], [3.0, 4.0]])
     right = Tensor([[2.0, 5.0], [-1.0, 6.0]])
@@ -185,7 +186,7 @@ def test_tensor_trace_executes_matmul_and_relu_through_compute_graph() -> None:
 
 
 def test_tensor_trace_execution_rejects_custom_operations_explicitly() -> None:
-    from aria.brain.tensor import Parameter
+    from aria.brain.parameter import Parameter
 
     value = Parameter([[1.0, 2.0]])
     custom = value.reshape((1, 2))
