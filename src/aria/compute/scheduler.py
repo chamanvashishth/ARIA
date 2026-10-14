@@ -338,7 +338,7 @@ class ScheduledExecutionContext(AbstractContextManager["ScheduledExecutionContex
         self.backend._local.execution = self
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[False]:
         self._active = False
         self._finished_at_ns = perf_counter_ns()
         if getattr(self.backend._local, "execution", None) is self:
