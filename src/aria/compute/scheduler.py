@@ -386,24 +386,13 @@ class ScheduledExecutionContext(AbstractContextManager["ScheduledExecutionContex
         self._peak_reserved_memory_bytes = max(
             self._peak_reserved_memory_bytes, peak_reserved_memory_bytes
         )
+        self._command_ids.extend(command.command_id for command in commands)
         self._submitted += len(commands)
         self._completed += sum(command.state == "completed" for command in commands)
         self._failed += sum(command.state != "completed" for command in commands)
 
     def _record_failure(self) -> None:
         self._failed += 1
-
-    def _record_batch(
-        self, commands: Sequence[ComputeCommand], peak_reserved_memory_bytes: int
-    ) -> None:
-        self._planned_workgroups += sum(len(command.workgroups) for command in commands)
-        self._peak_reserved_memory_bytes = max(
-            self._peak_reserved_memory_bytes, peak_reserved_memory_bytes
-        )
-        self._command_ids.extend(command.command_id for command in commands)
-        self._submitted += len(commands)
-        self._completed += sum(command.state == "completed" for command in commands)
-        self._failed += sum(command.state != "completed" for command in commands)
 
     def _record_cancelled(self) -> None:
         self._cancelled += 1
