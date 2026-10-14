@@ -14,7 +14,6 @@ from aria.compute.backends import ComputeRuntime, Matrix
 
 GraphState = Literal["completed", "failed", "blocked"]
 GraphValue = float | int | tuple[object, ...] | list[object]
-GraphInput = GraphValue | "NodeRef"
 GraphOperation = Literal["matmul", "add", "multiply", "relu", "sum"]
 
 
@@ -23,6 +22,9 @@ class NodeRef:
     """A symbolic reference to the output of a graph node."""
 
     node_id: str
+
+
+GraphInput = GraphValue | NodeRef
 
 
 @dataclass(frozen=True)
