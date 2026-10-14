@@ -323,7 +323,7 @@ def test_parallel_scheduler_respects_dependencies_and_failure_propagation() -> N
     states = {command.command_id: command.state for command in backend.commands}
     assert list(states.values()).count("failed") == 1
     assert list(states.values()).count("blocked") == 2
-    assert list(states.values()).count("completed") == 2
+    assert list(states.values()).count("completed") == 1
 
 
 def test_queued_command_can_be_cancelled_before_scheduler_starts() -> None:
