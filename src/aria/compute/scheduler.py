@@ -377,17 +377,33 @@ class ScheduledExecutionContext(AbstractContextManager["ScheduledExecutionContex
         self._command_ids.append(command_id)
 
     def _record_command(self, command: ComputeCommand) -> None:
-        self._planned_workgroups += len(command.workgroups)
+        self._record_batch((command,), command.reserved_memory_bytes)
+
+    def _record_batch(
+        self, commands: Sequence[ComputeCommand], peak_reserved_memory_bytes: int
+    ) -> None:
+        self._planned_workgroups += sum(len(command.workgroups) for command in commands)
         self._peak_reserved_memory_bytes = max(
-            self._peak_reserved_memory_bytes, command.reserved_memory_bytes
+            self._peak_reserved_memory_bytes, peak_reserved_memory_bytes
         )
-        if command.state == "completed":
-            self._completed += 1
-        else:
-            self._failed += 1
+        self._submitted += len(commands)
+        self._completed += sum(command.state == "completed" for command in commands)
+        self._failed += sum(command.state != "completed" for command in commands)
 
     def _record_failure(self) -> None:
         self._failed += 1
+
+    def _record_batch(
+        self, commands: Sequence[ComputeCommand], peak_reserved_memory_bytes: int
+    ) -> None:
+        self._planned_workgroups += sum(len(command.workgroups) for command in commands)
+        self._peak_reserved_memory_bytes = max(
+            self._peak_reserved_memory_bytes, peak_reserved_memory_bytes
+        )
+        self._command_ids.extend(command.command_id for command in commands)
+        self._submitted += len(commands)
+        self._completed += sum(command.state == "completed" for command in commands)
+        self._failed += sum(command.state != "completed" for command in commands)
 
     def _record_cancelled(self) -> None:
         self._cancelled += 1
@@ -475,24 +491,98 @@ class ScheduledComputeBackend:
             self._peak_reserved_memory_bytes = 0
             self._planned_workgroups = 0
 
-    def matmul(self, left: Matrix, right: Matrix) -> list[list[float]]:
+    def _execute_queue(
+        self,
+        queue: CommandQueue,
+        context: ScheduledExecutionContext | None,
+    ) -> tuple[ComputeCommand, ...]:
+        peak_reserved = queue.peak_reserved_memory_bytes
+        commands = ComputeScheduler(self.runtime).run(queue)
+        with self._lock:
+            self._history.extend(commands)
+            self._submitted += len(commands)
+            self._planned_workgroups += sum(len(command.workgroups) for command in commands)
+            self._peak_reserved_memory_bytes = max(
+                self._peak_reserved_memory_bytes, peak_reserved
+            )
+            self._completed += sum(
+                command.state == "completed" and command.result is not None
+                for command in commands
+            )
+            self._failed += sum(
+                command.state != "completed" or command.result is None
+                for command in commands
+            )
+        if context is not None:
+            context._record_batch(commands, peak_reserved)
+        return commands
+
+    def matmul_batch(
+        self,
+        operations: Sequence[tuple[Matrix, Matrix]],
+        *,
+        dependencies: Sequence[Sequence[int]] | None = None,
+    ) -> tuple[list[list[float]], ...]:
+        """Submit and execute a batch through one shared FIFO queue.
+
+        Dependencies are zero-based indices of earlier operations in this batch.
+        Memory reservations are accumulated before execution, so the configured
+        budget applies to the entire batch. Results preserve submission order.
+        """
+        if not isinstance(operations, Sequence) or isinstance(operations, (str, bytes)):
+            raise TypeError("operations must be a sequence of matrix operand pairs")
+        if not operations:
+            return ()
+        if dependencies is None:
+            dependency_list: Sequence[Sequence[int]] = [() for _ in operations]
+        else:
+            if len(dependencies) != len(operations):
+                raise ValueError("dependencies must contain one entry per operation")
+            dependency_list = dependencies
+
         context = getattr(self._local, "execution", None)
         if context is not None and context.cancelled:
             context._record_cancelled()
             raise RuntimeError(f"scheduled execution {context.execution_id} was cancelled")
 
         with self._lock:
-            ordinal = self._next_command_id
-            self._next_command_id += 1
-        execution_prefix = context.execution_id if context is not None else "model"
-        command_id = f"{execution_prefix}-matmul-{ordinal:08d}"
+            first_ordinal = self._next_command_id
+            self._next_command_id += len(operations)
+        prefix = context.execution_id if context is not None else "batch"
         queue = CommandQueue(
-            max_pending_commands=1,
+            max_pending_commands=len(operations),
             memory_budget_bytes=self.memory_budget_bytes,
             workgroup_size=self.workgroup_size,
         )
+        command_ids: list[str] = []
         try:
-            queue.submit_matmul(left, right, command_id=command_id)
+            for index, operation in enumerate(operations):
+                if (
+                    not isinstance(operation, Sequence)
+                    or isinstance(operation, (str, bytes))
+                    or len(operation) != 2
+                ):
+                    raise TypeError(f"operation {index} must contain left and right matrices")
+                prior_indices = tuple(dependency_list[index])
+                if any(
+                    isinstance(item, bool) or not isinstance(item, int)
+                    for item in prior_indices
+                ):
+                    raise TypeError("dependency indices must be integers")
+                if any(item < 0 or item >= index for item in prior_indices):
+                    raise ValueError(
+                        f"operation {index} dependencies must reference earlier batch indices"
+                    )
+                prior_ids = tuple(command_ids[item] for item in prior_indices)
+                command_id = f"{prefix}-batch-{first_ordinal + index:08d}"
+                command_ids.append(
+                    queue.submit_matmul(
+                        operation[0],
+                        operation[1],
+                        depends_on=prior_ids,
+                        command_id=command_id,
+                    )
+                )
         except Exception:
             if context is not None:
                 context._record_failure()
@@ -500,28 +590,23 @@ class ScheduledComputeBackend:
                 self._failed += 1
             raise
 
-        if context is not None:
-            context._record_submitted(command_id)
-        with self._lock:
-            self._submitted += 1
-
-        command = ComputeScheduler(self.runtime).run(queue)[0]
-        with self._lock:
-            self._history.append(command)
-            self._planned_workgroups += len(command.workgroups)
-            self._peak_reserved_memory_bytes = max(
-                self._peak_reserved_memory_bytes, command.reserved_memory_bytes
-            )
-            if command.state == "completed" and command.result is not None:
-                self._completed += 1
-            else:
-                self._failed += 1
-        if context is not None:
-            context._record_command(command)
-
-        if command.state != "completed" or command.result is None:
+        commands = self._execute_queue(queue, context)
+        failures = [
+            command for command in commands
+            if command.state != "completed" or command.result is None
+        ]
+        if failures:
+            first = failures[0]
             raise RuntimeError(
-                f"scheduled matrix multiplication {command.command_id} "
-                f"ended in state {command.state}: {command.error or 'no result'}"
+                f"scheduled batch command {first.command_id} ended in state "
+                f"{first.state}: {first.error or 'no result'}"
             )
-        return [list(row) for row in command.result]
+        results: list[list[list[float]]] = []
+        for command in commands:
+            assert command.result is not None
+            results.append([list(row) for row in command.result])
+        return tuple(results)
+
+    def matmul(self, left: Matrix, right: Matrix) -> list[list[float]]:
+        """Execute one product through the same shared-queue batch path."""
+        return self.matmul_batch(((left, right),))[0]
