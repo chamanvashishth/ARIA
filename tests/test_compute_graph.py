@@ -151,3 +151,43 @@ def test_graph_rejects_shape_mismatch_and_invalid_matmul_rank() -> None:
     result = rank.execute()
     assert result.node_metrics[0].state == "failed"
     assert "2-D" in result.node_metrics[0].error
+
+
+
+def test_tensor_trace_executes_supported_ops_through_compute_graph() -> None:
+    from aria.brain.tensor import Parameter, Tensor
+
+    left = Parameter([[1.0, -2.0], [3.0, 4.0]])
+    right = Tensor([[2.0, 5.0], [-1.0, 6.0]])
+    loss = ((left + right) * Tensor([[2.0, 2.0], [3.0, 1.0]])).sum()
+    eager_value = loss.item()
+
+    execution = loss.graph_trace().execute(max_workers=2)
+
+    assert execution.output_values == pytest.approx(eager_value)
+    execution.backward()
+    assert left.gradient_values() == pytest.approx([2.0, 2.0, 3.0, 1.0])
+
+
+def test_tensor_trace_executes_matmul_and_relu_through_compute_graph() -> None:
+    from aria.brain.tensor import Parameter, Tensor
+    from aria.brain.layers import ReLU
+
+    left = Parameter([[1.0, 2.0], [-3.0, 4.0]])
+    right = Tensor([[2.0], [1.0]])
+    loss = ReLU().forward(left.matmul(right)).sum()
+
+    execution = loss.graph_trace().execute()
+
+    assert execution.output_values == pytest.approx(loss.item())
+    execution.backward()
+    assert left.gradient_values() == pytest.approx([2.0, 1.0, 0.0, 0.0])
+
+
+def test_tensor_trace_execution_rejects_custom_operations_explicitly() -> None:
+    from aria.brain.tensor import Parameter
+
+    value = Parameter([[1.0, 2.0]])
+    custom = value.reshape((1, 2))
+    with pytest.raises(NotImplementedError, match="reshape"):
+        custom.graph_trace().execute()

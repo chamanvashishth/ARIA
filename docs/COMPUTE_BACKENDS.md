@@ -156,3 +156,24 @@ loss = ((weight * weight) + (weight * scale)).sum()
 loss.graph_trace().backward()
 print(weight.gradient_values())  # [6.0, 8.0]
 ~~~
+
+
+## Tensor graph execution bridge (Block 30)
+
+A Tensor operation trace can now be submitted to the general-purpose ComputeGraph evaluator with `tensor.graph_trace().execute()`. Leaf tensors become graph constants; supported `matmul`, `add`, `multiply`, `relu` and `sum` operations execute through the explicit graph runtime. The returned `TensorGraphExecution.output_values` contains the graph-computed output, and `TensorGraphExecution.backward()` runs reverse-mode autodiff through the original Tensor trace.
+
+~~~python
+from aria.brain import Parameter, Tensor
+from aria.brain.layers import ReLU
+
+weight = Parameter([[1.0, -2.0], [3.0, 4.0]])
+input_values = Tensor([[2.0, 5.0], [-1.0, 6.0]])
+loss = ReLU().forward(weight + input_values).sum()
+
+execution = loss.graph_trace().execute(max_workers=2)
+print(execution.output_values)
+execution.backward()
+print(weight.gradient_values())
+~~~
+
+This bridge deliberately rejects reshape and custom Tensor operations with a clear `NotImplementedError`; it never silently switches back to eager execution. Consequently, full Linear/Transformer graph execution is not yet supported because those paths currently include reshape and custom bias/attention operations. Forward graph execution and reverse-mode autodiff are connected through a result wrapper, but the graph evaluator does not yet replace the full neural-model execution path. All kernels still run on the host CPU; worker threads do not guarantee speedups.

@@ -331,6 +331,24 @@ class TensorGraphNode:
 
 
 @dataclass(frozen=True)
+class TensorGraphExecution:
+    """Result of executing a supported Tensor trace through ComputeGraph."""
+
+    trace: "TensorGraphTrace" = field(repr=False, compare=False)
+    graph_result: GraphExecutionResult
+    output_id: str
+
+    @property
+    def output_values(self) -> object:
+        """Return the graph-computed value for the trace's output tensor."""
+        return self.graph_result.output(self.output_id)
+
+    def backward(self) -> None:
+        """Backpropagate through the original Tensor graph after graph execution."""
+        self.trace.backward()
+
+
+@dataclass(frozen=True)
 class TensorGraphTrace:
     """Topological trace and reverse-mode executor for an eager Tensor graph.
 
@@ -399,6 +417,55 @@ class TensorGraphTrace:
                 return False
             seen.add(node.node_id)
         return self.output_id in seen
+
+    def execute(
+        self,
+        runtime: ComputeRuntime | None = None,
+        *,
+        max_workers: int = 1,
+    ) -> "TensorGraphExecution":
+        """Execute supported Tensor operations through the general ComputeGraph.
+
+        Leaf tensors become graph constants. The returned execution exposes the
+        graph-computed output; backward() delegates to the original Tensor trace.
+        Operations with custom or shape-only semantics fail explicitly rather
+        than silently falling back to eager execution.
+        """
+        if not self._tensors or len(self._tensors) != len(self.nodes):
+            raise RuntimeError("this trace does not contain an executable tensor graph")
+        if not self.validate():
+            raise ValueError("cannot execute an invalid tensor graph")
+
+        from aria.brain.tensor import Tensor
+
+        tensors = cast(tuple[Tensor, ...], self._tensors)
+        graph = ComputeGraph("tensor-autograd-graph")
+        graph_values: dict[str, GraphInput] = {}
+        for node, tensor in zip(self.nodes, tensors):
+            if node.operation == "leaf":
+                graph_values[node.node_id] = cast(GraphValue, _freeze(tensor.to_list()))
+                continue
+
+            if node.operation not in {"matmul", "add", "multiply", "relu", "sum"}:
+                raise NotImplementedError(
+                    f"Tensor graph execution does not yet support operation "
+                    f"{node.operation!r} at {node.node_id!r}"
+                )
+            inputs = [graph_values[dependency] for dependency in node.dependencies]
+            if node.operation == "matmul":
+                reference = graph.matmul(node.node_id, inputs[0], inputs[1])
+            elif node.operation == "add":
+                reference = graph.add(node.node_id, inputs[0], inputs[1])
+            elif node.operation == "multiply":
+                reference = graph.multiply(node.node_id, inputs[0], inputs[1])
+            elif node.operation == "relu":
+                reference = graph.relu(node.node_id, inputs[0])
+            else:
+                reference = graph.sum(node.node_id, inputs[0])
+            graph_values[node.node_id] = reference
+
+        result = graph.execute(runtime, max_workers=max_workers)
+        return TensorGraphExecution(self, result, self.output_id)
 
     def backward(self) -> None:
         """Propagate scalar-output gradients in reverse topological order.
