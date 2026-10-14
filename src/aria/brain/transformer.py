@@ -67,7 +67,13 @@ class RMSNorm(Module):
                 x._accumulate(dx)
             self.weight._accumulate(dw)
 
-        return Tensor.operation(_reshape(out, x.shape), parents=(x, self.weight), backward=backward)
+        epsilon = Tensor.scalar(self.eps)
+        return Tensor.operation(
+            _reshape(out, x.shape),
+            parents=(x, self.weight, epsilon),
+            backward=backward,
+            operation="rms_norm",
+        )
 
 
 
