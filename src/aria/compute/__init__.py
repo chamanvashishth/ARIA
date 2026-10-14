@@ -1,5 +1,12 @@
 """Software-emulated compute devices and scheduling primitives for ARIA."""
 
+from aria.compute.graph import (
+    ComputeGraph,
+    GraphExecutionResult,
+    GraphNode,
+    GraphNodeMetric,
+    NodeRef,
+)
 from aria.compute.backends import (
     BackendInfo,
     ComputeBackend,
@@ -28,6 +35,11 @@ __all__ = [
     "CommandQueue",
     "CommandState",
     "ComputeBackend",
+    "ComputeGraph",
+    "GraphExecutionResult",
+    "GraphNode",
+    "GraphNodeMetric",
+    "NodeRef",
     "ComputeCommand",
     "ComputeRuntime",
     "ComputeScheduler",

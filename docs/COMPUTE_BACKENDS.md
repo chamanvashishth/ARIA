@@ -100,3 +100,25 @@ Calling requires_grad_(True) again on a model using VNPU makes its next projecti
 ## Verification
 
 Tests compare VGPU forward values and gradients against VCPU, exercise Linear and model-level backend injection, verify the VNPU inference-only guard, check frozen TinyLanguageModel and TransformerLanguageModel instances, validate successful/failed runtime profiling, and cover queue dependencies, failure propagation, workgroup coverage, queue limits and memory accounting. Scheduler integration tests compare full Transformer outputs with the direct path, check VCPU/VGPU backpropagation, validate VNPU freezing, enforce memory budgets, bound command history, test scoped lifecycle cleanup, cooperative cancellation and concurrent thread-local contexts.
+
+
+## Compute graph engine (Block 26)
+
+ComputeGraph represents matrix multiplication as explicit nodes connected by NodeRef values. References may point to nodes added later; validate() checks unknown references and detects cycles before execution. The engine currently supports matrix multiplication nodes only.
+
+execute(runtime, max_workers=...) schedules independent ready nodes in bounded thread-pool waves. A downstream node starts only after its inputs have completed. A failed node blocks its dependents while independent branches continue. The returned GraphExecutionResult contains successful immutable outputs, per-node completion/failure/blocking state, elapsed time and estimated matrix-buffer bytes.
+
+\`\`\`python
+from aria.compute import ComputeGraph
+
+graph = ComputeGraph("two-stage-projection")
+hidden = graph.matmul("hidden", [[1, 2]], [[3], [4]])
+logits = graph.matmul("logits", hidden, [[2, 1]])
+
+result = graph.execute(max_workers=2)
+print(result.output(logits))
+for metric in result.node_metrics:
+    print(metric.node_id, metric.state, metric.elapsed_ns)
+\`\`\`
+
+This is an explicit graph API; it does not automatically trace or fuse existing eager Tensor/Transformer calls. All current kernels still execute on the host CPU. Thread scheduling does not guarantee speedups for CPU-bound Python loops, and memory values are estimates rather than process-memory measurements.

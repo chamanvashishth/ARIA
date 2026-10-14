@@ -936,6 +936,8 @@ timeline
     Block 18 : Approval-gated orchestration : Implemented foundation
     Block 19 : Integrated software compute backends : Implemented foundation
     Block 20 : Compute profiling and benchmark : Implemented foundation
+    Block 25 : Parallel compute workers : Implemented foundation
+    Block 26 : Compute graph engine : Implemented foundation
 ~~~
 
 ### Block workflow
