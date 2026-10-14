@@ -121,3 +121,22 @@ Current evaluation measures next-token behavior on caller-supplied examples and 
 ## Engineering rule
 
 Keep the system local-first and dependency-light. Do not mark a capability **Validated** merely because its module or interface exists. Validation requires reproducible tests, clear acceptance criteria, and evidence that the integrated behavior works.
+
+## Block 34 — graph-native Transformer operations
+
+**Implementation update:** 2026-10-14
+
+The explicit `ComputeGraph` now supports forward execution of:
+
+- Embedding row gathers from a trainable lookup table.
+- RMSNorm over the final hidden dimension with an explicit scale and epsilon.
+- Single-head causal attention with independent batch boundaries.
+- Stable mean next-token cross-entropy.
+
+`TensorGraphTrace.execute()` can dispatch these recorded Tensor operations through `ComputeGraph`. The existing eager reverse-mode Tensor graph remains the backward implementation: `TensorGraphExecution.backward()` traverses the original autograd graph after graph forward execution. This is graph-native forward execution with preserved autodiff, not yet a standalone graph compiler or an independent graph-native gradient engine.
+
+Focused tests were added for operation outputs, embedding/RMSNorm gradients, causal-attention execution, cross-entropy gradients, and a batched Transformer training-loss trace. These tests are committed, but must not be described as passing until CI reports a successful run for the corresponding commit.
+
+**Execution boundary:** all graph operations run as software kernels on the host CPU. Matrix products may use ARIA's software backends; embedding, normalization, attention and loss use host-CPU Python operations. No physical GPU/NPU acceleration is used or claimed.
+
+**Remaining validation:** run the complete Python test matrix, Ruff, Mypy and coverage gate; compare graph outputs against eager outputs across deterministic single-sequence and batched cases; verify causal isolation and finite-difference gradients. Only after those checks pass should Block 34 be marked validated.
