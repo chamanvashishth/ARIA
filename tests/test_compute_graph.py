@@ -262,7 +262,10 @@ def test_graph_executes_embedding_and_rms_norm_operations() -> None:
         (3.0 / (12.5 + 1e-5) ** 0.5, 2.0 / (12.5 + 1e-5) ** 0.5),
         (0.0, 1.0 / (2.0 + 1e-5) ** 0.5),
     )
-    assert result.output(normalized) == pytest.approx(expected)
+    actual = result.output(normalized)
+    assert [value for row in actual for value in row] == pytest.approx(
+        [value for row in expected for value in row]
+    )
     assert all(metric.state == "completed" for metric in result.node_metrics)
 
 
@@ -290,7 +293,8 @@ def test_rms_norm_tensor_trace_executes_and_preserves_backward() -> None:
     layer = RMSNorm(2)
     layer.weight._values = [0.7, 1.3]
     layer.weight.data = [0.7, 1.3]
-    loss = (layer.forward(inputs) * layer.forward(inputs)).sum()
+    output = layer.forward(inputs)
+    loss = (output * output).sum()
 
     execution = loss.graph_trace().execute()
     assert execution.output_values == pytest.approx(loss.item())
@@ -305,7 +309,8 @@ def test_causal_attention_tensor_trace_executes_and_backpropagates() -> None:
 
     inputs = Parameter([[0.2, -0.4], [0.7, 0.1]])
     attention = CausalSelfAttention(hidden_size=2, seed=31)
-    loss = (attention.forward(inputs) * attention.forward(inputs)).sum()
+    output = attention.forward(inputs)
+    loss = (output * output).sum()
 
     execution = loss.graph_trace().execute()
     assert execution.output_values == pytest.approx(loss.item(), abs=1e-8)
