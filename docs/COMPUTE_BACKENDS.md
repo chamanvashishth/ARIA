@@ -198,3 +198,27 @@ print(layer.bias.gradient_values())
 ~~~
 
 The graph executor computes forward values for these operations; the execution result's `backward()` method delegates gradient propagation to the original Tensor autograd graph. Tests compare graph and eager scalar outputs and verify input, weight, and bias gradients. Custom attention, embedding lookup and normalization operations remain outside this graph executor. All compute remains host-CPU software execution.
+
+
+## Multi-layer Sequential graph execution (Block 32)
+
+Module.graph_execute(inputs) runs a module (including Sequential) once, captures its Tensor trace, and executes supported operations through ComputeGraph. The result retains the model output shape for inference. For training, pass a scalar objective callback because the current reverse-mode interface requires a scalar loss.
+
+~~~python
+from aria.brain import Linear, ReLU, SGD, Sequential, Tensor
+
+model = Sequential(Linear(2, 3), ReLU(), Linear(3, 1))
+inputs = Tensor([[1.0, 2.0], [2.0, -1.0]])
+
+# Graph-executed inference returns the full (2, 1) output.
+inference = model.graph_execute(inputs)
+print(inference.output_values)
+
+# Graph-executed training objective and existing autodiff/optimizer.
+training = model.graph_execute(inputs, objective=lambda output: output.sum())
+training.backward()
+optimizer = SGD(model.parameters(), learning_rate=0.01)
+optimizer.step()
+~~~
+
+The graph executor computes the supported forward operations; TensorGraphExecution.backward() delegates gradients to the original Tensor reverse-mode graph. Integration tests compare multi-layer graph output against eager output, verify gradients reach both Linear layers and the input, and verify SGD updates every trainable parameter. All execution remains host-CPU software; this is not physical accelerator execution or graph fusion.

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from aria.brain.parameter import Parameter
 
@@ -13,6 +13,28 @@ class Module:
     def forward(self, inputs: Any) -> Any:
         """Run a forward pass; concrete modules implement their input contract."""
         raise NotImplementedError(f"{type(self).__name__} must implement forward()")
+
+    def graph_execute(
+        self,
+        inputs: Any,
+        *,
+        objective: Callable[[Any], Any] | None = None,
+        runtime: Any = None,
+        max_workers: int = 1,
+    ) -> Any:
+        """Execute this module's supported Tensor operations through ComputeGraph.
+
+        Pass a scalar objective (for example, lambda output: output.sum())
+        when training. Without an objective, the graph returns the full model
+        output, suitable for inference.
+        """
+        output = self.forward(inputs)
+        if objective is not None:
+            output = objective(output)
+        graph_trace = getattr(output, "graph_trace", None)
+        if not callable(graph_trace):
+            raise TypeError("graph execution requires the module to return a Tensor")
+        return graph_trace().execute(runtime, max_workers=max_workers)
 
     def parameters(self) -> list[Parameter]:
         params: list[Parameter] = []

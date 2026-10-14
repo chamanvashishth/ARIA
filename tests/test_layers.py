@@ -162,3 +162,52 @@ def test_linear_bias_operation_is_visible_in_tensor_trace() -> None:
     layer = Linear(2, 3, seed=301)
     output = layer.forward(Tensor([[1.0, 2.0]]))
     assert output.graph_trace().operation_counts["bias_add"] == 1
+
+
+def test_sequential_graph_execution_matches_eager_output() -> None:
+    model = Sequential(Linear(2, 3, seed=401), ReLU(), Linear(3, 1, seed=402))
+    inputs = Tensor.from_list([[1.0, -2.0], [0.5, 3.0]])
+
+    eager_values = model.forward(inputs)._values.copy()
+    execution = model.graph_execute(inputs)
+
+    assert execution.output_values == pytest.approx(
+        ((eager_values[0],), (eager_values[1],))
+    )
+    assert all(metric.state == "completed" for metric in execution.graph_result.node_metrics)
+    assert execution.trace.operation_counts["matmul"] == 2
+    assert execution.trace.operation_counts["relu"] == 1
+    assert execution.trace.operation_counts["bias_add"] == 2
+
+
+def test_sequential_graph_training_backpropagates_and_updates_all_layers() -> None:
+    from aria.brain import SGD
+
+    first = Linear(2, 2, seed=403)
+    first.weight = Parameter([[0.5, -0.25], [0.75, 0.5]])
+    first.bias = Parameter([0.1, 0.2])
+    second = Linear(2, 1, seed=404)
+    second.weight = Parameter([[0.4], [-0.3]])
+    second.bias = Parameter([0.05])
+    model = Sequential(first, ReLU(), second)
+    inputs = Parameter([[1.0, 2.0], [2.0, -1.0]])
+    initial_parameters = [parameter._values.copy() for parameter in model.parameters()]
+
+    execution = model.graph_execute(
+        inputs,
+        objective=lambda output: output.sum(),
+        max_workers=2,
+    )
+    assert isinstance(execution.output_values, float)
+
+    execution.backward()
+    parameters = model.parameters()
+    assert all(parameter.grad is not None for parameter in parameters)
+    assert inputs.grad is not None
+
+    optimizer = SGD(parameters, learning_rate=0.05)
+    optimizer.step()
+    assert all(
+        parameter._values != before
+        for parameter, before in zip(parameters, initial_parameters)
+    )
