@@ -443,7 +443,7 @@ class TensorGraphTrace:
         graph_values: dict[str, GraphInput] = {}
         for node, tensor in zip(self.nodes, tensors):
             if node.operation == "leaf":
-                graph_values[node.node_id] = cast(GraphValue, _freeze(tensor.to_list()))
+                graph_values[node.node_id] = _freeze(tensor.to_list())
                 continue
 
             if node.operation not in {"matmul", "add", "multiply", "relu", "sum"}:
