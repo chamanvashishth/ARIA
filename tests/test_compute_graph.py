@@ -299,3 +299,34 @@ def test_rms_norm_tensor_trace_executes_and_preserves_backward() -> None:
     assert inputs.grad is not None
     assert layer.weight.grad is not None
 
+def test_causal_attention_tensor_trace_executes_and_backpropagates() -> None:
+    from aria.brain import Parameter
+    from aria.brain.transformer import CausalSelfAttention
+
+    inputs = Parameter([[0.2, -0.4], [0.7, 0.1]])
+    attention = CausalSelfAttention(hidden_size=2, seed=31)
+    loss = (attention.forward(inputs) * attention.forward(inputs)).sum()
+
+    execution = loss.graph_trace().execute()
+    assert execution.output_values == pytest.approx(loss.item(), abs=1e-8)
+
+    execution.backward()
+    assert inputs.grad is not None
+    assert all(parameter.grad is not None for parameter in attention.parameters())
+
+
+def test_cross_entropy_tensor_trace_executes_and_backpropagates() -> None:
+    from aria.brain import Parameter
+    from aria.brain.language_model import _log_softmax_loss
+
+    logits = Parameter([[1.2, -0.3, 0.7], [-0.2, 0.8, 0.1]])
+    loss = _log_softmax_loss(logits, [2, 1])
+
+    execution = loss.graph_trace().execute()
+    assert execution.output_values == pytest.approx(loss.item(), abs=1e-10)
+
+    execution.backward()
+    assert logits.grad is not None
+    assert sum(logits.gradient_values()[:3]) == pytest.approx(0.0, abs=1e-10)
+    assert sum(logits.gradient_values()[3:]) == pytest.approx(0.0, abs=1e-10)
+
