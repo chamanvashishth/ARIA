@@ -6,6 +6,8 @@ from aria.compute.graph import (
     GraphNode,
     GraphNodeMetric,
     NodeRef,
+    TensorGraphNode,
+    TensorGraphTrace,
 )
 from aria.compute.backends import (
     BackendInfo,
@@ -40,6 +42,8 @@ __all__ = [
     "GraphNode",
     "GraphNodeMetric",
     "NodeRef",
+    "TensorGraphNode",
+    "TensorGraphTrace",
     "ComputeCommand",
     "ComputeRuntime",
     "ComputeScheduler",

@@ -84,7 +84,12 @@ class ReLU(Module):
             if x.requires_grad:
                 x._accumulate([g if value > 0.0 else 0.0 for g, value in zip(out.gradient_values(), x._values)])
 
-        return Tensor.operation(_reshape(values, x.shape), parents=(x,), backward=backward)
+        return Tensor.operation(
+            _reshape(values, x.shape),
+            parents=(x,),
+            backward=backward,
+            operation="relu",
+        )
 
 
 def _reshape(values: Sequence[float], shape: tuple[int, ...]) -> object:

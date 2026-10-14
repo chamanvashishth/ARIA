@@ -57,6 +57,7 @@ class Tensor:
     grad: Tensor | None = None
     _parents: tuple[Tensor, ...] = ()
     _backward: Callable[[], None] | None = None
+    _operation: str = "leaf"
 
     def __post_init__(self) -> None:
         self.shape = _shape(self.data)
@@ -73,8 +74,14 @@ class Tensor:
         *,
         parents: tuple[Tensor, ...],
         backward: Callable[[Tensor], None],
+        operation: str = "custom",
     ) -> Tensor:
-        out = cls(values, requires_grad=any(p.requires_grad for p in parents), _parents=parents)
+        out = cls(
+            values,
+            requires_grad=any(p.requires_grad for p in parents),
+            _parents=parents,
+            _operation=operation,
+        )
         out._backward = lambda: backward(out)
         return out
 
@@ -106,6 +113,7 @@ class Tensor:
             _build([a + b for a, b in zip(self._values, rhs._values)], self.shape),
             requires_grad=self.requires_grad or rhs.requires_grad,
             _parents=(self, rhs),
+            _operation="add",
         )
 
         def backward() -> None:
@@ -125,6 +133,7 @@ class Tensor:
             _build([a * b for a, b in zip(self._values, rhs._values)], self.shape),
             requires_grad=self.requires_grad or rhs.requires_grad,
             _parents=(self, rhs),
+            _operation="multiply",
         )
 
         def backward() -> None:
@@ -192,7 +201,9 @@ class Tensor:
                 right_gradient = selected_backend.matmul(left_transposed, gradient)
                 other._accumulate([value for row in right_gradient for value in row])
 
-        return Tensor.operation(output_values, parents=(self, other), backward=backward)
+        return Tensor.operation(
+            output_values, parents=(self, other), backward=backward, operation="matmul"
+        )
 
     def sum(self) -> Tensor:
         def backward(out: Tensor) -> None:
@@ -200,7 +211,9 @@ class Tensor:
                 scale = out.gradient_values()[0]
                 self._accumulate([scale] * len(self._values))
 
-        return Tensor.operation(sum(self._values), parents=(self,), backward=backward)
+        return Tensor.operation(
+            sum(self._values), parents=(self,), backward=backward, operation="sum"
+        )
 
 
     def backward(self) -> None:
@@ -250,8 +263,19 @@ class Tensor:
             _build(self._values, shape),
             parents=(self,),
             backward=lambda result: self._accumulate(result.gradient_values()) if self.requires_grad else None,
+            operation="reshape",
         )
         return out
+
+    def graph_trace(self):
+        """Return an immutable, inspectable trace of this tensor's autograd graph.
+
+        Tracing does not rerun the forward pass or replace reverse-mode autodiff;
+        it exposes the operation/dependency structure already recorded by Tensor.
+        """
+        from aria.compute.graph import TensorGraphTrace
+
+        return TensorGraphTrace.from_tensor(self)
 
     def to_list(self) -> object:
         return _build(self._values, self.shape)

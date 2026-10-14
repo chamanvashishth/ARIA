@@ -266,3 +266,81 @@ class ComputeGraph:
             node_metrics=tuple(metrics[node_id] for node_id in order),
             elapsed_ns=perf_counter_ns() - started,
         )
+
+
+
+@dataclass(frozen=True)
+class TensorGraphNode:
+    """A read-only view of one node in an existing Tensor autograd graph."""
+
+    node_id: str
+    operation: str
+    shape: tuple[int, ...]
+    dependencies: tuple[str, ...]
+    requires_grad: bool
+    has_backward: bool
+
+
+@dataclass(frozen=True)
+class TensorGraphTrace:
+    """Immutable topological trace of an existing Tensor computation graph.
+
+    This bridge inspects eager Tensor operations without executing them again.
+    Tensor.backward() remains the authoritative reverse-mode gradient engine.
+    """
+
+    nodes: tuple[TensorGraphNode, ...]
+    output_id: str
+
+    @classmethod
+    def from_tensor(cls, output: object) -> "TensorGraphTrace":
+        """Capture parents, operation labels, shapes and gradient capabilities."""
+        from aria.brain.tensor import Tensor
+
+        if not isinstance(output, Tensor):
+            raise TypeError("graph trace output must be a Tensor")
+        ordered: list[Tensor] = []
+        seen: set[int] = set()
+
+        def visit(node: Tensor) -> None:
+            if id(node) in seen:
+                return
+            seen.add(id(node))
+            for parent in node._parents:
+                visit(parent)
+            ordered.append(node)
+
+        visit(output)
+        identifiers = {id(node): f"tensor_{index}" for index, node in enumerate(ordered)}
+        nodes = tuple(
+            TensorGraphNode(
+                node_id=identifiers[id(node)],
+                operation=node._operation,
+                shape=node.shape,
+                dependencies=tuple(identifiers[id(parent)] for parent in node._parents),
+                requires_grad=node.requires_grad,
+                has_backward=node._backward is not None,
+            )
+            for node in ordered
+        )
+        return cls(nodes=nodes, output_id=identifiers[id(output)])
+
+    @property
+    def operation_counts(self) -> Mapping[str, int]:
+        """Count operations represented by the trace."""
+        counts: dict[str, int] = {}
+        for node in self.nodes:
+            counts[node.operation] = counts.get(node.operation, 0) + 1
+        return counts
+
+    def validate(self) -> bool:
+        """Check that all dependencies precede their consumers and IDs are unique."""
+        identifiers = [node.node_id for node in self.nodes]
+        if len(identifiers) != len(set(identifiers)):
+            return False
+        seen: set[str] = set()
+        for node in self.nodes:
+            if any(dependency not in seen for dependency in node.dependencies):
+                return False
+            seen.add(node.node_id)
+        return self.output_id in seen

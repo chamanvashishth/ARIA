@@ -122,3 +122,26 @@ for metric in result.node_metrics:
 \`\`\`
 
 This is an explicit graph API; it does not automatically trace or fuse existing eager Tensor/Transformer calls. All current kernels still execute on the host CPU. Thread scheduling does not guarantee speedups for CPU-bound Python loops, and memory values are estimates rather than process-memory measurements.
+
+
+## Tensor/autograd graph tracing (Block 27)
+
+Every Tensor retains an operation label (leaf, matmul, add, multiply, sum, reshape, relu, or custom) alongside the parent links used by reverse-mode autodiff. Call tensor.graph_trace() to get an immutable TensorGraphTrace in topological order, including node shapes, dependency IDs, gradient requirements and whether a backward callback exists. The trace can be validated and queried for operation counts.
+
+```python
+from aria.brain import Parameter, ReLU
+from aria.compute import VirtualCPUBackend
+
+left = Parameter([[1.0, 2.0]])
+right = Parameter([[3.0], [4.0]])
+prediction = ReLU().forward(left.matmul(right, backend=VirtualCPUBackend()))
+loss = prediction.sum()
+
+trace = loss.graph_trace()
+assert trace.validate()
+print(trace.operation_counts)
+loss.backward()
+print(left.gradient_values())
+```
+
+The trace is an inspection/diagnostics bridge over the existing eager Tensor autograd graph. It does not re-run or schedule Tensor operations through ComputeGraph yet; forward execution and reverse-mode gradient propagation remain in Tensor's eager engine. Custom layer operations are labelled custom unless explicitly tagged. No graph fusion or acceleration is implied.
