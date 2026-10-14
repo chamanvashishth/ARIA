@@ -24,7 +24,8 @@ def test_tensor_graph_trace_reports_operation_dependencies() -> None:
 
 def test_tensor_graph_trace_includes_elementwise_operations_and_reshape() -> None:
     value = Parameter([[1.0, 2.0]])
-    result = ((value + 2.0) * value).reshape((2,)).sum()
+    offset = Tensor([[2.0, 3.0]])
+    result = ((value + offset) * value).reshape((2,)).sum()
     trace = result.graph_trace()
 
     assert trace.validate()
