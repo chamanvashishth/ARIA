@@ -287,8 +287,10 @@ def _rms_norm(value: GraphValue, weight: GraphValue, epsilon: GraphValue) -> Gra
 class ComputeGraph:
     """Build and execute a validated directed acyclic operation graph.
 
-    Supports matmul, shape-matched add/multiply, ReLU, and sum. References may
-    point forward to nodes added later. Failed nodes block only their dependents.
+    Supports matrix multiplication, elementwise arithmetic, activations,
+    reductions, reshaping, embedding gathers, RMSNorm, causal attention, and
+    cross-entropy. References may point forward to nodes added later. Failed
+    nodes block only their dependents.
     """
 
     def __init__(self, name: str = "compute-graph") -> None:
