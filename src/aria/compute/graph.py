@@ -9,7 +9,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from time import perf_counter_ns
-from typing import Literal, Mapping, Sequence
+from typing import Literal, Mapping, Sequence, cast
 
 from aria.compute.backends import ComputeRuntime, Matrix
 
@@ -362,18 +362,16 @@ class TensorGraphTrace:
             raise RuntimeError("this trace does not contain an executable tensor graph")
         if not self.validate():
             raise ValueError("cannot execute an invalid tensor graph")
-        tensors = self._tensors
-        output = tensors[-1]
-        if not isinstance(output, Tensor):
+        if any(not isinstance(node, Tensor) for node in self._tensors):
             raise TypeError("tensor graph contains an invalid node")
+        tensors = cast(tuple[Tensor, ...], self._tensors)
+        output = tensors[-1]
         if output.shape != ():
             raise ValueError("backward() requires a scalar tensor")
         if not output.requires_grad:
             raise ValueError("cannot backpropagate from a tensor without gradients")
 
         for node in tensors:
-            if not isinstance(node, Tensor):
-                raise TypeError("tensor graph contains an invalid node")
             if node._parents:
                 node.grad = None
         output.grad = Tensor.scalar(1.0)
