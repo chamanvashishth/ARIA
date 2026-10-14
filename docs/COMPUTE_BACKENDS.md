@@ -148,10 +148,11 @@ Tensor.backward() now delegates to TensorGraphTrace.backward(). The trace retain
 Forward operations remain eager: Tensor operations calculate their values immediately, and the trace is built from those recorded dependencies. This block does not route elementwise, activation, reshape, or Tensor forward kernels through ComputeGraph's matrix-multiplication scheduler. No graph fusion or hardware acceleration is implied.
 
 ~~~python
-from aria.brain import Parameter
+from aria.brain import Parameter, Tensor
 
 weight = Parameter([[2.0, 3.0]])
-loss = ((weight * weight) + (weight * 2.0)).sum()
+scale = Tensor([[2.0, 2.0]])
+loss = ((weight * weight) + (weight * scale)).sum()
 loss.graph_trace().backward()
 print(weight.gradient_values())  # [6.0, 8.0]
 ~~~

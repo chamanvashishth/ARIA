@@ -47,7 +47,8 @@ def test_tensor_graph_trace_does_not_change_backward_gradients() -> None:
 
 def test_tensor_graph_trace_backward_accumulates_shared_parameter_paths() -> None:
     value = Parameter([[2.0, 3.0]])
-    loss = ((value * value) + (value * 2.0)).sum()
+    scale = Tensor([[2.0, 2.0]])
+    loss = ((value * value) + (value * scale)).sum()
 
     loss.graph_trace().backward()
 
