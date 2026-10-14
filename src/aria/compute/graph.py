@@ -15,7 +15,7 @@ from aria.compute.backends import ComputeRuntime, Matrix
 
 GraphState = Literal["completed", "failed", "blocked"]
 GraphValue = float | int | tuple["GraphValue", ...] | list["GraphValue"]
-GraphOperation = Literal["matmul", "add", "multiply", "relu", "sum"]
+GraphOperation = Literal["matmul", "add", "multiply", "relu", "sum", "reshape", "bias_add"]
 
 
 @dataclass(frozen=True)
@@ -35,6 +35,7 @@ class GraphNode:
     node_id: str
     operation: GraphOperation
     inputs: tuple[GraphInput, ...]
+    shape: tuple[int, ...] | None = None
 
     @property
     def dependencies(self) -> tuple[str, ...]:
@@ -115,6 +116,52 @@ def _map_relu(value: GraphValue) -> GraphValue:
     return max(0.0, float(value))
 
 
+def _reshape_value(value: GraphValue, shape: tuple[int, ...]) -> GraphValue:
+    flat: list[float | int] = []
+
+    def collect(item: GraphValue) -> None:
+        if isinstance(item, (tuple, list)):
+            for child in item:
+                collect(child)
+        else:
+            flat.append(item)
+
+    collect(value)
+    if any(dimension < 0 for dimension in shape):
+        raise ValueError("reshape dimensions must be non-negative")
+    size = 1
+    for dimension in shape:
+        size *= dimension
+    if size != len(flat):
+        raise ValueError("reshape must preserve the number of values")
+
+    def build(offset: int, dimensions: tuple[int, ...]) -> tuple[GraphValue, int]:
+        if not dimensions:
+            return flat[offset], offset + 1
+        items: list[GraphValue] = []
+        for _ in range(dimensions[0]):
+            item, offset = build(offset, dimensions[1:])
+            items.append(item)
+        return tuple(items), offset
+
+    if not shape:
+        return flat[0]
+    return build(0, shape)[0]
+
+
+def _bias_add(matrix: GraphValue, bias: GraphValue) -> GraphValue:
+    if len(_shape(matrix)) != 2 or len(_shape(bias)) != 1:
+        raise ValueError("bias_add requires a 2-D matrix and a 1-D bias")
+    rows = cast(tuple[GraphValue, ...], matrix)
+    bias_values = cast(tuple[GraphValue, ...] | list[GraphValue], bias)
+    if any(len(cast(tuple[GraphValue, ...], row)) != len(bias_values) for row in rows):
+        raise ValueError("bias width must match matrix columns")
+    return tuple(
+        tuple(float(value) + float(bias_values[column]) for column, value in enumerate(cast(tuple[GraphValue, ...], row)))
+        for row in rows
+    )
+
+
 def _sum_values(value: GraphValue) -> float:
     if isinstance(value, (tuple, list)):
         return fsum(_sum_values(item) for item in value)
@@ -177,6 +224,17 @@ class ComputeGraph:
     def sum(self, node_id: str, value: object) -> NodeRef:
         """Reduce all elements to one scalar."""
         return self._add(node_id, "sum", value)
+
+    def reshape(self, node_id: str, value: object, shape: tuple[int, ...]) -> NodeRef:
+        """Reshape a value without changing its number of elements."""
+        reference = self._add(node_id, "reshape", value)
+        node = self._nodes[node_id]
+        self._nodes[node_id] = GraphNode(node.node_id, node.operation, node.inputs, tuple(shape))
+        return reference
+
+    def bias_add(self, node_id: str, matrix: object, bias: object) -> NodeRef:
+        """Add a feature bias vector to every row of a 2-D matrix."""
+        return self._add(node_id, "bias_add", matrix, bias)
 
     def validate(self) -> tuple[str, ...]:
         """Validate references and return a deterministic topological ordering."""
@@ -252,8 +310,14 @@ class ComputeGraph:
                     result = _map_binary(values[0], values[1], node.operation)
                 elif node.operation == "relu":
                     result = _map_relu(values[0])
-                else:
+                elif node.operation == "sum":
                     result = _sum_values(values[0])
+                elif node.operation == "reshape":
+                    if node.shape is None:
+                        raise ValueError("reshape node is missing its target shape")
+                    result = _reshape_value(values[0], node.shape)
+                else:
+                    result = _bias_add(values[0], values[1])
                 return result, perf_counter_ns() - node_started, None
             except Exception as error:
                 return None, perf_counter_ns() - node_started, f"{type(error).__name__}: {error}"
@@ -446,7 +510,7 @@ class TensorGraphTrace:
                 graph_values[node.node_id] = _freeze(tensor.to_list())
                 continue
 
-            if node.operation not in {"matmul", "add", "multiply", "relu", "sum"}:
+            if node.operation not in {"matmul", "add", "multiply", "relu", "sum", "reshape", "bias_add"}:
                 raise NotImplementedError(
                     f"Tensor graph execution does not yet support operation "
                     f"{node.operation!r} at {node.node_id!r}"
@@ -460,8 +524,12 @@ class TensorGraphTrace:
                 reference = graph.multiply(node.node_id, inputs[0], inputs[1])
             elif node.operation == "relu":
                 reference = graph.relu(node.node_id, inputs[0])
-            else:
+            elif node.operation == "sum":
                 reference = graph.sum(node.node_id, inputs[0])
+            elif node.operation == "reshape":
+                reference = graph.reshape(node.node_id, inputs[0], node.shape)
+            else:
+                reference = graph.bias_add(node.node_id, inputs[0], inputs[1])
             graph_values[node.node_id] = reference
 
         result = graph.execute(runtime, max_workers=max_workers)

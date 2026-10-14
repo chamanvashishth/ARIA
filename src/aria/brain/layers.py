@@ -69,6 +69,7 @@ class Linear(Module):
                 ),
                 parents=(projected, bias),
                 backward=add_bias,
+                operation="bias_add",
             )
         return projected.reshape((*leading_shape, out_features))
 

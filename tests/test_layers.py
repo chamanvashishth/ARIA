@@ -155,3 +155,10 @@ def test_linear_vnpu_is_forward_only_and_requires_frozen_parameters() -> None:
     assert output.shape == (1, 2)
     assert all(math.isfinite(value) for value in output._values)
     assert output.requires_grad is False
+
+
+
+def test_linear_bias_operation_is_visible_in_tensor_trace() -> None:
+    layer = Linear(2, 3, seed=301)
+    output = layer.forward(Tensor([[1.0, 2.0]]))
+    assert output.graph_trace().operation_counts["bias_add"] == 1

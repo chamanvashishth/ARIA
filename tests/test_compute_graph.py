@@ -193,3 +193,53 @@ def test_tensor_trace_execution_rejects_custom_operations_explicitly() -> None:
     custom = value.reshape((1, 2))
     with pytest.raises(NotImplementedError, match="reshape"):
         custom.graph_trace().execute()
+
+
+
+def test_compute_graph_reshape_and_bias_add() -> None:
+    graph = ComputeGraph("linear-layer-ops")
+    flattened = graph.reshape("flatten", [[1.0, 2.0], [3.0, 4.0]], (2, 2))
+    biased = graph.bias_add("bias", flattened, [0.5, -0.5])
+    restored = graph.reshape("restore", biased, (1, 2, 2))
+
+    result = graph.execute()
+
+    assert result.output(restored) == (
+        ((1.5, 1.5), (3.5, 3.5)),
+    )
+
+
+def test_linear_tensor_trace_executes_through_compute_graph() -> None:
+    from aria.brain import Linear, Parameter, Tensor
+
+    layer = Linear(2, 2, seed=9)
+    layer.weight = Parameter([[1.0, 2.0], [3.0, 4.0]])
+    layer.bias = Parameter([0.5, -0.5])
+    inputs = Parameter([[[1.0, 2.0], [3.0, 4.0]]])
+    eager_loss = layer.forward(inputs).sum()
+    eager_value = eager_loss.item()
+
+    execution = eager_loss.graph_trace().execute()
+
+    assert execution.output_values == pytest.approx(eager_value)
+    execution.backward()
+    assert inputs.grad is not None
+    assert layer.weight.grad is not None
+    assert layer.bias is not None and layer.bias.grad is not None
+    assert inputs.gradient_values() == pytest.approx([4.0, 6.0, 4.0, 6.0])
+    assert layer.weight.gradient_values() == pytest.approx([4.0, 4.0, 6.0, 6.0])
+    assert layer.bias.gradient_values() == pytest.approx([2.0, 2.0])
+
+
+def test_linear_without_bias_executes_through_compute_graph() -> None:
+    from aria.brain import Linear, Parameter
+
+    layer = Linear(2, 1, bias=False, seed=10)
+    layer.weight = Parameter([[2.0], [3.0]])
+    loss = layer.forward(Parameter([[4.0, 5.0]])).sum()
+
+    execution = loss.graph_trace().execute()
+
+    assert execution.output_values == pytest.approx(23.0)
+    execution.backward()
+    assert layer.weight.gradient_values() == pytest.approx([4.0, 5.0])

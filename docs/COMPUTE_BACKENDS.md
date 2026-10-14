@@ -177,3 +177,24 @@ print(weight.gradient_values())
 ~~~
 
 This bridge deliberately rejects reshape and custom Tensor operations with a clear `NotImplementedError`; it never silently switches back to eager execution. Consequently, full Linear/Transformer graph execution is not yet supported because those paths currently include reshape and custom bias/attention operations. Forward graph execution and reverse-mode autodiff are connected through a result wrapper, but the graph evaluator does not yet replace the full neural-model execution path. All kernels still run on the host CPU; worker threads do not guarantee speedups.
+
+
+## Linear graph integration (Block 31)
+
+The explicit Tensor graph executor now supports the `reshape` and `bias_add` operations used by `Linear`. The layer labels its bias operation explicitly, allowing a complete Linear forward path—including input flattening, projection, bias, and output-shape restoration—to run through ComputeGraph.
+
+~~~python
+from aria.brain import Linear, Parameter
+
+layer = Linear(2, 2, seed=9)
+inputs = Parameter([[[1.0, 2.0], [3.0, 4.0]]])
+loss = layer.forward(inputs).sum()
+
+execution = loss.graph_trace().execute()
+print(execution.output_values)
+execution.backward()
+print(layer.weight.gradient_values())
+print(layer.bias.gradient_values())
+~~~
+
+The graph executor computes forward values for these operations; the execution result's `backward()` method delegates gradient propagation to the original Tensor autograd graph. Tests compare graph and eager scalar outputs and verify input, weight, and bias gradients. Custom attention, embedding lookup and normalization operations remain outside this graph executor. All compute remains host-CPU software execution.
