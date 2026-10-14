@@ -171,7 +171,8 @@ def test_tensor_trace_executes_supported_ops_through_compute_graph() -> None:
 
 
 def test_tensor_trace_executes_matmul_and_relu_through_compute_graph() -> None:
-    from aria.brain.tensor import Parameter, Tensor
+    from aria.brain.tensor import Tensor
+    from aria.brain.parameter import Parameter
     from aria.brain.layers import ReLU
 
     left = Parameter([[1.0, 2.0], [-3.0, 4.0]])
