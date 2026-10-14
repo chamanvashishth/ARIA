@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from math import fsum
+from math import exp, fsum, log
 from time import perf_counter_ns
 from typing import Literal, Mapping, cast
 
@@ -15,7 +15,7 @@ from aria.compute.backends import ComputeRuntime, Matrix
 
 GraphState = Literal["completed", "failed", "blocked"]
 GraphValue = float | int | tuple["GraphValue", ...] | list["GraphValue"]
-GraphOperation = Literal["matmul", "add", "multiply", "relu", "sum", "reshape", "bias_add", "embedding", "rms_norm"]
+GraphOperation = Literal["matmul", "add", "multiply", "relu", "sum", "reshape", "bias_add", "embedding", "rms_norm", "causal_attention", "cross_entropy"]
 
 
 @dataclass(frozen=True)
@@ -185,6 +185,63 @@ def _embedding(weight: GraphValue, token_ids: GraphValue) -> GraphValue:
     return tuple(output)
 
 
+def _causal_attention(query: GraphValue, key: GraphValue, value: GraphValue) -> GraphValue:
+    shape = _shape(query)
+    if shape != _shape(key) or shape != _shape(value) or len(shape) not in (2, 3):
+        raise ValueError("causal attention expects matching [time, hidden] or [batch, time, hidden] tensors")
+    batch, time, hidden = (1, *shape) if len(shape) == 2 else shape
+    if batch <= 0 or time <= 0 or hidden <= 0:
+        raise ValueError("causal attention dimensions must be positive")
+
+    def flatten(item: GraphValue) -> list[float]:
+        if isinstance(item, (tuple, list)):
+            return [number for child in item for number in flatten(child)]
+        return [float(item)]
+
+    q, k, v = flatten(query), flatten(key), flatten(value)
+    output = [0.0] * len(q)
+    scale = hidden ** -0.5
+    for batch_index in range(batch):
+        offset = batch_index * time * hidden
+        for position in range(time):
+            query_start = offset + position * hidden
+            scores = [
+                sum(q[query_start + dim] * k[offset + step * hidden + dim] for dim in range(hidden)) * scale
+                for step in range(position + 1)
+            ]
+            maximum = max(scores)
+            probabilities = [exp(score - maximum) for score in scores]
+            denominator = sum(probabilities)
+            probabilities = [probability / denominator for probability in probabilities]
+            for dim in range(hidden):
+                output[query_start + dim] = sum(
+                    probabilities[step] * v[offset + step * hidden + dim]
+                    for step in range(position + 1)
+                )
+    return _reshape_value(tuple(output), shape)
+
+
+def _cross_entropy(logits: GraphValue, targets: GraphValue) -> GraphValue:
+    if len(_shape(logits)) != 2 or len(_shape(targets)) != 1:
+        raise ValueError("cross_entropy expects [time, vocab] logits and [time] targets")
+    rows, vocab = _shape(logits)
+    target_values = cast(tuple[GraphValue, ...], targets)
+    logit_rows = cast(tuple[GraphValue, ...], logits)
+    if rows == 0 or len(target_values) != rows:
+        raise ValueError("cross_entropy requires one target per non-empty logits row")
+    losses: list[float] = []
+    for row_index, raw_target in enumerate(target_values):
+        if isinstance(raw_target, (tuple, list)) or int(raw_target) != raw_target:
+            raise ValueError("cross_entropy targets must be integer token IDs")
+        target = int(raw_target)
+        if not 0 <= target < vocab:
+            raise IndexError(f"target token out of range: {target}")
+        row = [float(value) for value in cast(tuple[GraphValue, ...], logit_rows[row_index])]
+        maximum = max(row)
+        losses.append(maximum + log(sum(exp(value - maximum) for value in row)) - row[target])
+    return sum(losses) / rows
+
+
 def _rms_norm(value: GraphValue, weight: GraphValue, epsilon: GraphValue) -> GraphValue:
     if len(_shape(value)) < 2 or len(_shape(weight)) != 1 or _shape(epsilon) != ():
         raise ValueError("rms_norm expects [..., hidden], [hidden], and scalar epsilon")
@@ -239,7 +296,7 @@ class ComputeGraph:
             raise ValueError("node_id must be a non-empty string")
         if node_id in self._nodes:
             raise ValueError(f"duplicate graph node: {node_id}")
-        expected = 1 if operation in {"relu", "sum", "reshape"} else 3 if operation == "rms_norm" else 2
+        expected = 1 if operation in {"relu", "sum", "reshape"} else 3 if operation in {"rms_norm", "causal_attention"} else 2
         if len(inputs) != expected:
             raise ValueError(f"{operation} requires {expected} input(s)")
         frozen: list[GraphInput] = []
@@ -293,6 +350,16 @@ class ComputeGraph:
     ) -> NodeRef:
         """Apply RMS normalization over the final dimension."""
         return self._add(node_id, "rms_norm", value, weight, epsilon)
+
+    def causal_attention(
+        self, node_id: str, query: object, key: object, value: object
+    ) -> NodeRef:
+        """Execute single-head causal attention over time, independently per batch."""
+        return self._add(node_id, "causal_attention", query, key, value)
+
+    def cross_entropy(self, node_id: str, logits: object, targets: object) -> NodeRef:
+        """Compute mean stable next-token cross-entropy."""
+        return self._add(node_id, "cross_entropy", logits, targets)
 
     def validate(self) -> tuple[str, ...]:
         """Validate references and return a deterministic topological ordering."""
@@ -378,6 +445,10 @@ class ComputeGraph:
                     result = _embedding(values[0], values[1])
                 elif node.operation == "rms_norm":
                     result = _rms_norm(values[0], values[1], values[2])
+                elif node.operation == "causal_attention":
+                    result = _causal_attention(values[0], values[1], values[2])
+                elif node.operation == "cross_entropy":
+                    result = _cross_entropy(values[0], values[1])
                 else:
                     result = _bias_add(values[0], values[1])
                 return result, perf_counter_ns() - node_started, None
@@ -572,7 +643,7 @@ class TensorGraphTrace:
                 graph_values[node.node_id] = _freeze(tensor.to_list())
                 continue
 
-            if node.operation not in {"matmul", "add", "multiply", "relu", "sum", "reshape", "bias_add", "embedding", "rms_norm"}:
+            if node.operation not in {"matmul", "add", "multiply", "relu", "sum", "reshape", "bias_add", "embedding", "rms_norm", "causal_attention", "cross_entropy"}:
                 raise NotImplementedError(
                     f"Tensor graph execution does not yet support operation "
                     f"{node.operation!r} at {node.node_id!r}"
@@ -594,6 +665,10 @@ class TensorGraphTrace:
                 reference = graph.embedding(node.node_id, inputs[0], inputs[1])
             elif node.operation == "rms_norm":
                 reference = graph.rms_norm(node.node_id, inputs[0], inputs[1], inputs[2])
+            elif node.operation == "causal_attention":
+                reference = graph.causal_attention(node.node_id, inputs[0], inputs[1], inputs[2])
+            elif node.operation == "cross_entropy":
+                reference = graph.cross_entropy(node.node_id, inputs[0], inputs[1])
             else:
                 reference = graph.bias_add(node.node_id, inputs[0], inputs[1])
             graph_values[node.node_id] = reference
