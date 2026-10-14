@@ -41,6 +41,7 @@ def benchmark_batch(
     )
     individual = ScheduledComputeBackend(ComputeRuntime("vcpu"))
     batched = ScheduledComputeBackend(ComputeRuntime("vcpu"))
+    parallel = ScheduledComputeBackend(ComputeRuntime("vcpu"), max_workers=4)
 
     def run_individual():
         return tuple(individual.matmul(left, right) for left, right in operations)
@@ -48,14 +49,20 @@ def benchmark_batch(
     def run_batch():
         return batched.matmul_batch(operations)
 
+    def run_parallel():
+        return parallel.matmul_batch(operations)
+
     for _ in range(warmup):
         run_individual()
         run_batch()
+        run_parallel()
 
     individual_samples: list[float] = []
     batch_samples: list[float] = []
     reference = ()
     batch_output = ()
+    parallel_output = ()
+    parallel_samples: list[float] = []
     for _ in range(iterations):
         started = time.perf_counter_ns()
         reference = run_individual()
@@ -64,6 +71,10 @@ def benchmark_batch(
         started = time.perf_counter_ns()
         batch_output = run_batch()
         batch_samples.append((time.perf_counter_ns() - started) / 1_000_000)
+
+        started = time.perf_counter_ns()
+        parallel_output = run_parallel()
+        parallel_samples.append((time.perf_counter_ns() - started) / 1_000_000)
 
     max_error = max(
         (
@@ -74,8 +85,17 @@ def benchmark_batch(
         ),
         default=0.0,
     )
+    parallel_error = max(
+        (
+            abs(reference[op][row][column] - parallel_output[op][row][column])
+            for op in range(batch_size)
+            for row in range(size)
+            for column in range(size)
+        ),
+        default=0.0,
+    )
     return {
-        "benchmark": "aria_shared_queue_batch_comparison",
+        "benchmark": "aria_compute_batch_and_worker_comparison",
         "workload": {
             "batch_size": batch_size,
             "matrix_shape": [size, size],
@@ -93,6 +113,12 @@ def benchmark_batch(
                 "commands_per_iteration": batch_size,
                 "peak_reserved_memory_bytes": batched.stats.peak_reserved_memory_bytes,
             },
+            "parallel_workers": {
+                "worker_count": 4,
+                "median_latency_ms": _median_ms(parallel_samples),
+                "commands_per_iteration": batch_size,
+                "max_absolute_output_difference": parallel_error,
+            },
             "max_absolute_output_difference": max_error,
         },
         "environment": {
@@ -103,8 +129,9 @@ def benchmark_batch(
         },
         "interpretation": [
             "Both paths use the same VCPU host-CPU matrix runtime.",
-            "The shared queue executes commands synchronously in FIFO order.",
-            "Batching reduces queue construction to one queue per batch; it does not add parallel workers.",
+            "The single-worker shared queue executes synchronously in FIFO order.",
+            "The worker-pool mode runs independent commands concurrently and waits for dependencies.",
+            "All modes use host-CPU kernels; Python threads do not guarantee speedups, especially for CPU-bound Python loops.",
             "Small synthetic workloads are noisy; no universal speedup is implied.",
         ],
     }

@@ -6,6 +6,7 @@ output-tile descriptors, not independent hardware dispatches.
 from __future__ import annotations
 
 from collections import deque
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from threading import Event, Lock, local
@@ -14,8 +15,8 @@ from typing import Literal, Sequence
 
 from aria.compute.backends import ComputeRuntime, Matrix
 
-CommandState = Literal["queued", "running", "completed", "failed", "blocked"]
-_TERMINAL = frozenset({"completed", "failed", "blocked"})
+CommandState = Literal["queued", "running", "completed", "failed", "blocked", "cancelled"]
+_TERMINAL = frozenset({"completed", "failed", "blocked", "cancelled"})
 
 
 @dataclass(frozen=True)
@@ -232,22 +233,40 @@ class CommandQueue:
         if self._reserved_memory_bytes < 0:
             raise RuntimeError("internal scheduler memory accounting underflow")
 
+    def cancel(self, command_id: str) -> bool:
+        """Cancel a command before it starts; running kernels cannot be interrupted."""
+        record = self._commands.get(command_id)
+        if record is None:
+            raise KeyError(f"unknown command: {command_id}")
+        if record.state != "queued":
+            return False
+        record.state = "cancelled"
+        record.error = "cancelled before execution"
+        record.completed_at_ns = perf_counter_ns()
+        self._release(record)
+        return True
+
 
 class ComputeScheduler:
     """Execute ready commands synchronously in deterministic submission order."""
 
-    def __init__(self, runtime: ComputeRuntime | None = None) -> None:
+    def __init__(self, runtime: ComputeRuntime | None = None, *, max_workers: int = 1) -> None:
+        if isinstance(max_workers, bool) or not isinstance(max_workers, int) or max_workers <= 0:
+            raise ValueError("max_workers must be a positive integer")
         self.runtime = runtime or ComputeRuntime()
+        self.max_workers = max_workers
 
     def run(self, queue: CommandQueue) -> tuple[ComputeCommand, ...]:
+        if self.max_workers == 1:
+            return self._run_sequential(queue)
+        return self._run_parallel(queue)
+
+    def _run_sequential(self, queue: CommandQueue) -> tuple[ComputeCommand, ...]:
         for record in queue._commands.values():
             if record.state != "queued":
                 continue
             dependencies = [queue._commands[item] for item in record.dependencies]
-            failed = next(
-                (item for item in dependencies if item.state in {"failed", "blocked"}),
-                None,
-            )
+            failed = next((item for item in dependencies if item.state in {"failed", "blocked", "cancelled"}), None)
             if failed is not None:
                 record.state = "blocked"
                 record.error = f"dependency {failed.command_id} ended in state {failed.state}"
@@ -256,7 +275,6 @@ class ComputeScheduler:
                 continue
             if any(item.state != "completed" for item in dependencies):
                 continue
-
             record.state = "running"
             record.started_at_ns = perf_counter_ns()
             try:
@@ -269,7 +287,60 @@ class ComputeScheduler:
             finally:
                 record.completed_at_ns = perf_counter_ns()
                 queue._release(record)
+        return queue.commands
 
+    def _run_parallel(self, queue: CommandQueue) -> tuple[ComputeCommand, ...]:
+        pending = [record for record in queue._commands.values() if record.state == "queued"]
+        futures: dict[Future[list[list[float]]], _CommandRecord] = {}
+
+        def execute(record: _CommandRecord) -> list[list[float]]:
+            return self.runtime.matmul(record.left, record.right)
+
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            while pending or futures:
+                progressed = False
+                for record in tuple(pending):
+                    dependencies = [queue._commands[item] for item in record.dependencies]
+                    failed = next((item for item in dependencies if item.state in {"failed", "blocked", "cancelled"}), None)
+                    if failed is not None:
+                        record.state = "blocked"
+                        record.error = f"dependency {failed.command_id} ended in state {failed.state}"
+                        record.completed_at_ns = perf_counter_ns()
+                        queue._release(record)
+                        pending.remove(record)
+                        progressed = True
+                        continue
+                    if any(item.state != "completed" for item in dependencies):
+                        continue
+                    if len(futures) >= self.max_workers:
+                        break
+                    record.state = "running"
+                    record.started_at_ns = perf_counter_ns()
+                    futures[executor.submit(execute, record)] = record
+                    pending.remove(record)
+                    progressed = True
+
+                if futures and (len(futures) >= self.max_workers or not progressed or not pending):
+                    completed, _ = wait(futures, return_when=FIRST_COMPLETED)
+                    for future in completed:
+                        record = futures.pop(future)
+                        try:
+                            output = future.result()
+                            record.result = tuple(tuple(value for value in row) for row in output)
+                            record.state = "completed"
+                        except Exception as error:
+                            record.state = "failed"
+                            record.error = f"{type(error).__name__}: {error}"
+                        finally:
+                            record.completed_at_ns = perf_counter_ns()
+                            queue._release(record)
+                elif pending and not progressed and not futures:
+                    for record in pending:
+                        record.state = "blocked"
+                        record.error = "dependencies could not be resolved"
+                        record.completed_at_ns = perf_counter_ns()
+                        queue._release(record)
+                    pending.clear()
         return queue.commands
 
     @staticmethod
@@ -282,6 +353,7 @@ class ComputeScheduler:
             completed=states.count("completed"),
             failed=states.count("failed"),
             blocked=states.count("blocked"),
+            cancelled=states.count("cancelled"),
             reserved_memory_bytes=queue.reserved_memory_bytes,
             peak_reserved_memory_bytes=queue.peak_reserved_memory_bytes,
             planned_workgroups=sum(len(item.workgroups) for item in queue._commands.values()),
@@ -414,13 +486,17 @@ class ScheduledComputeBackend:
         workgroup_size: int = 16,
         memory_budget_bytes: int | None = None,
         history_limit: int = 1024,
+        max_workers: int = 1,
     ) -> None:
         if isinstance(history_limit, bool) or not isinstance(history_limit, int) or history_limit <= 0:
             raise ValueError("history_limit must be a positive integer")
         self.runtime = runtime or ComputeRuntime()
         self.workgroup_size = workgroup_size
         self.memory_budget_bytes = memory_budget_bytes
+        if isinstance(max_workers, bool) or not isinstance(max_workers, int) or max_workers <= 0:
+            raise ValueError("max_workers must be a positive integer")
         self.history_limit = history_limit
+        self.max_workers = max_workers
         self._history: deque[ComputeCommand] = deque(maxlen=history_limit)
         self._submitted = 0
         self._completed = 0
@@ -453,6 +529,7 @@ class ScheduledComputeBackend:
                 completed=self._completed,
                 failed=self._failed,
                 blocked=0,
+                cancelled=0,
                 reserved_memory_bytes=0,
                 peak_reserved_memory_bytes=self._peak_reserved_memory_bytes,
                 planned_workgroups=self._planned_workgroups,
@@ -486,7 +563,7 @@ class ScheduledComputeBackend:
         context: ScheduledExecutionContext | None,
     ) -> tuple[ComputeCommand, ...]:
         peak_reserved = queue.peak_reserved_memory_bytes
-        commands = ComputeScheduler(self.runtime).run(queue)
+        commands = ComputeScheduler(self.runtime, max_workers=self.max_workers).run(queue)
         with self._lock:
             self._history.extend(commands)
             self._submitted += len(commands)

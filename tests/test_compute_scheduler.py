@@ -1,3 +1,6 @@
+import time
+from threading import Lock
+
 import pytest
 
 from aria.compute import ComputeRuntime, ScheduledComputeBackend
@@ -255,3 +258,98 @@ def test_execution_context_tracks_whole_batch_memory_and_commands() -> None:
     assert execution.stats.completed == 2
     assert execution.stats.peak_reserved_memory_bytes == 80
     assert len(execution.stats.command_ids) == 2
+
+
+def test_parallel_scheduler_runs_independent_commands_concurrently() -> None:
+    class TrackingRuntime:
+        def __init__(self) -> None:
+            self._runtime = ComputeRuntime("vcpu")
+            self.info = self._runtime.info
+            self._lock = Lock()
+            self.active = 0
+            self.maximum_active = 0
+
+        def matmul(self, left, right):
+            with self._lock:
+                self.active += 1
+                self.maximum_active = max(self.maximum_active, self.active)
+            time.sleep(0.03)
+            try:
+                return self._runtime.matmul(left, right)
+            finally:
+                with self._lock:
+                    self.active -= 1
+
+    runtime = TrackingRuntime()
+    backend = ScheduledComputeBackend(runtime=runtime, max_workers=3)  # type: ignore[arg-type]
+    results = backend.matmul_batch(
+        (
+            ([[1.0]], [[2.0]]),
+            ([[2.0]], [[3.0]]),
+            ([[3.0]], [[4.0]]),
+        )
+    )
+
+    assert results == ([[2.0]], [[6.0]], [[12.0]])
+    assert runtime.maximum_active > 1
+    assert backend.stats.completed == 3
+
+
+def test_parallel_scheduler_respects_dependencies_and_failure_propagation() -> None:
+    class SelectiveRuntime:
+        def __init__(self) -> None:
+            self._runtime = ComputeRuntime("vcpu")
+            self.info = self._runtime.info
+
+        def matmul(self, left, right):
+            if left[0][0] == 9:
+                raise ArithmeticError("expected test failure")
+            return self._runtime.matmul(left, right)
+
+    backend = ScheduledComputeBackend(
+        runtime=SelectiveRuntime(), max_workers=3  # type: ignore[arg-type]
+    )
+    with pytest.raises(RuntimeError, match="ended in state failed"):
+        backend.matmul_batch(
+            (
+                ([[9]], [[2]]),
+                ([[3]], [[4]]),
+                ([[5]], [[6]]),
+                ([[7]], [[8]]),
+            ),
+            dependencies=((), (0,), (), (1,)),
+        )
+
+    states = {command.command_id: command.state for command in backend.commands}
+    assert list(states.values()).count("failed") == 1
+    assert list(states.values()).count("blocked") == 1
+    assert list(states.values()).count("completed") == 2
+
+
+def test_queued_command_can_be_cancelled_before_scheduler_starts() -> None:
+    from aria.compute.scheduler import CommandQueue, ComputeScheduler
+
+    queue = CommandQueue()
+    cancelled = queue.submit_matmul([[2]], [[3]], command_id="cancel-me")
+    dependent = queue.submit_matmul(
+        [[4]], [[5]], depends_on=(cancelled,), command_id="waits-for-cancelled"
+    )
+    independent = queue.submit_matmul([[6]], [[7]], command_id="independent")
+
+    assert queue.cancel(cancelled) is True
+    assert queue.cancel(cancelled) is False
+    snapshots = ComputeScheduler(max_workers=2).run(queue)
+
+    states = {item.command_id: item.state for item in snapshots}
+    assert states == {
+        "cancel-me": "cancelled",
+        "waits-for-cancelled": "blocked",
+        "independent": "completed",
+    }
+    assert ComputeScheduler.stats(queue).cancelled == 1
+    assert queue.reserved_memory_bytes == 0
+
+
+def test_parallel_scheduler_validates_worker_count() -> None:
+    with pytest.raises(ValueError, match="max_workers"):
+        ScheduledComputeBackend(max_workers=0)

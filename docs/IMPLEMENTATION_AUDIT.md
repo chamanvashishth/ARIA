@@ -64,7 +64,8 @@ Mypy is a mandatory quality job. It is not configured with `continue-on-error`.
 | Virtual compute scheduler (21) | Implemented synchronous foundation | `compute/scheduler.py`; FIFO command queue, dependencies, logical output workgroups, queue capacity, estimated-memory reservations, command state tracking and dependency failure propagation; no async or parallel hardware dispatch |
 | Neural runtime integration (22) | Implemented synchronous integration foundation | `ScheduledComputeBackend` routes Linear and attention matrix products through the scheduler, preserves VCPU/VGPU autodiff and VNPU inference-only checks, retains bounded command history, and includes full-Transformer equivalence/benchmark coverage |
 | Model execution management (23) | Implemented synchronous lifecycle foundation | `ScheduledExecutionContext` scopes model-call metrics, tracks commands and estimated memory, supports cooperative between-kernel cancellation, isolates concurrent thread contexts, and cleans up safely after failures; no preemptive kernel interruption or asynchronous worker pool |
-| Batch compute execution (24) | Implemented shared-queue synchronous foundation | `ScheduledComputeBackend.matmul_batch` submits independent or dependency-ordered products to one queue, reserves memory across the entire batch, executes in FIFO order, and reports aggregate outcomes; eager Tensor/Transformer operations still require immediate results and are not automatically fused |
+| Batch compute execution (24) | Implemented shared-queue foundation | `ScheduledComputeBackend.matmul_batch` submits independent or dependency-ordered products to one queue, reserves memory across the entire batch, and reports aggregate outcomes; eager Tensor/Transformer operations still require immediate results and are not automatically fused |
+| Parallel compute workers (25) | Implemented optional bounded thread-pool execution | `ComputeScheduler(max_workers=N)` and `ScheduledComputeBackend(max_workers=N)` concurrently execute ready independent commands, wait for dependencies, propagate failures, and retain submission-order results; queued commands can be cancelled before execution; running Python kernels cannot be interrupted and threads do not guarantee CPU-bound speedups |
 
 ## Verified missing or incomplete requirements
 
@@ -108,7 +109,7 @@ Current evaluation measures next-token behavior on caller-supplied examples and 
 
 ## Recommended implementation order
 
-1. **Compute expansion:** add optional worker execution only after defining concurrency safety, cancellation semantics, and resource ownership; evaluate backend behavior on representative model workloads. Shared-queue batch submission is implemented, but execution remains synchronous.
+1. **Compute expansion:** add optional worker execution only after defining concurrency safety, cancellation semantics, and resource ownership; evaluate backend behavior on representative model workloads. Shared-queue batch submission and optional bounded thread-pool execution are implemented; dispatch remains synchronous to the caller.
 2. **Local planner adapter:** accept structured plans from the local model, parse them strictly, reject malformed or unsupported tool requests, and retain the mandatory approval gate.
 3. **Agent roles and QA:** define a small set of typed, testable roles; avoid creating agents without distinct responsibilities and acceptance criteria.
 4. **Memory and RAG integration:** add local semantic indexing and provenance-preserving retrieval; evaluate relevance before injecting context into prompts.
