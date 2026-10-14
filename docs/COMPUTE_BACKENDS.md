@@ -229,3 +229,9 @@ The graph executor computes the supported forward operations; TensorGraphExecuti
 The Transformer feed-forward MLP (Linear → ReLU → Linear) now has integration coverage through Module.graph_execute. Its graph output is checked against eager execution, and a graph-executed scalar objective is backpropagated through the existing Tensor autodiff path before SGD updates every feed-forward parameter.
 
 This is a deliberate component-level milestone, not a claim that the full Transformer runs through ComputeGraph yet. RMSNorm, token Embedding, causal self-attention, and cross-entropy still use custom Tensor operations without graph-native forward kernels. Full Transformer graph execution remains unsupported until those operations receive explicit graph implementations. All existing Transformer forward/training behavior remains available through the eager Tensor path.
+
+## Graph-native Transformer operations
+
+The explicit compute graph also supports Embedding gathers, RMSNorm, single-head causal attention, and stable mean cross-entropy. These operations can be reached from an eager Tensor computation through `Tensor.graph_trace().execute()`. The graph computes the forward values; `TensorGraphExecution.backward()` delegates gradient propagation to the original reverse-mode Tensor graph. This preserves the tested eager gradient rules while graph execution is introduced incrementally.
+
+Causal attention receives explicit batch/time metadata so the graph keeps each sample's causal history isolated. The graph operations use host-CPU Python implementations; they do not imply physical GPU/NPU execution. The current graph trace is not yet an independent graph compiler or graph-native autodiff engine.
