@@ -253,5 +253,5 @@ def test_execution_context_tracks_whole_batch_memory_and_commands() -> None:
     assert results == ([[11.0]], [[23.0]])
     assert execution.stats.submitted == 2
     assert execution.stats.completed == 2
-    assert execution.stats.peak_reserved_memory_bytes == 48
+    assert execution.stats.peak_reserved_memory_bytes == 80
     assert len(execution.stats.command_ids) == 2

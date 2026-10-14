@@ -47,7 +47,7 @@ The execution context scopes counters, elapsed time, command IDs and peak estima
 
 Cancellation is cooperative: calling `execution.cancel()` causes the next matrix operation to fail before it is submitted. A Python matrix kernel already running cannot be interrupted. The scope reports submitted/completed/failed/cancelled counts and elapsed nanoseconds. Memory figures are scheduler estimates, not process-memory measurements. Workgroups describe logical output tiles; they are not independently dispatched.
 
-Each matrix product is submitted and completed synchronously before the caller continues, because the next tensor operation needs the result. This preserves the existing Tensor computation graph: VCPU/VGPU backward matrix products also pass through the adapter. VNPU remains inference-only and requires all model parameters to be frozen with `model.requires_grad_(False)`.
+`ScheduledComputeBackend.matmul_batch()` submits several matrix products into one shared FIFO queue and executes the queue once. Optional zero-based dependency indices must refer to earlier batch items; failed prerequisites block dependent commands while independent commands continue. All operands are validated and memory reservations are accumulated before execution, so the configured memory budget applies to the whole batch. Results preserve submission order; if any command fails or is blocked, the batch raises after all eligible commands have been processed. `matmul()` delegates to a one-item batch. This public API supports independent matrix workloads, but eager Tensor/Transformer operations still request each result immediately and are not automatically fused into model batches. Each matrix product is completed synchronously before the caller continues, because the next tensor operation needs the result. This preserves the existing Tensor computation graph: VCPU/VGPU backward matrix products also pass through the adapter. VNPU remains inference-only and requires all model parameters to be frozen with `model.requires_grad_(False)`.
 
 Run the end-to-end model diagnostic:
 
@@ -86,7 +86,8 @@ Calling requires_grad_(True) again on a model using VNPU makes its next projecti
 - `python scripts/benchmark_compute.py` compares latency and numerical error against the VCPU reference on deterministic synthetic matrices.
 - `CommandQueue` provides FIFO submissions, dependencies on earlier commands, bounded pending capacity, estimated-memory reservations, and logical output workgroup plans.
 - `ComputeScheduler` runs ready commands synchronously in submission order, records completed/failed/blocked states, and blocks dependents after prerequisite failures.
-- `ScheduledComputeBackend` connects this queue to neural forward and backward matrix operations, executing one complete matrix command synchronously per backend call.
+- `ScheduledComputeBackend` connects this queue to neural forward and backward matrix operations. `matmul_batch()` submits several products to one shared queue, applies dependency ordering and a whole-batch memory budget, and executes synchronously; ordinary eager Tensor calls use the same path as one-item batches.
+- `python scripts/benchmark_compute_batch.py` compares individual queue calls with shared-queue batches on identical deterministic VCPU workloads; it reports numerical equivalence and diagnostic latency without claiming parallelism.
 - `ScheduledExecutionContext` adds per-model-call lifecycle tracking, thread-local scope ownership, cooperative between-kernel cancellation, elapsed-time and resource summaries, and exception-safe cleanup.
 - No asynchronous dispatch, parallel worker pool, preemptive kernel cancellation, or physical hardware scheduling.
 - No automatic device discovery or hardware fallback.
