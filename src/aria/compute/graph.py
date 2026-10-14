@@ -194,9 +194,12 @@ def _causal_attention(
     if len(_shape(batch_time)) != 1 or len(cast(tuple[GraphValue, ...], batch_time)) != 2:
         raise ValueError("causal attention batch metadata must contain [batch, time]")
     batch_raw, time_raw = cast(tuple[GraphValue, ...], batch_time)
-    if int(batch_raw) != batch_raw or int(time_raw) != time_raw:
+    if isinstance(batch_raw, (tuple, list)) or isinstance(time_raw, (tuple, list)):
         raise ValueError("causal attention batch metadata must be integers")
-    batch, time = int(batch_raw), int(time_raw)
+    batch_number, time_number = cast(float | int, batch_raw), cast(float | int, time_raw)
+    if int(batch_number) != batch_number or int(time_number) != time_number:
+        raise ValueError("causal attention batch metadata must be integers")
+    batch, time = int(batch_number), int(time_number)
     hidden = shape[-1]
     if batch <= 0 or time <= 0 or hidden <= 0 or shape[0] != batch * time:
         raise ValueError("causal attention dimensions are invalid")
@@ -204,7 +207,7 @@ def _causal_attention(
     def flatten(item: GraphValue) -> list[float]:
         if isinstance(item, (tuple, list)):
             return [number for child in item for number in flatten(child)]
-        return [float(item)]
+        return [float(cast(float | int, item))]
 
     q, k, v = flatten(query), flatten(key), flatten(value)
     output = [0.0] * len(q)
@@ -278,7 +281,7 @@ def _rms_norm(value: GraphValue, weight: GraphValue, epsilon: GraphValue) -> Gra
         for row in range(rows)
         for col in range(hidden)
     ]
-    return cast(GraphValue, _reshape_value(tuple(output), _shape(value)))
+    return _reshape_value(tuple(output), _shape(value))
 
 
 class ComputeGraph:
