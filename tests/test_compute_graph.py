@@ -244,3 +244,58 @@ def test_linear_without_bias_executes_through_compute_graph() -> None:
     assert execution.output_values == pytest.approx(23.0)
     execution.backward()
     assert layer.weight.gradient_values() == pytest.approx([4.0, 5.0])
+
+def test_graph_executes_embedding_and_rms_norm_operations() -> None:
+    graph = ComputeGraph("transformer-primitives")
+    embedded = graph.embedding("embedding", [[1.0, 2.0], [3.0, 4.0]], [1, 0, 1])
+    normalized = graph.rms_norm(
+        "rms_norm",
+        [[3.0, 4.0], [0.0, 2.0]],
+        [1.0, 0.5],
+        1e-5,
+    )
+
+    result = graph.execute()
+
+    assert result.output(embedded) == ((3.0, 4.0), (1.0, 2.0), (3.0, 4.0))
+    expected = (
+        (3.0 / (12.5 + 1e-5) ** 0.5, 2.0 / (12.5 + 1e-5) ** 0.5),
+        (0.0, 1.0 / (2.0 + 1e-5) ** 0.5),
+    )
+    assert result.output(normalized) == pytest.approx(expected)
+    assert all(metric.state == "completed" for metric in result.node_metrics)
+
+
+def test_embedding_tensor_trace_executes_and_preserves_backward() -> None:
+    from aria.brain import Embedding
+
+    layer = Embedding(3, 2, seed=3)
+    loss = layer.forward([1, 0, 1]).sum()
+
+    execution = loss.graph_trace().execute()
+    assert execution.output_values == pytest.approx(loss.item())
+
+    execution.backward()
+    assert layer.weight.grad is not None
+    assert layer.weight.gradient_values() == pytest.approx(
+        [1.0, 1.0, 2.0, 2.0, 0.0, 0.0]
+    )
+
+
+def test_rms_norm_tensor_trace_executes_and_preserves_backward() -> None:
+    from aria.brain import Parameter
+    from aria.brain.transformer import RMSNorm
+
+    inputs = Parameter([[0.3, -0.7], [1.1, 0.2]])
+    layer = RMSNorm(2)
+    layer.weight._values = [0.7, 1.3]
+    layer.weight.data = [0.7, 1.3]
+    loss = (layer.forward(inputs) * layer.forward(inputs)).sum()
+
+    execution = loss.graph_trace().execute()
+    assert execution.output_values == pytest.approx(loss.item())
+
+    execution.backward()
+    assert inputs.grad is not None
+    assert layer.weight.grad is not None
+
