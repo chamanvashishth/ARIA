@@ -405,9 +405,9 @@ def test_transformer_feed_forward_executes_through_compute_graph() -> None:
     eager = feed_forward.forward(inputs).to_list()
     execution = feed_forward.graph_execute(inputs)
 
-    assert execution.output_values == pytest.approx(
-        tuple(tuple(row) for row in eager)
-    )
+    assert [
+        value for row in execution.output_values for value in row
+    ] == pytest.approx([value for row in eager for value in row])
     assert all(metric.state == "completed" for metric in execution.graph_result.node_metrics)
     assert execution.trace.operation_counts["matmul"] == 2
     assert execution.trace.operation_counts["relu"] == 1
