@@ -331,10 +331,10 @@ def test_queued_command_can_be_cancelled_before_scheduler_starts() -> None:
 
     queue = CommandQueue()
     cancelled = queue.submit_matmul([[2]], [[3]], command_id="cancel-me")
-    dependent = queue.submit_matmul(
+    queue.submit_matmul(
         [[4]], [[5]], depends_on=(cancelled,), command_id="waits-for-cancelled"
     )
-    independent = queue.submit_matmul([[6]], [[7]], command_id="independent")
+    queue.submit_matmul([[6]], [[7]], command_id="independent")
 
     assert queue.cancel(cancelled) is True
     assert queue.cancel(cancelled) is False
