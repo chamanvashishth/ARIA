@@ -222,3 +222,10 @@ optimizer.step()
 ~~~
 
 The graph executor computes the supported forward operations; TensorGraphExecution.backward() delegates gradients to the original Tensor reverse-mode graph. Integration tests compare multi-layer graph output against eager output, verify gradients reach both Linear layers and the input, and verify SGD updates every trainable parameter. All execution remains host-CPU software; this is not physical accelerator execution or graph fusion.
+
+
+## Transformer graph integration status (Block 33)
+
+The Transformer feed-forward MLP (Linear → ReLU → Linear) now has integration coverage through Module.graph_execute. Its graph output is checked against eager execution, and a graph-executed scalar objective is backpropagated through the existing Tensor autodiff path before SGD updates every feed-forward parameter.
+
+This is a deliberate component-level milestone, not a claim that the full Transformer runs through ComputeGraph yet. RMSNorm, token Embedding, causal self-attention, and cross-entropy still use custom Tensor operations without graph-native forward kernels. Full Transformer graph execution remains unsupported until those operations receive explicit graph implementations. All existing Transformer forward/training behavior remains available through the eager Tensor path.

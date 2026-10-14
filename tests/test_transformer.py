@@ -393,3 +393,47 @@ def test_transformer_vnpu_runs_only_after_model_parameters_are_frozen() -> None:
     logits = model.forward([1, 2])
     assert logits.shape == (2, 7)
     assert logits.requires_grad is False
+
+
+def test_transformer_feed_forward_executes_through_compute_graph() -> None:
+    from aria.brain import Parameter
+    from aria.brain.transformer import FeedForward
+
+    inputs = Parameter([[0.2, -0.5], [0.8, 0.3]])
+    feed_forward = FeedForward(hidden_size=2, intermediate_size=3, seed=510)
+
+    eager = feed_forward.forward(inputs).to_list()
+    execution = feed_forward.graph_execute(inputs)
+
+    assert execution.output_values == pytest.approx(
+        tuple(tuple(row) for row in eager)
+    )
+    assert all(metric.state == "completed" for metric in execution.graph_result.node_metrics)
+    assert execution.trace.operation_counts["matmul"] == 2
+    assert execution.trace.operation_counts["relu"] == 1
+    assert execution.trace.operation_counts["bias_add"] == 2
+
+
+def test_transformer_feed_forward_graph_training_updates_parameters() -> None:
+    from aria.brain import Parameter, SGD
+    from aria.brain.transformer import FeedForward
+
+    inputs = Parameter([[0.2, -0.5], [0.8, 0.3]])
+    feed_forward = FeedForward(hidden_size=2, intermediate_size=3, seed=511)
+    parameters = feed_forward.parameters()
+    before = [parameter._values.copy() for parameter in parameters]
+
+    execution = feed_forward.graph_execute(
+        inputs,
+        objective=lambda output: (output * output).sum(),
+        max_workers=2,
+    )
+    assert isinstance(execution.output_values, float)
+    execution.backward()
+
+    assert inputs.grad is not None
+    assert all(parameter.grad is not None for parameter in parameters)
+
+    optimizer = SGD(parameters, learning_rate=0.01)
+    optimizer.step()
+    assert all(parameter._values != old for parameter, old in zip(parameters, before))
