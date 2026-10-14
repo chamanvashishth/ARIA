@@ -15,7 +15,7 @@ from aria.compute.backends import ComputeRuntime, Matrix
 
 GraphState = Literal["completed", "failed", "blocked"]
 GraphValue = float | int | tuple["GraphValue", ...] | list["GraphValue"]
-GraphOperation = Literal["matmul", "add", "multiply", "relu", "sum", "reshape", "bias_add"]
+GraphOperation = Literal["matmul", "add", "multiply", "relu", "sum", "reshape", "bias_add", "embedding", "rms_norm"]
 
 
 @dataclass(frozen=True)
@@ -168,6 +168,54 @@ def _sum_values(value: GraphValue) -> float:
     return float(value)
 
 
+def _embedding(weight: GraphValue, token_ids: GraphValue) -> GraphValue:
+    if len(_shape(weight)) != 2:
+        raise ValueError("embedding weight must be a 2-D matrix")
+    if len(_shape(token_ids)) != 1:
+        raise ValueError("embedding token IDs must be a 1-D sequence")
+    rows = cast(tuple[GraphValue, ...], weight)
+    output: list[GraphValue] = []
+    for raw_id in cast(tuple[GraphValue, ...], token_ids):
+        if isinstance(raw_id, (tuple, list)) or int(raw_id) != raw_id:
+            raise ValueError("embedding token IDs must be integers")
+        token_id = int(raw_id)
+        if not 0 <= token_id < len(rows):
+            raise IndexError(f"token id out of range: {token_id}")
+        output.append(rows[token_id])
+    return tuple(output)
+
+
+def _rms_norm(value: GraphValue, weight: GraphValue, epsilon: GraphValue) -> GraphValue:
+    if len(_shape(value)) < 2 or len(_shape(weight)) != 1 or _shape(epsilon) != ():
+        raise ValueError("rms_norm expects [..., hidden], [hidden], and scalar epsilon")
+    hidden = _shape(value)[-1]
+    scale = cast(tuple[GraphValue, ...], weight)
+    if len(scale) != hidden:
+        raise ValueError("RMSNorm scale width must match the input hidden dimension")
+    eps = float(cast(float | int, epsilon))
+    if eps <= 0.0:
+        raise ValueError("RMSNorm epsilon must be positive")
+    flat: list[float] = []
+
+    def collect(item: GraphValue) -> None:
+        if isinstance(item, (tuple, list)):
+            for child in item:
+                collect(child)
+        else:
+            flat.append(float(item))
+
+    collect(value)
+    rows = len(flat) // hidden
+    output = [
+        flat[row * hidden + col]
+        / (sum(flat[row * hidden + col] ** 2 for col in range(hidden)) / hidden + eps) ** 0.5
+        * float(cast(float | int, scale[col]))
+        for row in range(rows)
+        for col in range(hidden)
+    ]
+    return cast(GraphValue, _reshape_value(tuple(output), _shape(value)))
+
+
 class ComputeGraph:
     """Build and execute a validated directed acyclic operation graph.
 
@@ -191,7 +239,7 @@ class ComputeGraph:
             raise ValueError("node_id must be a non-empty string")
         if node_id in self._nodes:
             raise ValueError(f"duplicate graph node: {node_id}")
-        expected = 1 if operation in {"relu", "sum", "reshape"} else 2
+        expected = 1 if operation in {"relu", "sum", "reshape"} else 3 if operation == "rms_norm" else 2
         if len(inputs) != expected:
             raise ValueError(f"{operation} requires {expected} input(s)")
         frozen: list[GraphInput] = []
@@ -235,6 +283,16 @@ class ComputeGraph:
     def bias_add(self, node_id: str, matrix: object, bias: object) -> NodeRef:
         """Add a feature bias vector to every row of a 2-D matrix."""
         return self._add(node_id, "bias_add", matrix, bias)
+
+    def embedding(self, node_id: str, weight: object, token_ids: object) -> NodeRef:
+        """Gather embedding rows for a one-dimensional sequence of token IDs."""
+        return self._add(node_id, "embedding", weight, token_ids)
+
+    def rms_norm(
+        self, node_id: str, value: object, weight: object, epsilon: object = 1e-5
+    ) -> NodeRef:
+        """Apply RMS normalization over the final dimension."""
+        return self._add(node_id, "rms_norm", value, weight, epsilon)
 
     def validate(self) -> tuple[str, ...]:
         """Validate references and return a deterministic topological ordering."""
@@ -316,6 +374,10 @@ class ComputeGraph:
                     if node.shape is None:
                         raise ValueError("reshape node is missing its target shape")
                     result = _reshape_value(values[0], node.shape)
+                elif node.operation == "embedding":
+                    result = _embedding(values[0], values[1])
+                elif node.operation == "rms_norm":
+                    result = _rms_norm(values[0], values[1], values[2])
                 else:
                     result = _bias_add(values[0], values[1])
                 return result, perf_counter_ns() - node_started, None
@@ -510,7 +572,7 @@ class TensorGraphTrace:
                 graph_values[node.node_id] = _freeze(tensor.to_list())
                 continue
 
-            if node.operation not in {"matmul", "add", "multiply", "relu", "sum", "reshape", "bias_add"}:
+            if node.operation not in {"matmul", "add", "multiply", "relu", "sum", "reshape", "bias_add", "embedding", "rms_norm"}:
                 raise NotImplementedError(
                     f"Tensor graph execution does not yet support operation "
                     f"{node.operation!r} at {node.node_id!r}"
@@ -528,6 +590,10 @@ class TensorGraphTrace:
                 reference = graph.sum(node.node_id, inputs[0])
             elif node.operation == "reshape":
                 reference = graph.reshape(node.node_id, inputs[0], node.shape)
+            elif node.operation == "embedding":
+                reference = graph.embedding(node.node_id, inputs[0], inputs[1])
+            elif node.operation == "rms_norm":
+                reference = graph.rms_norm(node.node_id, inputs[0], inputs[1], inputs[2])
             else:
                 reference = graph.bias_add(node.node_id, inputs[0], inputs[1])
             graph_values[node.node_id] = reference
