@@ -20,9 +20,10 @@ def _log_softmax_loss(logits: Tensor, targets: list[int]) -> Tensor:
     if not targets:
         raise ValueError("at least one target is required")
 
+    target_ids = list(targets)
     values = logits._values
     losses = []
-    for row, target in enumerate(targets):
+    for row, target in enumerate(target_ids):
         if not 0 <= target < vocab:
             raise IndexError(f"target token out of range: {target}")
         start = row * vocab
@@ -36,7 +37,7 @@ def _log_softmax_loss(logits: Tensor, targets: list[int]) -> Tensor:
     def backward(out: Tensor) -> None:
         grad = [0.0] * len(values)
         scale = out.gradient_values()[0] / time
-        for row, target in enumerate(targets):
+        for row, target in enumerate(target_ids):
             start = row * vocab
             row_values = values[start:start + vocab]
             maximum = max(row_values)
@@ -47,7 +48,12 @@ def _log_softmax_loss(logits: Tensor, targets: list[int]) -> Tensor:
         if logits.requires_grad:
             logits._accumulate(grad)
 
-    return Tensor.operation(mean_loss, parents=(logits,), backward=backward)
+    return Tensor.operation(
+        mean_loss,
+        parents=(logits, Tensor(target_ids)),
+        backward=backward,
+        operation="cross_entropy",
+    )
 
 
 class TinyLanguageModel(Module):
