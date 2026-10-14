@@ -171,9 +171,7 @@ def test_sequential_graph_execution_matches_eager_output() -> None:
     eager_values = model.forward(inputs)._values.copy()
     execution = model.graph_execute(inputs)
 
-    assert execution.output_values == pytest.approx(
-        ((eager_values[0],), (eager_values[1],))
-    )
+    assert [row[0] for row in execution.output_values] == pytest.approx(eager_values)
     assert all(metric.state == "completed" for metric in execution.graph_result.node_metrics)
     assert execution.trace.operation_counts["matmul"] == 2
     assert execution.trace.operation_counts["relu"] == 1
