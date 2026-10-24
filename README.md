@@ -1,220 +1,152 @@
-# ARIA: Autonomous Research and Intelligence Architecture
+# ARIA
 
-[![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Test Suite](https://img.shields.io/badge/tests-310%20passed-success.svg)](tests/)
-[![Architecture](https://img.shields.io/badge/architecture-first--principles-purple.svg)](src/aria/)
-[![Privacy](https://img.shields.io/badge/privacy-100%25%20local--first-emerald.svg)](#privacy-and-data-sovereignty)
-[![Compute](https://img.shields.io/badge/compute-VCPU%20%7C%20VGPU%20%7C%20VNPU-orange.svg)](docs/COMPUTE_BACKENDS.md)
+### Autonomous Research & Intelligence Architecture
 
-ARIA is a software-only, local-first intelligence architecture engineered from first principles around an owned neural core. It implements reverse-mode automatic differentiation, causal transformer attention, RMSNorm, software-defined compute devices (VCPU, VGPU, VNPU), a virtual DAG compute scheduler, BM25 lexical retrieval-augmented generation (RAG), and a deterministic byte tokenizer without external cloud APIs or proprietary framework dependencies.
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
+[![Tests: 310 Passed](https://img.shields.io/badge/tests-310%20passed-brightgreen.svg)](tests/)
+[![Dependencies: Standard Library Core](https://img.shields.io/badge/core%20deps-zero-purple.svg)](pyproject.toml)
+[![Data Privacy: 100% Local](https://img.shields.io/badge/telemetry-zero%20cloud%20calls-teal.svg)](#why-aria-vs-cloud-llms)
 
----
+ARIA is a lightweight, local-first neural runtime and AI assistant built from the ground up in pure Python. 
 
-## Visual Architecture Overview
-
-<p align="center">
-  <img src="docs/assets/aria-architecture-flow.svg" alt="ARIA End-to-End System Architecture Pipeline" width="100%">
-</p>
+Most modern AI apps are wrappers around third-party cloud APIs or depend on heavy compiled binaries like PyTorch and CUDA. ARIA takes the opposite path: an inspectable, dependency-free neural engine featuring its own reverse-mode tensor autograd, software-defined compute backends (CPU, tiled GPU simulation, INT8 NPU), a local BM25 document search engine, and a causal transformer language model. Everything runs entirely on your local machine with zero external network calls, zero API token costs, and complete privacy.
 
 ---
 
-## Architectural Paradigms: ARIA vs. Conventional Cloud LLMs
+## Dynamic System Architecture
 
-ARIA was intentionally designed with an architectural philosophy distinct from conventional hyperscaler language models such as OpenAI GPT-4, Anthropic Claude, and Google Gemini.
+Here is how data moves through ARIA's execution pipeline:
 
 <p align="center">
-  <img src="docs/assets/aria-vs-llms.svg" alt="ARIA vs Conventional Cloud LLMs Architectural Comparison" width="100%">
+  <img src="docs/assets/aria-architecture-flow.svg" alt="ARIA Dynamic Architecture Pipeline" width="100%">
 </p>
 
-### Detailed Technical Comparison
+### What Happens When You Send a Query
 
-| Dimension | Conventional Cloud LLMs (GPT-4, Claude, Gemini) | ARIA (Autonomous Research & Intelligence Architecture) |
+1. **Ingestion & Byte-Level Tokenization**: Your text enters through the Web Studio, the loopback API, or the CLI. The `ByteTokenizer` converts the input directly into fundamental bytes (0 to 255) plus special tokens (`PAD`, `EOS`). This guarantees zero Out-of-Vocabulary (OOV) crashes regardless of strange characters, code snippets, or languages.
+2. **Tri-Engine Routing**:
+   - **Step A (Intent Match)**: The fast Multi-Layer Perceptron (MLP) checks the prompt against indexed intent patterns using TF-IDF. Common queries, navigation, and system commands resolve in under 1 millisecond.
+   - **Step B (Local Knowledge Retrieval)**: If the query references local documentation, the BM25 lexical engine scans indexed files, scores matching text chunks, and injects grounded context.
+   - **Step C (Generative Autoregressive Core)**: Open-ended queries route to the causal transformer to generate next-token responses using causal self-attention and RMSNorm.
+3. **Safe Tool Dispatch**: If the query contains calculations or system queries, ARIA routes them through a secure Abstract Syntax Tree (AST) evaluator. Code is never passed to arbitrary `eval()`, and any tool with side effects requires explicit human approval before running.
+4. **Virtual Compute Scheduling**: Neural tensor operations are dispatched through a FIFO command queue with dependency tracking, allocating memory estimates and executing across the selected virtual device backend.
+
+---
+
+## Why ARIA vs. Cloud LLMs (GPT-4, Claude, Gemini)
+
+Cloud models are powerful generalists, but they come with significant architectural trade-offs: data privacy risks, vendor lock-in, recurring API bills, silent prompt drift, and frequent factual hallucinations caused by pure probabilistic next-token guessing.
+
+ARIA was built as a pragmatic, self-contained alternative for developers who want full control over their code, data, and compute stack.
+
+### Direct Comparison
+
+| Feature | Cloud LLMs (GPT-4, Claude, Gemini) | ARIA |
 |---|---|---|
-| **System Ownership** | Proprietary black box accessed via remote REST API. | 100% owned, inspectable source code in pure Python. |
-| **Telemetry & Privacy** | Prompts, embeddings, and completions transit public networks to third-party data centers. | Zero network egress. 100% private, local-first execution on host hardware. |
-| **Inference Mechanism** | Pure autoregressive probabilistic next-token generation across billions of parameters. | Tri-Engine Hybrid Routing: deterministic MLP classifier, BM25 lexical RAG, and autoregressive SLM. |
-| **Hallucination Risk** | Inherent stochastic risk; cannot guarantee factuality without complex external scaffolding. | Deterministic routing for domain tags and verified local documents eliminates hallucinations for known knowledge. |
-| **Compute Requirements** | Dedicated clusters of enterprise GPUs (NVIDIA H100/A100) with tens of gigabytes of VRAM. | Software-defined compute virtualization (VCPU, VGPU, VNPU) running on any standard CPU. |
-| **Hardware Dependencies** | Proprietary driver stacks (CUDA, ROCm, cuDNN, Metal). | Pure Python standard library core; zero mandatory accelerator drivers. |
-| **Autograd & Transparency** | Weights and gradients are hidden behind an opaque token endpoint. | Fully inspectable computational graph with native reverse-mode automatic differentiation. |
-| **Quantization Architecture** | Post-training quantization requiring specialized hardware execution (bitsandbytes, AWQ, EXL2). | Native symmetric INT8 quantization simulated directly in the virtual NPU (`VirtualNPUBackend`). |
-| **Tool Execution Safety** | Autonomous agent tool dispatch susceptible to prompt injection and uncontrolled loops. | Orchestration pipeline with mandatory human-in-the-loop approval and sandboxed AST mathematical evaluation. |
-| **Economic Model** | Recurring per-million token billing, monthly subscription tiers, and API rate limits. | Zero operational cost. Completely free and open-source under Apache-2.0. |
-| **Model Drift** | Continuous unannounced upstream updates alter model outputs and degrade established prompts. | Fully deterministic checkpoints and freeze policies ensuring immutable inference behavior over time. |
+| **Execution Environment** | Remote hyperscaler server farms | 100% local on your own machine |
+| **Data Privacy** | Prompts and documents sent over public internet | Zero telemetry; no data ever leaves your computer |
+| **Response Strategy** | Pure stochastic next-token generation (can hallucinate) | Hybrid: Intent classifier (<1ms) + BM25 RAG + Transformer |
+| **Factual Grounding** | Guesses answers based on compressed training weights | Retrieves exact local text chunks via BM25 lexical search |
+| **Hardware Required** | Datacenter GPUs (NVIDIA H100 / A100 clusters) | Any standard laptop or desktop CPU |
+| **Framework Dependencies** | Proprietary closed APIs or heavy CUDA/C++ stacks | Pure Python standard library core; optional lightweight web UI |
+| **Autograd Visibility** | Zero visibility into weights, loss, or gradients | Native reverse-mode autodiff; every matrix and gradient is inspectable |
+| **Operating Cost** | Pay per 1M tokens, monthly subscriptions, rate limits | $0 forever; open source under Apache 2.0 |
+| **Tool Execution Safety** | Autonomous agents can run into uninspected tool loops | Strict human-in-the-loop approval gate and AST-parsed math |
+| **Model Stability** | Upstream provider silently updates or deprecates models | Immutable checkpoints; behavior never changes unexpectedly |
 
 ---
 
-## How the Architecture Works
+## Under The Hood: Core Architecture
 
-ARIA operates as a layered modular system designed for predictability, auditable computation, and zero cloud lock-in.
+### 1. Reverse-Mode Autograd Engine (`src/aria/brain/tensor.py`)
+ARIA implements its own dynamic computational graph with reverse-mode automatic differentiation without importing PyTorch:
+- Every `Tensor` tracks its operation history (`leaf`, `matmul`, `add`, `multiply`, `sum`, `reshape`, `relu`).
+- Calling `tensor.graph_trace()` generates an inspectable DAG that validates node connections and parameter dependencies in topological order.
+- Matrix backward passes propagate analytical gradients:
+  `dA = dC * B.T` and `dB = A.T * dC`.
+- Gradients accumulate safely across shared parameters and clear cleanly with `zero_grad()`.
 
-```text
-+---------------------------------------------------------------------------------------+
-|                                    CLIENT INTERFACES                                  |
-|   Obsidian Web Studio (app.py)  |  Loopback REST API (server.py)  |  Terminal CLI     |
-+---------------------------------------------------------------------------------------+
-                                           |
-                                           v
-+---------------------------------------------------------------------------------------+
-|                                 INGESTION & TOKENIZATION                              |
-|           ByteTokenizer: Deterministic 8-bit byte mapping (0-255) + Special Tokens     |
-|           Input validation, payload bounding, and non-standard constant filters       |
-+---------------------------------------------------------------------------------------+
-                                           |
-                                           v
-+---------------------------------------------------------------------------------------+
-|                            TRI-ENGINE HYBRID ROUTING MATRIX                           |
-|                                                                                       |
-|   [ Intent Classifier ] ----------> [ BM25 Lexical RAG ] ---------> [ Transformer SLM ]|
-|   TF-IDF + MLP Neural Net           Sliding window chunker          Causal Self-Attention |
-|   Sub-millisecond matching          BM25 k1=1.5, b=0.75             RMSNorm + Linear head|
-|   High-confidence tags (<0.35)      Local grounded context          Autoregressive gen    |
-+---------------------------------------------------------------------------------------+
-                                           |
-                                           v
-+---------------------------------------------------------------------------------------+
-|                             TENSOR BRAIN & VIRTUAL COMPUTE                            |
-|                                                                                       |
-|   Tensor Autograd Engine            Compute Scheduler               Virtual Backends  |
-|   Reverse-mode dynamic DAG          FIFO command queue              VCPU: IEEE FP32   |
-|   Matrix backward propagation       Logical workgroup tiling        VGPU: Cache tiled |
-|   dC = dA x B^T | dB = A^T x dC     Estimated memory reservations   VNPU: INT8 quant  |
-+---------------------------------------------------------------------------------------+
-                                           |
-                                           v
-+---------------------------------------------------------------------------------------+
-|                                GOVERNANCE & ORCHESTRATION                             |
-|   ToolRegistry: AST-verified arithmetic, system introspection, parameter validation   |
-|   Human Approval Gate: Mandatory verification boundary before executing tool actions  |
-|   State & Memory: JSONL conversation logging, mid-epoch checkpoint recovery           |
-+---------------------------------------------------------------------------------------+
-```
+### 2. Software-Defined Compute Devices (`src/aria/compute/backends.py`)
+Rather than coupling neural networks to proprietary hardware drivers, ARIA introduces virtual software devices:
+- **VCPU**: Reference float32 matrix operations with full reverse-mode gradient tracking. Default for training and development.
+- **VGPU**: Block-tiled matrix multiplication simulating hardware cache locality and tiled loops while maintaining exact derivatives.
+- **VNPU**: Integer inference engine using symmetric INT8 quantization (`s = max(|X|) / 127`). It runs matrix multiplications with integer accumulation and guards against tracked gradients to prevent undefined backward passes.
 
-### 1. The First-Principles Autograd Tensor Engine (`aria.brain.tensor`)
+### 3. Compute Scheduler & DAG Executor (`src/aria/compute/scheduler.py`)
+- Provides a FIFO command queue that resolves task dependencies before execution.
+- Computes estimated memory buffer footprints before launching operations to prevent out-of-memory spikes.
+- Uses `ScheduledExecutionContext` for cooperative between-kernel cancellation and thread-safe isolated metrics tracking.
 
-At the core of ARIA is an independent tensor automatic differentiation engine built without relying on PyTorch, JAX, or TensorFlow:
+### 4. Tri-Engine Hybrid Inference (`chatbot.py` & `src/aria/rag/`)
+- **Engine 1 (Intent Classifier)**: Uses Scikit-Learn's `MLPClassifier` with TF-IDF vectorization to map common queries to structured intents in sub-millisecond time.
+- **Engine 2 (BM25 Lexical RAG)**: Splits local documents into sliding-window text chunks (128 words with 64-word overlap) and ranks them using calibrated BM25 scoring (`k1=1.5`, `b=0.75`).
+- **Engine 3 (Causal Transformer)**: A multi-layer decoder language model with causal attention masking and RMSNorm pre-normalization for open-ended text completion.
 
-- **Dynamic Reverse-Mode Autodiff**: Every tensor records its generating operation (`leaf`, `matmul`, `add`, `multiply`, `sum`, `reshape`, `relu`, `rmsnorm`, `attention`).
-- **Graph Tracing**: Invoking `tensor.graph_trace()` generates an immutable, inspectable topological execution DAG validating dependencies and parameter gradient requirements.
-- **Matrix Multiplication Backward Pass**: For forward projection $C = A \cdot B$, exact gradients are propagated via:
-  $$\frac{\partial L}{\partial A} = \frac{\partial L}{\partial C} \cdot B^T$$
-  $$\frac{\partial L}{\partial B} = A^T \cdot \frac{\partial L}{\partial C}$$
-- **Gradient Isolation**: Intermediate node gradients are tracked and cleared via `zero_grad()`, while shared parameters correctly accumulate gradients across complex branched graphs.
-
-### 2. Software-Defined Compute Devices (`aria.compute.backends`)
-
-ARIA decouples neural mathematics from physical hardware through virtual software backends:
-
-- **Virtual CPU (`VirtualCPUBackend`)**: The reference IEEE-754 floating-point implementation supporting full autograd training and validation.
-- **Virtual GPU (`VirtualGPUBackend`)**: Tiled matrix multiplication simulating L1/L2 cache locality and block decomposition while preserving exact reverse-mode derivatives.
-- **Virtual NPU (`VirtualNPUBackend`)**: Quantized integer inference engine using symmetric INT8 quantization:
-  $$s = \frac{\max(|X|)}{127}, \quad X_{q} = \text{clip}\left(\left\lfloor \frac{X}{s} \right\rceil, -127, 127\right)$$
-  The VNPU executes matrix accumulation in integer space and prohibits tracked gradient operations to safeguard against undefined quantized backward passes.
-
-### 3. Virtual Compute Scheduler (`aria.compute.scheduler`)
-
-To manage execution order, memory usage, and concurrency:
-
-- **FIFO Command Queue**: Manages command dependencies, detects topological graph cycles, and ensures sequential or worker-pool execution.
-- **Logical Workgroup Partitioning**: Slices matrix calculations into planned workgroups for deterministic scheduling.
-- **Estimated Memory Reservations**: Enforces strict memory budgets prior to batch execution, rejecting workloads exceeding memory capacity.
-- **Cooperative Cancellation**: Scoped execution contexts (`ScheduledExecutionContext`) track elapsed time, active command IDs, and permit non-destructive cancellation between kernel boundaries.
-
-### 4. Tri-Engine Hybrid Inference Pipeline
-
-Rather than passing every simple prompt to a heavy language model, ARIA uses an intelligent tri-engine hierarchy:
-
-1. **Engine 1: Multi-Layer Perceptron Intent Classifier (`chatbot.py`)**
-   - Uses TF-IDF n-gram vectorization coupled with a multi-layer neural network.
-   - Evaluates intents in sub-millisecond execution times.
-   - When confidence exceeds the 0.35 threshold, it produces deterministic, instantaneous responses for greetings, identity queries, navigation commands, and standard domain questions.
-2. **Engine 2: Local BM25 Lexical RAG (`src/aria/rag`)**
-   - When domain context is needed, incoming queries are routed to an in-memory BM25 retrieval index.
-   - Documents are tokenized and split via sliding-window chunking (default chunk size: 128 tokens, overlap: 64 tokens).
-   - Relevant text chunks are retrieved and assembled with explicit provenance tracking without calling hosted vector databases or remote embedding APIs.
-3. **Engine 3: Autoregressive Decoder Transformer (`src/aria/brain/transformer.py`)**
-   - For open-ended generation, inputs are dispatched to ARIA's causal language model.
-   - Features single/multi-head causal self-attention with upper-triangular masking:
-     $$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{Q K^T}{\sqrt{d_k}} + M\right) V, \quad M_{ij} = \begin{cases} 0 & i \ge j \\ -\infty & i < j \end{cases}$$
-   - Uses RMSNorm pre-normalization for training stability and cross-entropy next-token prediction.
-
-### 5. Deterministic Tokenization (`src/aria/tokenizer`)
-
-ARIA avoids external BPE or sentencepiece libraries by utilizing a pure-Python `ByteTokenizer`:
-- Maps directly to the 256 fundamental byte values (`0x00` through `0xFF`).
-- Incorporates dedicated indices for `[PAD]` and `[EOS]`.
-- 100% immune to Out-Of-Vocabulary (OOV) errors across any Unicode text, binary string, or programming syntax.
-
-### 6. Agent Governance & Human-in-the-Loop Orchestration (`src/aria/agent`)
-
-ARIA tools are strictly audited and guarded:
-- **Zero Raw Code Execution**: Mathematical expressions are evaluated using a recursive Abstract Syntax Tree (AST) parser (`safe_calculate`), disallowing `eval()` or unwhitelisted operators.
-- **Schema Contracts**: Every registered tool enforces explicit JSON schema parameters.
-- **Mandatory Approval Barrier**: Multi-step agent plans require human confirmation before any side-effecting action is dispatched.
+### 5. Safe Tool Registry & Human Gate (`src/aria/agent/`)
+- Tools are registered with explicit JSON input schemas.
+- Calculations run through a custom Python AST parser (`safe_calculate`) supporting basic arithmetic and exponents without using unsafe `eval()`.
+- Multi-step agent plans require human confirmation before any state-modifying action is dispatched.
 
 ---
 
-## Repository Structure
+## Project Structure
 
 ```text
 ARIA/
-├── app.py                      # Flask Application Factory & Obsidian Web Studio
-├── chatbot.py                  # Multi-Layer Perceptron Intent Classifier & TF-IDF
-├── chatbot_model.pkl           # Pre-trained neural intent model cache
-├── intents.json                # Structured dataset of patterns, tags, and responses
-├── pyproject.toml              # PEP 517/621 build config, Ruff, Mypy, and Pytest specs
+├── app.py                      # Flask Application & ChatGPT-style Obsidian UI
+├── chatbot.py                  # Intent Classifier (TF-IDF + Neural Network)
+├── chatbot_model.pkl           # Serialized intent classifier model cache
+├── intents.json                # Intent dataset: patterns, tags, and responses
+├── pyproject.toml              # Build configuration, test settings, and linters
 ├── requirements.txt            # Optional web & ML dependencies (Flask, NumPy, Scikit-Learn)
-├── README.md                   # System technical manual and reference guide
-├── LICENSE                     # Apache-2.0 Open-Source License
-├── docs/                       # Technical architecture & compute specifications
-│   ├── assets/                 # Architecture flow & animated SVG visuals
-│   │   ├── aria-architecture-flow.svg
-│   │   └── aria-vs-llms.svg
-│   ├── COMPUTE_BACKENDS.md     # Mathematical specification of VCPU, VGPU, and VNPU
-│   └── IMPLEMENTATION_AUDIT.md # Verification evidence, baseline matrix, and audit logs
-├── scripts/                    # Compute, batching, and inference diagnostic benchmarks
+├── README.md                   # System documentation and reference guide
+├── LICENSE                     # Apache-2.0 open-source license
+├── docs/                       # Technical specs and architecture visuals
+│   ├── assets/
+│   │   └── aria-architecture-flow.svg  # Dynamic system architecture diagram
+│   ├── COMPUTE_BACKENDS.md     # Detailed VCPU, VGPU, and VNPU specifications
+│   └── IMPLEMENTATION_AUDIT.md # Technical verification audit and capability baseline
+├── scripts/                    # Compute, batching, and inference benchmarks
 │   ├── benchmark_compute.py
 │   ├── benchmark_compute_batch.py
 │   ├── benchmark_inference.py
 │   └── benchmark_scheduled_transformer.py
 ├── src/
-│   └── aria/                   # Core First-Principles Neural Framework (Zero external deps)
-│       ├── agent/              # ToolRegistry, AST tools, and approval orchestrator
-│       ├── api/                # Loopback REST API server with security hardening
-│       ├── brain/              # Tensor autograd, neural layers, optimizers, transformer
-│       ├── cli.py              # Unified command-line interface
-│       ├── compute/            # VCPU, VGPU, VNPU virtual devices & FIFO DAG scheduler
-│       ├── evaluation/         # Perplexity, parameter health, and gradient verification
-│       ├── inference/          # Deterministic autoregressive generation
-│       ├── memory/             # JSONL conversation store and literal search
-│       ├── rag/                # BM25 lexical retriever, sliding chunker, text pipeline
+│   └── aria/                   # Core ARIA engine (zero external dependencies)
+│       ├── agent/              # Tool registry, AST math evaluator, approval orchestrator
+│       ├── api/                # Loopback REST API server
+│       ├── brain/              # Autograd tensor engine, neural layers, optimizers, transformer
+│       ├── cli.py              # Unified command line interface
+│       ├── compute/            # Virtual devices (VCPU/VGPU/VNPU) and FIFO scheduler
+│       ├── evaluation/         # Model loss, perplexity, and gradient checks
+│       ├── inference/          # Deterministic autoregressive generator
+│       ├── memory/             # JSONL persistent conversation store
+│       ├── rag/                # BM25 lexical retriever and sliding chunker
 │       ├── runtime/            # In-memory execution lifecycle manager
-│       ├── tokenizer/          # ByteTokenizer (byte-level 0-255 mapping)
-│       ├── training/           # Autograd trainer, checkpointing with mid-epoch cursor
-│       ├── ui/                 # Standalone dependency-free loopback HTML interface
-│       └── verification/       # Shape contracts and structural response verification
-├── static/                     # Obsidian Dark Theme client styling and JavaScript
+│       ├── tokenizer/          # Byte-level tokenizer (0-255 mapping)
+│       ├── training/           # Autograd trainer with mid-epoch checkpoint recovery
+│       ├── ui/                 # Minimal dependency-free browser interface
+│       └── verification/       # Response shape verification and type contracts
+├── static/                     # Dark Obsidian stylesheet and client JS
 │   ├── css/chatgpt.css
 │   └── js/chatgpt.js
 ├── templates/
-│   └── index.html              # ChatGPT-inspired minimalist Web Studio UI
-└── tests/                      # 310 Comprehensive Unit & Integration Tests
+│   └── index.html              # ChatGPT-style web interface template
+└── tests/                      # 310 Unit and integration tests
 ```
 
 ---
 
-## Quickstart & Installation
+## Quickstart
 
 ### 1. Prerequisites
+- Python 3.11 or newer.
+- Works across Windows, macOS, and Linux on any standard CPU.
 
-- Python 3.11, 3.12, 3.13, or 3.14.
-- Standard CPython runtime (Windows, macOS, or Linux).
-- Hardware: Standard x86_64 or ARM64 CPU. No discrete GPU required.
+### 2. Setup
 
-### 2. Environment Setup
-
-Clone the repository and create an isolated virtual environment:
+Clone the repository and create a virtual environment:
 
 ```bash
 git clone https://github.com/chamanvashishth/ARIA.git
@@ -232,20 +164,18 @@ Activate the environment:
   ```powershell
   .\.venv\Scripts\Activate.ps1
   ```
-- **Windows (Command Prompt)**:
-  ```cmd
-  .\.venv\Scripts\activate.bat
-  ```
 
-### 3. Dependency Installation
+### 3. Installation
 
-Core ARIA (`src/aria/`) requires **zero external dependencies** and runs on the Python standard library alone. To install the optional Web Studio interface and intent classification dependencies:
+Core ARIA (`src/aria/`) runs entirely on the standard Python library with **zero external packages**. 
+
+To run the Web Studio and intent classifier, install the pinned web dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Or install in editable mode with development tooling:
+Or install with development test tools:
 
 ```bash
 pip install -e .[web,dev]
@@ -253,132 +183,77 @@ pip install -e .[web,dev]
 
 ---
 
-## Running ARIA
+## Running The System
 
-### Option A: Obsidian Web Studio (ChatGPT-Style UI)
-
-Launch the full web interface featuring high-contrast typography, syntax-highlighted code blocks, and real-time engine selection:
+### Web Studio (ChatGPT-Style Obsidian Interface)
+Launch the web interface with syntax-highlighted code blocks, one-click copy, and engine switching:
 
 ```bash
 python app.py
 ```
 
-Or via the ARIA CLI:
+Then open your browser at **http://127.0.0.1:5000**.
+
+### Standalone Local API Server (Zero Dependencies)
+Run the lightweight loopback daemon without installing Flask:
 
 ```bash
-python -m aria.cli web --port 5000
+python -m aria.cli serve --port 8765
 ```
 
-Open your browser at:
-`http://127.0.0.1:5000`
-
-### Option B: Standalone Dependency-Free Local API Server
-
-Launch the lightweight HTTP loopback daemon which requires only standard Python libraries:
-
-```bash
-python -m aria.cli serve --host 127.0.0.1 --port 8765
-```
-
-Access the built-in minimal UI at `http://127.0.0.1:8765` or query the REST endpoint:
+Access the minimal UI at **http://127.0.0.1:8765** or call the JSON endpoint:
 
 ```bash
 curl -X POST http://127.0.0.1:8765/api/generate \
   -H "Content-Type: application/json" \
-  -d '{"prompt": "Hello ARIA", "max_tokens": 32, "temperature": 0.7}'
+  -d '{"prompt": "Hello ARIA", "max_tokens": 32}'
 ```
 
-### Option C: Interactive Terminal Chat
-
-Engage directly with the neural runtime inside your console:
+### Interactive CLI Chat
+Run a session directly in your terminal:
 
 ```bash
 python -m aria.cli chat
 ```
 
-### Option D: Training the Neural Brain
-
-Train a causal transformer from scratch with deterministic checkpointing:
-
-```bash
-python -m aria.cli train \
-  --data-path data/corpus.txt \
-  --epochs 10 \
-  --batch-size 4 \
-  --learning-rate 0.001 \
-  --checkpoint-dir checkpoints/
-```
-
 ---
 
-## Verification & Test Suite
+## Testing & Benchmarks
 
-ARIA enforces strict test coverage and type hygiene across all components.
-
-### Execute Full Test Matrix (310 Tests)
+### Run The Test Suite (310 Tests)
+Run pytest across all units (autograd, layers, compute backends, scheduler, RAG, and tools):
 
 ```bash
 pytest -q
 ```
 
-Output:
-```text
-310 passed in 2.85s (100% passing rate)
-```
+All 310 tests pass with strict type validation.
 
-### Static Analysis & Linting
-
-```bash
-# Type check with Mypy (enforces strict typing across 41 source files)
-mypy src/aria
-
-# Code quality check with Ruff
-ruff check .
-```
-
----
-
-## Compute & Inference Benchmarks
-
-ARIA includes diagnostic benchmark utilities to measure software-defined matrix multiplication latency, scheduler overhead, and autoregressive throughput.
-
-### 1. Matrix Compute Benchmark (VCPU vs. VGPU vs. VNPU)
+### Run Compute Benchmarks
+Compare matrix multiplication speed and numerical error across VCPU, tiled VGPU, and INT8 VNPU:
 
 ```bash
 python scripts/benchmark_compute.py
 ```
 
-Measures numerical equivalence, relative error, and latency for square matrix multiplications across dimensions ($N = 16, 32, 64, 128$).
-
-### 2. Virtual Scheduler Batch Benchmark
+Benchmark the virtual scheduler with multi-worker queues:
 
 ```bash
 python scripts/benchmark_compute_batch.py
 ```
 
-Compares sequential single-worker command queue processing against bounded multi-worker thread execution under dependency DAG constraints.
-
-### 3. Autoregressive Transformer Profiler
-
-```bash
-python scripts/benchmark_scheduled_transformer.py --warmup 1 --iterations 5 --sequence-length 8
-```
-
-Verifies numerical parity between direct eager execution and scheduler-dispatched causal attention passes.
-
 ---
 
-## Technical Audit & Capability Boundaries
+## Engineering Notes & Trade-offs
 
-In accordance with strict senior engineering standards, ARIA explicitly documents verified foundational capabilities alongside current research boundaries (see [docs/IMPLEMENTATION_AUDIT.md](docs/IMPLEMENTATION_AUDIT.md)):
+A realistic look at what ARIA is and what it is not:
 
-- **Software Emulation vs. Physical Acceleration**: Virtual devices (VCPU, VGPU, VNPU) execute exclusively on the host CPU. No CUDA kernels or physical NPU execution is claimed.
-- **Lexical vs. Semantic Retrieval**: The RAG subsystem uses BM25 lexical term scoring. Vector embedding indexes and semantic re-ranking are planned foundations.
-- **Tool Sandbox Boundary**: Registered tools execute inside the host Python process with AST syntax verification. Operating-system-level process sandboxing and container isolation are not yet integrated.
-- **Planner Architecture**: The current agent orchestrator accepts structured multi-step plans with strict human approval gates; fully autonomous goal decomposition is an experimental research module.
+- **Software-Defined, Not Hardware CUDA**: ARIA's compute backends run as pure Python loops on your host CPU. They are designed for transparency, research, and algorithmic experimentation, not for competing with hardware-accelerated CUDA C++ libraries.
+- **Lexical BM25 vs. Dense Vectors**: The built-in RAG system uses lexical BM25 matching rather than dense vector embeddings. This avoids requiring heavy external embedding models while giving fast, deterministic retrieval for technical documentation.
+- **Local Scope**: ARIA is built for local autonomy and privacy. It is not intended to replace multi-hundred-billion parameter models on open-domain creative writing, but rather to provide a fast, private, and fully inspectable intelligence engine on your own machine.
 
 ---
 
 ## License
 
-ARIA is open-source software licensed under the [Apache License, Version 2.0](LICENSE). You are free to use, modify, distribute, and integrate this software in commercial and private environments with full intellectual property sovereignty.
+ARIA is open-source software licensed under the [Apache License, Version 2.0](LICENSE). You are free to use, modify, distribute, and integrate it into private or commercial projects.
