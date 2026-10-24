@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 520" width="100%" height="100%" style="background:#0a0c10; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <linearGradient id="bgComp" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0c10" />
+      <stop offset="50%" stop-color="#0e131f" />
+      <stop offset="100%" stop-color="#0a0c10" />
+    </linearGradient>
+
+    <linearGradient id="ariaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#022c22" stop-opacity="0.5" />
+    </linearGradient>
+
+    <linearGradient id="gptGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3b0764" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#1e1b4b" stop-opacity="0.5" />
+    </linearGradient>
+
+    <style>
+      .pulse-aria-border {
+        animation: pulseAria 3.5s ease-in-out infinite;
+      }
+      @keyframes pulseAria {
+        0%, 100% { stroke: #10b981; filter: drop-shadow(0 0 2px rgba(16, 185, 129, 0.4)); }
+        50% { stroke: #34d399; filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.8)); }
+      }
+
+      .pulse-gpt-border {
+        animation: pulseGpt 3.5s ease-in-out infinite;
+      }
+      @keyframes pulseGpt {
+        0%, 100% { stroke: #ef4444; filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.3)); }
+        50% { stroke: #f87171; filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.6)); }
+      }
+
+      .flow-pulse {
+        animation: flowGlow 2.5s ease-in-out infinite alternate;
+      }
+      @keyframes flowGlow {
+        from { opacity: 0.6; }
+        to { opacity: 1; }
+      }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1100" height="520" fill="url(#bgComp)" rx="16" stroke="#1f2937" stroke-width="1.5" />
+
+  <!-- Header -->
+  <g transform="translate(40, 45)">
+    <text x="0" y="0" fill="#f8fafc" font-size="20" font-weight="700" letter-spacing="0.08em">PARADIGM COMPARISON: ARIA vs. CONVENTIONAL CLOUD LLMs</text>
+    <text x="0" y="20" fill="#94a3b8" font-size="12" letter-spacing="0.03em">Autonomous Research &amp; Intelligence Architecture compared against GPT-4 / Claude / Gemini APIs</text>
+  </g>
+
+  <!-- COLUMN 1: ARIA (LEFT) -->
+  <g transform="translate(40, 90)">
+    <rect width="490" height="400" rx="12" fill="url(#ariaGrad)" stroke="#10b981" stroke-width="1.5" class="pulse-aria-border" />
+    <rect x="0" y="0" width="490" height="42" rx="12" fill="#064e3b" fill-opacity="0.6" />
+    <text x="18" y="26" fill="#34d399" font-size="14" font-weight="700" letter-spacing="0.06em">ARIA // FIRST-PRINCIPLES NEURAL ARCHITECTURE</text>
+    
+    <!-- Item 1 -->
+    <g transform="translate(20, 60)">
+      <text x="0" y="0" fill="#10b981" font-size="11" font-weight="700">100% PRIVACY &amp; DATA SOVEREIGNTY</text>
+      <text x="0" y="18" fill="#e2e8f0" font-size="11">Zero external telemetry. Runs completely offline on host CPU.</text>
+      <text x="0" y="32" fill="#94a3b8" font-size="10">No remote logging, no training on your data, no network dependency.</text>
+    </g>
+
+    <!-- Item 2 -->
+    <g transform="translate(20, 115)">
+      <text x="0" y="0" fill="#10b981" font-size="11" font-weight="700">TRI-ENGINE DETERMINISTIC ROUTING</text>
+      <text x="0" y="18" fill="#e2e8f0" font-size="11">Sub-millisecond MLP classifier + BM25 RAG + Autoregressive SLM.</text>
+      <text x="0" y="32" fill="#94a3b8" font-size="10">Eliminates hallucinations for domain facts via deterministic fallback gates.</text>
+    </g>
+
+    <!-- Item 3 -->
+    <g transform="translate(20, 170)">
+      <text x="0" y="0" fill="#10b981" font-size="11" font-weight="700">PURE SOFTWARE-DEFINED COMPUTE</text>
+      <text x="0" y="18" fill="#e2e8f0" font-size="11">Virtual CPU (VCPU), Tiled VGPU, and Symmetric INT8 VNPU.</text>
+      <text x="0" y="32" fill="#94a3b8" font-size="10">Runs on any machine without requiring CUDA, ROCm, or discrete GPUs.</text>
+    </g>
+
+    <!-- Item 4 -->
+    <g transform="translate(20, 225)">
+      <text x="0" y="0" fill="#10b981" font-size="11" font-weight="700">TRANSPARENT REVERSE-MODE AUTOGRAD</text>
+      <text x="0" y="18" fill="#e2e8f0" font-size="11">Native Tensor graph tracing and exact gradient propagation.</text>
+      <text x="0" y="32" fill="#94a3b8" font-size="10">Every forward calculation, intermediate node, and weight update is auditable.</text>
+    </g>
+
+    <!-- Item 5 -->
+    <g transform="translate(20, 280)">
+      <text x="0" y="0" fill="#10b981" font-size="11" font-weight="700">MANDATORY HUMAN-IN-THE-LOOP GOVERNANCE</text>
+      <text x="0" y="18" fill="#e2e8f0" font-size="11">Approval-gated orchestrator with sandboxed AST math evaluation.</text>
+      <text x="0" y="32" fill="#94a3b8" font-size="10">No uninspected tool invocations or rogue code executions.</text>
+    </g>
+
+    <!-- Item 6 -->
+    <g transform="translate(20, 335)">
+      <text x="0" y="0" fill="#10b981" font-size="11" font-weight="700">ZERO LICENSING FEES &amp; ZERO DRIFT</text>
+      <text x="0" y="18" fill="#e2e8f0" font-size="11">$0 token costs, zero rate limits, zero silent model updates.</text>
+      <text x="0" y="32" fill="#94a3b8" font-size="10">Self-contained codebase licensed under Apache-2.0.</text>
+    </g>
+  </g>
+
+  <!-- COLUMN 2: CONVENTIONAL CLOUD LLMs (RIGHT) -->
+  <g transform="translate(570, 90)">
+    <rect width="490" height="400" rx="12" fill="url(#gptGrad)" stroke="#ef4444" stroke-width="1.5" class="pulse-gpt-border" />
+    <rect x="0" y="0" width="490" height="42" rx="12" fill="#450a0a" fill-opacity="0.6" />
+    <text x="18" y="26" fill="#f87171" font-size="14" font-weight="700" letter-spacing="0.06em">CONVENTIONAL CLOUD LLMs (GPT-4 / CLAUDE / GEMINI)</text>
+    
+    <!-- Item 1 -->
+    <g transform="translate(20, 60)">
+      <text x="0" y="0" fill="#ef4444" font-size="11" font-weight="700">CLOUD LOCK-IN &amp; TELEMETRY EXPOSURE</text>
+      <text x="0" y="18" fill="#cbd5e1" font-size="11">All prompts &amp; confidential code sent to third-party data centers.</text>
+      <text x="0" y="32" fill="#94a3b8" font-size="10">Dependent on active internet connection, server uptime, and provider TOS.</text>
+    </g>
+
+    <!-- Item 2 -->
+    <g transform="translate(20, 115)">
+      <text x="0" y="0" fill="#ef4444" font-size="11" font-weight="700">PURE PROBABILISTIC NEXT-TOKEN STOCHASTICITY</text>
+      <text x="0" y="18" fill="#cbd5e1" font-size="11">Generates responses purely by statistical probability sampling.</text>
+      <text x="0" y="32" fill="#94a3b8" font-size="10">Prone to subtle hallucinations and ungrounded fabrications.</text>
+    </g>
+
+    <!-- Item 3 -->
+    <g transform="translate(20, 170)">
+      <text x="0" y="0" fill="#ef4444" font-size="11" font-weight="700">MASSIVE HARDWARE &amp; INFRASTRUCTURE EXPENSE</text>
+      <text x="0" y="18" fill="#cbd5e1" font-size="11">Requires mega-clusters of NVIDIA H100 GPUs and gigabytes of VRAM.</text>
+      <text x="0" y="32" fill="#94a3b8" font-size="10">Cannot be run, audited, or compiled on standard commodity machines.</text>
+    </g>
+
+    <!-- Item 4 -->
+    <g transform="translate(20, 225)">
+      <text x="0" y="0" fill="#ef4444" font-size="11" font-weight="700">OPAQUE BLACK-BOX EXECUTION</text>
+      <text x="0" y="18" fill="#cbd5e1" font-size="11">Weights, training data, and computation graphs are confidential.</text>
+      <text x="0" y="32" fill="#94a3b8" font-size="10">Zero insight into internal tensors, gradients, or latent layer activations.</text>
+    </g>
+
+    <!-- Item 5 -->
+    <g transform="translate(20, 280)">
+      <text x="0" y="0" fill="#ef4444" font-size="11" font-weight="700">AUTONOMOUS BLACK-BOX AGENT RISKS</text>
+      <text x="0" y="18" fill="#cbd5e1" font-size="11">Agent frameworks execute tools without mandatory human checkpoints.</text>
+      <text x="0" y="32" fill="#94a3b8" font-size="10">Prone to infinite prompt-injection loops and unexpected side-effects.</text>
+    </g>
+
+    <!-- Item 6 -->
+    <g transform="translate(20, 335)">
+      <text x="0" y="0" fill="#ef4444" font-size="11" font-weight="700">EXPENSIVE PER-TOKEN BILLING &amp; SILENT DRIFT</text>
+      <text x="0" y="18" fill="#cbd5e1" font-size="11">Pay-per-token pricing models accumulate recurring SaaS expenses.</text>
+      <text x="0" y="32" fill="#94a3b8" font-size="10">Silent backend updates alter model behavior and break downstream prompts.</text>
+    </g>
+  </g>
+</svg>

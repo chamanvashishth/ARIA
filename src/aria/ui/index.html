@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#10131b">
+<title>ARIA — Local Intelligence</title>
+<style>
+:root{color-scheme:dark;--bg:#0b0e14;--panel:#121722;--panel2:#171e2b;--line:#273143;--text:#eef2fa;--muted:#9aa7bc;--accent:#d4ff72;--accent2:#b8ee55;--danger:#ff9a9a}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#1c2a2a 0,transparent 34%),var(--bg);color:var(--text);font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
+.shell{max-width:1180px;margin:0 auto;padding:28px 22px 22px;min-height:100vh;display:flex;flex-direction:column;gap:20px}
+header{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid var(--line);padding-bottom:18px}
+.brand{display:flex;align-items:center;gap:13px}.mark{width:42px;height:42px;border-radius:14px;background:var(--accent);color:#10150b;display:grid;place-items:center;font-size:21px;font-weight:900;letter-spacing:-2px}.brand h1{font-size:18px;letter-spacing:.16em;margin:0}.brand p{margin:1px 0 0;color:var(--muted);font-size:12px;letter-spacing:.04em}
+.status{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:8px 12px;color:var(--muted);font-size:12px}.dot{width:7px;height:7px;border-radius:50%;background:#667386}.dot.online{background:var(--accent);box-shadow:0 0 12px #d4ff7266}.dot.offline{background:var(--danger)}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:18px;flex:1;min-height:0}
+.chat,.sidecard{background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+.chat{display:flex;flex-direction:column;min-height:650px}.chathead{padding:20px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}.chathead h2{margin:0;font-size:16px;font-weight:650}.chathead p{margin:3px 0 0;color:var(--muted);font-size:12px}.tinylabel{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);border:1px solid #d4ff7240;padding:5px 8px;border-radius:6px;white-space:nowrap}
+.messages{padding:24px;display:flex;flex-direction:column;gap:18px;flex:1;overflow-y:auto;max-height:calc(100vh - 330px);min-height:260px}
+.welcome{margin:auto;max-width:460px;text-align:center;padding:26px 10px}.orb{width:56px;height:56px;border-radius:20px;border:1px solid #d4ff7270;color:var(--accent);display:grid;place-items:center;font-size:26px;margin:0 auto 18px;background:linear-gradient(145deg,#d4ff721a,transparent)}.welcome h3{font-size:24px;letter-spacing:-.04em;margin:0 0 8px}.welcome p{color:var(--muted);margin:0 auto 20px;max-width:380px;font-size:13px}.suggestions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}.suggestions button{background:var(--panel2);border:1px solid var(--line);color:#d5deec;border-radius:999px;padding:8px 11px;font-size:12px;cursor:pointer}.suggestions button:hover{border-color:#d4ff7280;color:var(--accent)}
+.message{display:flex;flex-direction:column;gap:5px;max-width:88%;align-self:flex-start}.message.user{align-self:flex-end;align-items:flex-end}.who{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}.bubble{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px 15px;border:1px solid var(--line);background:var(--panel2);border-radius:5px 16px 16px 16px}.user .bubble{background:#d4ff7214;border-color:#d4ff7235;border-radius:16px 5px 16px 16px}.message.error .bubble{border-color:#ff9a9a66;color:#ffd0d0}
+.composer{border-top:1px solid var(--line);padding:17px 18px 13px}.composebox{display:flex;align-items:flex-end;gap:10px;background:#0b0f16;border:1px solid #344055;border-radius:14px;padding:9px}.composebox:focus-within{border-color:#d4ff7290;box-shadow:0 0 0 3px #d4ff7210}textarea{resize:vertical;min-height:44px;max-height:180px;flex:1;background:transparent;border:0;outline:0;color:var(--text);font:inherit;padding:9px 8px}textarea::placeholder{color:#748198}.send{height:42px;min-width:78px;border:0;border-radius:10px;background:var(--accent);color:#12170b;font-weight:750;cursor:pointer;padding:0 15px}.send:hover{background:var(--accent2)}.send:disabled{opacity:.45;cursor:wait}.hint{display:flex;justify-content:space-between;gap:12px;color:#78859b;font-size:11px;margin-top:9px;padding:0 4px}
+aside{display:flex;flex-direction:column;gap:14px}.sidecard{padding:18px}.sidecard h3{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#cbd4e3;margin:0 0 16px}.metric{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #273143a0;font-size:12px}.metric:last-child{border:0;padding-bottom:0}.metric span{color:var(--muted)}.metric strong{font-weight:600;text-align:right;overflow-wrap:anywhere}.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}.field label{font-size:12px;color:#b8c3d4}.field input,.field select{width:100%;background:#0b0f16;border:1px solid #303b4e;border-radius:9px;padding:10px;color:var(--text);font:inherit;outline:0}.field input:focus,.field select:focus{border-color:#d4ff7280}.sidebutton{width:100%;background:transparent;border:1px solid var(--line);color:#dce4f0;border-radius:9px;padding:9px;cursor:pointer;font:inherit;font-size:12px}.sidebutton:hover{border-color:#d4ff7280}.notice{color:var(--muted);font-size:12px;margin:0}.notice strong{color:var(--accent);font-weight:600}.foot{color:#667389;font-size:11px;text-align:center;padding-top:1px}
+@media(max-width:850px){.layout{grid-template-columns:1fr}.chat{min-height:540px}.messages{max-height:55vh}.sidegrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}aside{display:contents}.chat{grid-row:1}.sidecard{grid-row:auto}}
+@media(max-width:560px){.shell{padding:16px 10px}.brand h1{font-size:15px}.brand p{font-size:10px}.mark{width:36px;height:36px}.status{font-size:10px;padding:7px 9px}.chathead{padding:16px}.messages{padding:16px}.message{max-width:96%}.sidegrid{display:flex;flex-direction:column}.hint{font-size:10px}.send{min-width:60px}}
+</style>
+</head>
+<body>
+<div class="shell">
+<header>
+  <div class="brand"><div class="mark">A.</div><div><h1>ARIA</h1><p>LOCAL INTELLIGENCE SYSTEM</p></div></div>
+  <div class="status"><span id="statusDot" class="dot"></span><span id="statusText">Checking local runtime…</span></div>
+</header>
+<main class="layout">
+  <section class="chat">
+    <div class="chathead"><div><h2>Conversation</h2><p>Private by default · Requests stay on this machine</p></div><span class="tinylabel">LOCAL MODE</span></div>
+    <div class="messages" id="messages" aria-live="polite">
+      <div class="welcome" id="welcome"><div class="orb">✳</div><h3>Think locally.</h3><p>Talk to your local ARIA runtime. Its answers depend on the model you have loaded and trained.</p><div class="suggestions"><button type="button">Explain neural networks simply</button><button type="button">Give me a Python exercise</button><button type="button">What is a qubit?</button></div></div>
+    </div>
+    <form class="composer" id="chatForm">
+      <div class="composebox"><textarea id="prompt" rows="1" maxlength="12000" placeholder="Message ARIA…" aria-label="Message ARIA"></textarea><button class="send" id="sendButton" type="submit">Send ↑</button></div>
+      <div class="hint"><span>Enter to send · Shift+Enter for a new line</span><span id="charCount">0 / 12000</span></div>
+    </form>
+  </section>
+  <aside>
+    <section class="sidecard"><h3>Generation settings</h3>
+      <div class="field"><label for="maxTokens">Maximum new tokens</label><input id="maxTokens" type="number" min="1" max="1024" value="64"></div>
+      <div class="field"><label for="temperature">Temperature</label><input id="temperature" type="number" min="0.01" max="5" step="0.1" value="0.8"></div>
+      <div class="field"><label for="topK">Top-k sampling</label><input id="topK" type="number" min="1" max="260" value="20"></div>
+      <button class="sidebutton" id="clearButton" type="button">Clear conversation</button>
+    </section>
+    <section class="sidecard"><h3>Runtime</h3>
+      <div class="metric"><span>Connection</span><strong id="connectionMetric">Checking</strong></div>
+      <div class="metric"><span>Last generation</span><strong id="lastTime">—</strong></div>
+      <div class="metric"><span>Generated tokens</span><strong id="lastTokens">—</strong></div>
+      <div class="metric"><span>Service</span><strong>ARIA Local API</strong></div>
+    </section>
+    <section class="sidecard"><h3>About this build</h3><p class="notice"><strong>Foundation UI</strong><br><br>This interface is a local control surface, not proof of model quality. A randomly initialized or minimally trained model may produce incoherent text.</p></section>
+  </aside>
+</main>
+<div class="foot">ARIA · LOCAL-FIRST SOFTWARE · NO HOSTED MODEL API REQUIRED</div>
+</div>
+<script>
+(function(){
+  const $ = (id) => document.getElementById(id);
+  const messages = $("messages");
+  const welcome = $("welcome");
+  const form = $("chatForm");
+  const prompt = $("prompt");
+  const sendButton = $("sendButton");
+  let busy = false;
+
+  function addMessage(role, text, error) {
+    if (welcome && welcome.parentNode) welcome.remove();
+    const wrap = document.createElement("div");
+    wrap.className = "message " + role + (error ? " error" : "");
+    const who = document.createElement("div");
+    who.className = "who";
+    who.textContent = error ? "Runtime notice" : (role === "user" ? "You" : "ARIA");
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;
+    wrap.append(who, bubble);
+    messages.appendChild(wrap);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  async function checkHealth() {
+    const dot = $("statusDot");
+    const status = $("statusText");
+    try {
+      const response = await fetch("/health", {cache:"no-store"});
+      const data = await response.json();
+      if (!response.ok || !data.runtime_started) throw new Error("Runtime is not started");
+      dot.className = "dot online";
+      status.textContent = "Local runtime connected";
+      $("connectionMetric").textContent = "Connected";
+    } catch (_) {
+      dot.className = "dot offline";
+      status.textContent = "Runtime unavailable";
+      $("connectionMetric").textContent = "Offline";
+    }
+  }
+
+  function updateCount() { $("charCount").textContent = prompt.value.length + " / 12000"; }
+  prompt.addEventListener("input", updateCount);
+  prompt.addEventListener("keydown", function(event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      form.requestSubmit();
+    }
+  });
+
+  document.querySelectorAll(".suggestions button").forEach(function(button) {
+    button.addEventListener("click", function() {
+      prompt.value = button.textContent;
+      updateCount();
+      prompt.focus();
+    });
+  });
+
+  $("clearButton").addEventListener("click", function() {
+    messages.innerHTML = "";
+    const node = document.createElement("div");
+    node.className = "welcome";
+    node.innerHTML = '<div class="orb">✳</div><h3>Fresh context.</h3><p>Your visible conversation has been cleared. This does not delete saved runtime memory.</p>';
+    messages.appendChild(node);
+  });
+
+  form.addEventListener("submit", async function(event) {
+    event.preventDefault();
+    if (busy) return;
+    const text = prompt.value.trim();
+    if (!text) { prompt.focus(); return; }
+    const maxTokens = Number($("maxTokens").value);
+    const temperature = Number($("temperature").value);
+    const topK = Number($("topK").value);
+    if (!Number.isInteger(maxTokens) || maxTokens < 1 || maxTokens > 1024 ||
+        !Number.isFinite(temperature) || temperature <= 0 || temperature > 5 ||
+        !Number.isInteger(topK) || topK < 1) {
+      addMessage("assistant", "Check the generation settings. Token count must be 1–1024, temperature must be greater than 0 and at most 5, and top-k must be a positive integer.", true);
+      return;
+    }
+
+    addMessage("user", text);
+    prompt.value = "";
+    updateCount();
+    busy = true;
+    sendButton.disabled = true;
+    sendButton.textContent = "…";
+    const started = performance.now();
+    try {
+      const response = await fetch("/generate", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({prompt:text, config:{max_new_tokens:maxTokens, temperature:temperature, top_k:topK}})
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        const detail = data && data.error && data.error.message ? data.error.message : "Request failed";
+        throw new Error(detail);
+      }
+      addMessage("assistant", data.text || "(The model returned an empty response.)");
+      $("lastTime").textContent = Number(data.elapsed_seconds).toFixed(2) + " s";
+      $("lastTokens").textContent = String(data.generated_tokens);
+      $("connectionMetric").textContent = "Connected";
+    } catch (error) {
+      addMessage("assistant", error.message || "Could not reach the local API.", true);
+      checkHealth();
+    } finally {
+      busy = false;
+      sendButton.disabled = false;
+      sendButton.textContent = "Send ↑";
+      prompt.focus();
+    }
+  });
+
+  checkHealth();
+})();
+</script>
+</body>
+</html>

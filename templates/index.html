@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#000000">
+  <title>ARIA // STUDIO</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ffffff'><rect width='24' height='24' rx='6'/></svg>">
+  
+  <!-- Clean Modern Typography Stack -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/chatgpt.css') }}">
+  <!-- Fast Markdown Parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body class="minimal-chatgpt-theme">
+
+  <div class="app-container">
+    
+    <!-- LEFT SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-top">
+        <div class="sidebar-header">
+          <div class="brand">
+            <div class="brand-mark">A</div>
+            <span class="brand-title">ARIA</span>
+          </div>
+          <button class="icon-btn close-sidebar-btn" id="closeSidebarBtn" title="Close sidebar">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+              <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        <button class="new-chat-btn" id="newChatBtn">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          <span>New chat</span>
+        </button>
+      </div>
+
+      <!-- History List -->
+      <div class="sidebar-history-container">
+        <div class="history-section-title">Recent Chats</div>
+        <div class="chat-history-list" id="chatHistoryList">
+          <!-- Dynamic chat session items -->
+        </div>
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <button class="sidebar-footer-btn" id="openSettingsBtn">
+          <div class="user-avatar">S</div>
+          <div class="user-meta">
+            <span class="user-name">Local Runtime</span>
+            <span class="user-status">Host • Offline</span>
+          </div>
+          <svg class="gear-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN CHAT CONTAINER -->
+    <main class="main-content">
+      
+      <!-- Top Navigation Bar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="icon-btn sidebar-toggle-btn" id="openSidebarBtn" title="Toggle sidebar">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <line x1="9" y1="3" x2="9" y2="21"/>
+            </svg>
+          </button>
+          
+          <div class="engine-picker">
+            <select id="engineSelector" class="engine-select" title="Switch Engine">
+              <option value="hybrid" selected>Hybrid Engine (NLP + ARIA RAG)</option>
+              <option value="aria_rag">ARIA RAG (Document Retrieval)</option>
+              <option value="aria_transformer">ARIA Transformer (Neural SLM)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <button class="action-btn" id="debugToggleBtn" title="Toggle inspection">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <span id="debugBtnLabel">Inspect</span>
+          </button>
+
+          <button class="action-btn" id="retrainTopBtn" title="Recompile Weights">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+              <path d="M23 4v6h-6M1 20v-6h6"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            <span>Retrain</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Chat Messages Scroll Viewport -->
+      <div class="chat-viewport" id="chatViewport">
+        
+        <!-- EMPTY STATE: MINIMAL CHATGPT WELCOME -->
+        <div class="welcome-screen" id="welcomeScreen">
+          <div class="welcome-center">
+            <div class="welcome-mark">A</div>
+            <h1 class="welcome-heading">What can I help with today?</h1>
+          </div>
+
+          <!-- Minimal Prompt Cards -->
+          <div class="suggestions-grid">
+            <button class="suggestion-card" data-prompt="Explain the ARIA neural architecture and tensor autograd pipeline.">
+              <div class="card-title">System Architecture</div>
+              <div class="card-desc">Tensors, reverse-mode autodiff, and compute backends</div>
+            </button>
+
+            <button class="suggestion-card" data-prompt="Show me a Python implementation of vectorized moving average with type hints.">
+              <div class="card-title">Python Code</div>
+              <div class="card-desc">Production functions, type signatures, and clean syntax</div>
+            </button>
+
+            <button class="suggestion-card" data-prompt="What are the differences between VCPU, VGPU, and VNPU compute backends in ARIA?">
+              <div class="card-title">Compute Devices</div>
+              <div class="card-desc">Virtual CPU, tiled GPU loops, and quantized NPU</div>
+            </button>
+
+            <button class="suggestion-card" data-prompt="calculate (1024 * 64) / 8 + 512">
+              <div class="card-title">Evaluate Math</div>
+              <div class="card-desc">Fast deterministic arithmetic evaluation</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat Messages Container -->
+        <div class="messages-container" id="messagesContainer">
+          <!-- Dynamically populated messages -->
+        </div>
+
+        <!-- Stop Generating Button -->
+        <div class="stop-generating-wrapper" id="stopWrapper" style="display: none;">
+          <button class="stop-generating-btn" id="stopBtn">
+            <span class="stop-icon">■</span>
+            <span>Stop generating</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Bottom Chat Input Area -->
+      <div class="input-area-wrapper">
+        <div class="input-container">
+          <textarea
+            id="chatInput"
+            class="chat-textarea"
+            placeholder="Message ARIA..."
+            rows="1"
+          ></textarea>
+          
+          <button class="send-btn" id="sendBtn" title="Send (Enter)" disabled>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M12 19V5M5 12l7-7 7 7"/>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="input-disclaimer">
+          ARIA Local Stack • Host 127.0.0.1:5000 • All compute offline
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- DIAGNOSTICS MODAL -->
+  <div class="modal-overlay" id="settingsModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">System Diagnostics</h3>
+        <button class="icon-btn modal-close-btn" id="closeSettingsModalBtn">
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="diagnostic-row">
+          <span class="diag-label">Neural Architecture</span>
+          <span class="diag-value">Transformer SLM (Causal Attention + RMSNorm)</span>
+        </div>
+        <div class="diagnostic-row">
+          <span class="diag-label">Compute Devices</span>
+          <span class="diag-value">VCPU, VGPU (Autodiff), VNPU (Frozen Int8)</span>
+        </div>
+        <div class="diagnostic-row">
+          <span class="diag-label">Verification Suite</span>
+          <span class="diag-value">310 Passed (100% Suite)</span>
+        </div>
+        <div class="diagnostic-row">
+          <span class="diag-label">BM25 Document RAG</span>
+          <span class="diag-value" id="modalAriaRagChunks">3 Indexed Chunks</span>
+        </div>
+        <div class="diagnostic-row">
+          <span class="diag-label">Intent Classifier</span>
+          <span class="diag-value">Multi-Layer Perceptron (64, 32)</span>
+        </div>
+        <div class="diagnostic-row">
+          <span class="diag-label">Intent Tags</span>
+          <span class="diag-value" id="modalIntentsCount">Loading...</span>
+        </div>
+
+        <div class="modal-action-box">
+          <p class="modal-hint">Modified dataset? Re-train the local classifier and re-index weights:</p>
+          <button class="primary-btn" id="modalRetrainBtn">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+              <path d="M23 4v6h-6M1 20v-6h6"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            <span>Retrain Model</span>
+          </button>
+          <div id="retrainStatusMsg" class="retrain-msg"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="{{ url_for('static', filename='js/chatgpt.js') }}"></script>
+</body>
+</html>

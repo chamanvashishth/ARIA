@@ -1,0 +1,7 @@
+# Web Application & Machine Learning Dependencies
+# Install with: pip install -r requirements.txt
+# Or via package extras: pip install .[web]
+
+flask>=3.0.0
+scikit-learn>=1.4.0
+numpy>=1.24.0

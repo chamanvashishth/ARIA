@@ -1,0 +1,468 @@
+import pytest
+
+from aria.brain import SGD, TinyLanguageModel, TransformerLanguageModel
+from aria.evaluation import evaluate_language_model
+from aria.tokenizer import ByteTokenizer
+from aria.training import (
+    LanguageModelTrainer,
+    TokenBatchSampler,
+    TokenWindowDataset,
+    build_train_validation_datasets,
+    split_token_ids,
+)
+
+
+def test_token_window_dataset_creates_next_token_pairs() -> None:
+    dataset = TokenWindowDataset([1, 2, 3, 4, 5], sequence_length=3)
+    assert len(dataset) == 1
+    assert dataset[0] == ([1, 2, 3], [2, 3, 4])
+
+
+def test_trainer_runs_and_updates_model() -> None:
+    tokens = ByteTokenizer().encode("hello hello hello")
+    dataset = TokenWindowDataset(tokens, sequence_length=4, stride=2)
+    model = TransformerLanguageModel(
+        vocab_size=ByteTokenizer.VOCAB_SIZE,
+        hidden_size=8,
+        intermediate_size=16,
+        num_layers=1,
+        max_sequence_length=4,
+        seed=5,
+    )
+    optimizer = SGD(model.parameters(), learning_rate=0.01)
+    before = list(model.lm_head.weight._values)
+
+    trainer = LanguageModelTrainer(model, optimizer, dataset)
+    history = trainer.train(2)
+
+    assert len(history) == 2
+    assert all(step.loss > 0 for step in history)
+    assert model.lm_head.weight._values != before
+    assert trainer.step_count == 2
+
+
+def test_tiny_corpus_training_reduces_loss() -> None:
+    # A deliberately simple repeating pattern checks the learning loop, not
+    # general language quality or held-out generalization.
+    token_ids = [1, 2] * 16
+    dataset = TokenWindowDataset(token_ids, sequence_length=2, stride=1)
+    model = TinyLanguageModel(vocab_size=3, embedding_dim=8, seed=23)
+    optimizer = SGD(model.parameters(), learning_rate=0.05)
+    examples = [dataset[index] for index in range(len(dataset))]
+
+    initial = evaluate_language_model(model, examples).mean_loss
+    trainer = LanguageModelTrainer(model, optimizer, dataset)
+    trainer.train(120)
+    final = evaluate_language_model(model, examples).mean_loss
+
+    assert final < initial * 0.8
+    assert trainer.step_count == 120
+
+
+def test_split_token_ids_is_deterministic_and_non_overlapping() -> None:
+    train, validation = split_token_ids(list(range(10)), validation_fraction=0.3)
+    assert train == list(range(7))
+    assert validation == [7, 8, 9]
+    assert set(train).isdisjoint(validation)
+
+
+def test_build_train_validation_datasets_preserves_split_boundary() -> None:
+    train, validation = build_train_validation_datasets(
+        list(range(16)),
+        sequence_length=3,
+        stride=1,
+        validation_fraction=0.25,
+    )
+
+    assert train.token_ids == list(range(12))
+    assert validation.token_ids == [12, 13, 14, 15]
+    assert train[-1] == ([8, 9, 10], [9, 10, 11])
+    assert validation[0] == ([12, 13, 14], [13, 14, 15])
+
+
+def test_train_and_evaluate_reports_train_and_validation_changes() -> None:
+    train, validation = build_train_validation_datasets(
+        [1, 2] * 20,
+        sequence_length=2,
+        stride=1,
+        validation_fraction=0.25,
+    )
+    model = TinyLanguageModel(vocab_size=3, embedding_dim=8, seed=23)
+    optimizer = SGD(model.parameters(), learning_rate=0.05)
+    trainer = LanguageModelTrainer(model, optimizer, train)
+
+    report = trainer.train_and_evaluate(60, validation)
+
+    assert report.steps == 60
+    assert report.final_train_loss < report.initial_train_loss
+    assert report.final_validation.token_count == len(validation) * validation.sequence_length
+    assert report.final_generalization_gap == pytest.approx(
+        report.final_validation.mean_loss - report.final_train_loss
+    )
+
+
+def test_train_and_evaluate_rejects_mismatched_sequence_lengths() -> None:
+    train = TokenWindowDataset([1, 2, 1, 2, 1, 2], sequence_length=2)
+    validation = TokenWindowDataset([1, 2, 1, 2, 1], sequence_length=3)
+    model = TinyLanguageModel(vocab_size=3, embedding_dim=4, seed=5)
+    trainer = LanguageModelTrainer(model, SGD(model.parameters(), learning_rate=0.01), train)
+
+    with pytest.raises(ValueError, match="sequence lengths must match"):
+        trainer.train_and_evaluate(1, validation)
+
+
+def test_trainer_epoch_visits_every_dataset_example_once() -> None:
+    dataset = TokenWindowDataset([1, 2, 3, 4, 5, 6], sequence_length=2, stride=2)
+    model = TinyLanguageModel(vocab_size=7, embedding_dim=4, seed=11)
+    trainer = LanguageModelTrainer(model, SGD(model.parameters(), learning_rate=0.01), dataset)
+
+    history = trainer.train_epoch()
+
+    assert len(history) == len(dataset)
+    assert [item.step for item in history] == [1, 2]
+    assert trainer.step_count == len(dataset)
+
+
+def test_scheduler_changes_learning_rate_deterministically() -> None:
+    from aria.brain import StepDecay
+
+    model = TinyLanguageModel(vocab_size=7, embedding_dim=4, seed=12)
+    optimizer = SGD(model.parameters(), learning_rate=0.1)
+    trainer = LanguageModelTrainer(
+        model,
+        optimizer,
+        TokenWindowDataset([1, 2, 3, 4, 5, 6], sequence_length=2, stride=2),
+        scheduler=StepDecay(drop_every=2, gamma=0.5),
+    )
+
+    history = trainer.train(4)
+
+    assert [round(item.learning_rate, 8) for item in history] == [0.1, 0.05, 0.05, 0.025]
+    assert optimizer.learning_rate == pytest.approx(0.025)
+
+
+def test_scheduler_rejects_invalid_configuration() -> None:
+    from aria.brain import ExponentialDecay, StepDecay
+
+    with pytest.raises(ValueError, match="gamma"):
+        ExponentialDecay(gamma=0)
+    with pytest.raises(ValueError, match="drop_every"):
+        StepDecay(drop_every=0)
+
+
+def test_mini_batch_averages_gradients_and_counts_one_optimizer_step() -> None:
+    dataset = TokenWindowDataset([1, 2, 1, 2, 1, 2], sequence_length=2, stride=1)
+    model = TinyLanguageModel(vocab_size=3, embedding_dim=4, seed=31)
+    optimizer = SGD(model.parameters(), learning_rate=0.01)
+    trainer = LanguageModelTrainer(model, optimizer, dataset, batch_size=2)
+
+    history = trainer.train(1)
+
+    assert len(history) == 1
+    assert history[0].step == 1
+    assert history[0].loss > 0
+    assert trainer.step_count == 1
+
+
+def test_mini_batch_epoch_uses_every_example_once() -> None:
+    dataset = TokenWindowDataset([1, 2, 3, 4, 5, 6, 1], sequence_length=2, stride=1)
+    model = TinyLanguageModel(vocab_size=7, embedding_dim=4, seed=32)
+    trainer = LanguageModelTrainer(
+        model,
+        SGD(model.parameters(), learning_rate=0.01),
+        dataset,
+        batch_size=2,
+    )
+
+    history = trainer.train_epoch()
+
+    assert len(history) == 3
+    assert [item.step for item in history] == [1, 2, 3]
+    assert trainer.step_count == 3
+
+
+def test_batch_size_must_be_positive() -> None:
+    model = TinyLanguageModel(vocab_size=3, embedding_dim=4, seed=33)
+    dataset = TokenWindowDataset([1, 2, 1, 2], sequence_length=2)
+    with pytest.raises(ValueError, match="batch_size"):
+        LanguageModelTrainer(model, SGD(model.parameters(), learning_rate=0.01), dataset, batch_size=0)
+
+
+
+def test_batch_sampler_is_deterministic_and_covers_each_index_once() -> None:
+    dataset = TokenWindowDataset(list(range(20)), sequence_length=2, stride=2)
+    sampler = TokenBatchSampler(dataset, batch_size=3, shuffle=True, seed=17)
+    first = sampler.batches(epoch=4)
+    second = sampler.batches(epoch=4)
+
+    assert first == second
+    assert sorted(index for batch in first for index in batch) == list(range(len(dataset)))
+    assert all(0 < len(batch) <= 3 for batch in first)
+    assert sampler.batches(epoch=5) != first
+
+
+def test_batch_sampler_drop_last_and_invalid_epoch() -> None:
+    dataset = TokenWindowDataset(list(range(12)), sequence_length=2, stride=2)
+    sampler = TokenBatchSampler(dataset, batch_size=2, drop_last=True)
+    batches = sampler.batches()
+
+    assert all(len(batch) == 2 for batch in batches)
+    with pytest.raises(ValueError, match="epoch"):
+        sampler.batches(epoch=-1)
+
+
+def test_train_epochs_supports_seeded_shuffle() -> None:
+    dataset = TokenWindowDataset([1, 2, 3, 4, 5, 6, 1, 2, 3], sequence_length=2, stride=1)
+    model = TinyLanguageModel(vocab_size=7, embedding_dim=4, seed=34)
+    trainer = LanguageModelTrainer(
+        model,
+        SGD(model.parameters(), learning_rate=0.01),
+        dataset,
+        batch_size=2,
+    )
+
+    history = trainer.train_epochs(2, shuffle=True, seed=99)
+
+    assert len(history) == 2 * ((len(dataset) + 1) // 2)
+    assert trainer.step_count == len(history)
+
+
+def test_tiny_language_model_batched_logits_match_per_sequence_forward() -> None:
+    model = TinyLanguageModel(vocab_size=7, embedding_dim=5, seed=81)
+    inputs = [[1, 2, 3], [3, 4, 5]]
+    batched = model.forward_batch(inputs)
+
+    expected = [
+        value
+        for sequence in inputs
+        for value in model.forward(sequence)._values
+    ]
+    assert batched.shape == (len(inputs) * len(inputs[0]), 7)
+    assert batched._values == pytest.approx(expected)
+
+
+def test_tiny_language_model_batched_loss_matches_mean_of_sequence_losses() -> None:
+    model = TinyLanguageModel(vocab_size=7, embedding_dim=5, seed=82)
+    inputs = [[1, 2, 3], [3, 4, 5]]
+    targets = [[2, 3, 4], [4, 5, 6]]
+
+    batched_loss = model.loss_batch(inputs, targets).item()
+    individual_losses = [
+        model.loss(sequence, target).item()
+        for sequence, target in zip(inputs, targets)
+    ]
+
+    assert batched_loss == pytest.approx(sum(individual_losses) / len(individual_losses))
+
+
+def test_trainer_uses_batched_loss_path_for_tiny_model() -> None:
+    dataset = TokenWindowDataset([1, 2, 3, 4, 5, 6], sequence_length=2, stride=2)
+    model = TinyLanguageModel(vocab_size=7, embedding_dim=4, seed=83)
+    trainer = LanguageModelTrainer(
+        model,
+        SGD(model.parameters(), learning_rate=0.01),
+        dataset,
+        batch_size=2,
+    )
+
+    result = trainer.train_batch([0, 1])
+
+    assert result.step == 1
+    assert result.loss > 0
+    assert trainer.step_count == 1
+
+
+def test_transformer_trainer_uses_batched_loss_for_mini_batch() -> None:
+    dataset = TokenWindowDataset([1, 2, 3, 4, 5, 6, 7], sequence_length=2, stride=1)
+    model = TransformerLanguageModel(
+        vocab_size=8,
+        hidden_size=4,
+        intermediate_size=8,
+        num_layers=1,
+        max_sequence_length=2,
+        seed=84,
+    )
+    trainer = LanguageModelTrainer(
+        model,
+        SGD(model.parameters(), learning_rate=0.01),
+        dataset,
+        batch_size=2,
+    )
+    before = list(model.lm_head.weight._values)
+
+    result = trainer.train_batch([0, 1])
+
+    assert result.step == 1
+    assert result.loss > 0
+    assert trainer.step_count == 1
+    assert model.lm_head.weight._values != before
+
+
+
+def test_transformer_training_reduces_fixed_corpus_loss_and_keeps_parameters_finite() -> None:
+    from aria.evaluation import inspect_parameter_health
+
+    token_ids = [1, 2] * 8
+    dataset = TokenWindowDataset(token_ids, sequence_length=2, stride=1)
+    model = TransformerLanguageModel(
+        vocab_size=3,
+        hidden_size=4,
+        intermediate_size=8,
+        num_layers=1,
+        max_sequence_length=2,
+        seed=124,
+    )
+    optimizer = SGD(model.parameters(), learning_rate=0.02)
+    examples = [dataset[index] for index in range(len(dataset))]
+
+    initial_loss = evaluate_language_model(model, examples).mean_loss
+    trainer = LanguageModelTrainer(model, optimizer, dataset, batch_size=2)
+    history = trainer.train(60)
+    final_loss = evaluate_language_model(model, examples).mean_loss
+    health = inspect_parameter_health(model)
+
+    assert len(history) == 60
+    assert trainer.step_count == 60
+    assert final_loss < initial_loss
+    assert all(__import__("math").isfinite(step.loss) for step in history)
+    assert health.healthy
+    assert health.parameter_count == sum(
+        len(parameter._values) for parameter in model.parameters()
+    )
+
+
+
+def test_trainer_rejects_non_finite_loss_before_backward_or_update(monkeypatch) -> None:
+    import aria.training.trainer as trainer_module
+    from aria.brain import Tensor
+
+    dataset = TokenWindowDataset([1, 2, 1, 2], sequence_length=2)
+    model = TinyLanguageModel(vocab_size=3, embedding_dim=4, seed=131)
+    optimizer = SGD(model.parameters(), learning_rate=0.01)
+    trainer = LanguageModelTrainer(model, optimizer, dataset)
+    before = [list(parameter._values) for parameter in model.parameters()]
+    monkeypatch.setattr(
+        trainer_module,
+        "_log_softmax_loss",
+        lambda logits, targets: Tensor.scalar(float("nan")),
+    )
+
+    with pytest.raises(ValueError, match="training loss must be finite"):
+        trainer.train_step(0)
+
+    assert [parameter._values for parameter in model.parameters()] == before
+    assert trainer.step_count == 0
+
+
+def test_trainer_rejects_non_finite_gradients_without_updating_parameters(monkeypatch) -> None:
+    import math
+    from aria.brain import Tensor
+
+    dataset = TokenWindowDataset([1, 2, 1, 2], sequence_length=2)
+    model = TinyLanguageModel(vocab_size=3, embedding_dim=4, seed=132)
+    optimizer = SGD(model.parameters(), learning_rate=0.01)
+    trainer = LanguageModelTrainer(model, optimizer, dataset)
+    parameters = model.parameters()
+    before = [list(parameter._values) for parameter in parameters]
+
+    def invalid_loss(logits, targets):
+        parameter = parameters[0]
+        return Tensor.operation(
+            1.0,
+            parents=(parameter,),
+            backward=lambda result: parameter._accumulate(
+                [math.nan] * len(parameter._values)
+            ),
+        )
+
+    monkeypatch.setattr(model, "loss_batch", invalid_loss)
+
+    with pytest.raises(ValueError, match="training gradients must be finite"):
+        trainer.train_batch([0])
+
+    assert [parameter._values for parameter in parameters] == before
+    assert trainer.step_count == 0
+    assert all(parameter.grad is None for parameter in parameters)
+
+
+
+def test_trainer_rolls_back_parameters_and_learning_rate_if_scheduler_fails() -> None:
+    class FailingScheduler:
+        def step(self, optimizer, completed_steps):
+            optimizer.learning_rate = 0.0
+            raise RuntimeError("scheduler failure")
+
+    dataset = TokenWindowDataset([1, 2, 1, 2], sequence_length=2)
+    model = TinyLanguageModel(vocab_size=3, embedding_dim=4, seed=133)
+    optimizer = SGD(model.parameters(), learning_rate=0.01)
+    trainer = LanguageModelTrainer(model, optimizer, dataset, scheduler=FailingScheduler())
+    parameters = model.parameters()
+    values_before = [list(parameter._values) for parameter in parameters]
+    learning_rate_before = optimizer.learning_rate
+
+    with pytest.raises(RuntimeError, match="scheduler failure"):
+        trainer.train_step(0)
+
+    assert [parameter._values for parameter in parameters] == values_before
+    assert trainer.step_count == 0
+    assert optimizer.learning_rate == learning_rate_before
+    assert all(parameter.grad is None for parameter in parameters)
+
+
+def test_trainer_clears_stale_gradients_after_non_finite_loss() -> None:
+    import aria.training.trainer as trainer_module
+    from aria.brain import Tensor
+
+    dataset = TokenWindowDataset([1, 2, 1, 2], sequence_length=2)
+    model = TinyLanguageModel(vocab_size=3, embedding_dim=4, seed=134)
+    optimizer = SGD(model.parameters(), learning_rate=0.01)
+    trainer = LanguageModelTrainer(model, optimizer, dataset)
+    parameters = model.parameters()
+    for parameter in parameters:
+        parameter.grad = Tensor(parameter.data)
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(
+        trainer_module,
+        "_log_softmax_loss",
+        lambda logits, targets: Tensor.scalar(float("inf")),
+    )
+
+    try:
+        with pytest.raises(ValueError, match="training loss must be finite"):
+            trainer.train_step(0)
+    finally:
+        monkeypatch.undo()
+
+    assert all(parameter.grad is None for parameter in parameters)
+    assert trainer.step_count == 0
+
+
+def test_train_epoch_can_pause_and_resume_same_sampler_order() -> None:
+    dataset = TokenWindowDataset([1, 2, 3, 4, 5, 6, 1, 2, 3], sequence_length=2, stride=1)
+    model = TinyLanguageModel(vocab_size=7, embedding_dim=4, seed=401)
+    trainer = LanguageModelTrainer(
+        model, SGD(model.parameters(), learning_rate=0.01), dataset, batch_size=2
+    )
+
+    first = trainer.train_epoch(shuffle=True, seed=77, max_batches=1)
+    assert len(first) == 1
+    assert trainer.completed_epochs == 0
+    assert trainer.sampler_state is not None
+    assert trainer.sampler_state["next_batch"] == 1
+
+    remainder = trainer.train_epoch(shuffle=True, seed=77)
+    assert len(remainder) == 3
+    assert trainer.completed_epochs == 1
+    assert trainer.sampler_state is None
+
+
+def test_train_epoch_rejects_changed_sampler_configuration_mid_epoch() -> None:
+    dataset = TokenWindowDataset([1, 2, 3, 4, 5, 6, 1, 2, 3], sequence_length=2, stride=1)
+    model = TinyLanguageModel(vocab_size=7, embedding_dim=4, seed=402)
+    trainer = LanguageModelTrainer(
+        model, SGD(model.parameters(), learning_rate=0.01), dataset, batch_size=2
+    )
+    trainer.train_epoch(shuffle=True, seed=77, max_batches=1)
+
+    with pytest.raises(ValueError, match="sampler configuration"):
+        trainer.train_epoch(shuffle=True, seed=78)

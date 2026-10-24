@@ -1,0 +1,214 @@
+{
+  "intents": [
+    {
+      "tag": "greeting",
+      "patterns": [
+        "hi",
+        "hello",
+        "hey",
+        "good morning",
+        "good evening",
+        "what's up",
+        "howdy",
+        "greetings",
+        "is anyone there",
+        "hey there"
+      ],
+      "responses": [
+        "System ready. What would you like to build, analyze, or compute?",
+        "Welcome to the workspace. What topic or calculation would you like to explore?",
+        "Online and ready. Let me know what you need assistance with."
+      ]
+    },
+    {
+      "tag": "goodbye",
+      "patterns": [
+        "bye",
+        "see you later",
+        "goodbye",
+        "exit",
+        "quit",
+        "talk to you later",
+        "cya",
+        "have a good day"
+      ],
+      "responses": [
+        "Session closed. All local runtime metrics have been preserved.",
+        "Goodbye. Keep building.",
+        "Session ended. Feel free to resume anytime."
+      ]
+    },
+    {
+      "tag": "thanks",
+      "patterns": [
+        "thanks",
+        "thank you",
+        "that helps",
+        "awesome, thanks",
+        "much appreciated",
+        "great job",
+        "cool, thanks"
+      ],
+      "responses": [
+        "Glad that helped. Let me know if you need anything further.",
+        "Confirmed. Let me know if you need to run any more checks or computations.",
+        "You're welcome."
+      ]
+    },
+    {
+      "tag": "about_bot",
+      "patterns": [
+        "who are you",
+        "what is your name",
+        "what are you",
+        "tell me about yourself",
+        "are you a bot",
+        "are you chatgpt"
+      ],
+      "responses": [
+        "This is ARIA (Autonomous Research & Intelligence Architecture), an independent, local-first intelligence stack built from first principles in Python. It runs completely offline with its own tensor autograd engine, compute scheduler, and neural layers.",
+        "ARIA: A self-contained neural workspace implementing reverse-mode autograd, causal Transformer SLMs, virtual compute devices (VCPU/VGPU/VNPU), and lexical retrieval without external cloud APIs.",
+        "An autonomous, local-first computing system designed for private, deterministic execution directly on your hardware."
+      ]
+    },
+    {
+      "tag": "capabilities",
+      "patterns": [
+        "what can you do",
+        "help",
+        "how does this work",
+        "features",
+        "what can I ask you",
+        "list your features"
+      ],
+      "responses": [
+        "Current system capabilities:\n- **First-Principles Neural Network**: Transformer SLM with causal attention and RMSNorm\n- **Virtual Compute Devices**: VCPU reference, VGPU tiled execution, VNPU int8 quantization\n- **Local RAG Pipeline**: In-memory BM25 lexical indexing with provenance tracking\n- **Math & Tool Execution**: Arithmetic evaluation and system inspection\n- **Deterministic Testing**: 297 verified unit tests passing across all 26 core blocks",
+        "Core functions available:\n1. Execute mathematical expressions (`calc <expr>`)\n2. Query system architecture and deep learning theory\n3. Generate Python code snippets and algorithms\n4. Search indexed local knowledge base via BM25 retrieval"
+      ]
+    },
+    {
+      "tag": "ai_explanation",
+      "patterns": [
+        "what is ai",
+        "explain artificial intelligence",
+        "what is machine learning",
+        "how does machine learning work",
+        "tell me about ai",
+        "define ai"
+      ],
+      "responses": [
+        "**Machine Learning (ML)** is a mathematical framework where models optimize parameterized functions to minimize empirical loss across training distributions.\n\nKey pipeline stages:\n1. **Data Representation**: Encoding raw signals into high-dimensional vectors (e.g. byte token IDs, embeddings).\n2. **Forward Computation**: Passing inputs through tensor transformations (`W · X + b`) and non-linear activations (`ReLU`, `Softmax`).\n3. **Backpropagation**: Applying the chain rule to compute exact partial derivatives of loss with respect to parameters.\n4. **Optimization**: Updating weights via gradient descent (`W := W - η · ∇W`).",
+        "**Artificial Intelligence Systems** transition from heuristic rule engines to continuous numerical optimization. Modern deep neural networks compose multi-layer affine transformations with attention mechanisms to learn representations directly from data."
+      ]
+    },
+    {
+      "tag": "python_help",
+      "patterns": [
+        "why python for ai",
+        "is python good for ai",
+        "what is python used for",
+        "teach me python",
+        "why is python popular"
+      ],
+      "responses": [
+        "Python dominates systems engineering and scientific computing due to:\n- **Expressive Syntax**: Minimal syntax overhead allows focusing directly on numerical algorithms.\n- **Extensible C-API**: Seamless integration with low-level accelerated kernels and hardware backends.\n- **Universal Ecosystem**: Standardized tooling for tensors, autograd, tabular structures, and serialization.",
+        "In this project, Python is used from scratch: building tensor classes, tracking graph dependencies, computing analytical gradients, and orchestrating virtual compute devices in pure, dependency-light standard code."
+      ]
+    },
+    {
+      "tag": "code_example",
+      "patterns": [
+        "show me a python code example",
+        "give me python code",
+        "how to write a function in python",
+        "python code snippet",
+        "example of python"
+      ],
+      "responses": [
+        "Here is a clean implementation of a vectorized moving average with type annotations:\n\n```python\nfrom typing import Sequence\n\ndef moving_average(values: Sequence[float], window_size: int) -> list[float]:\n    \"\"\"Compute the simple moving average over a sliding window.\"\"\"\n    if window_size <= 0 or window_size > len(values):\n        raise ValueError(\"Invalid window size\")\n    \n    result: list[float] = []\n    window_sum = sum(values[:window_size])\n    result.append(window_sum / window_size)\n    \n    for i in range(window_size, len(values)):\n        window_sum += values[i] - values[i - window_size]\n        result.append(window_sum / window_size)\n        \n    return result\n\n# Example usage\ndata = [10.0, 12.0, 14.0, 16.0, 18.0, 20.0]\nprint(\"Smoothed:\", moving_average(data, window_size=3))\n# Output: [12.0, 14.0, 16.0, 18.0]\n```",
+        "Here is how a reverse-mode automatic differentiation graph node is structured in pure Python:\n\n```python\nclass Value:\n    def __init__(self, data: float, children: tuple = (), op: str = ''):\n        self.data = float(data)\n        self.grad = 0.0\n        self._backward = lambda: None\n        self._prev = set(children)\n        self._op = op\n\n    def __add__(self, other):\n        other = other if isinstance(other, Value) else Value(other)\n        out = Value(self.data + other.data, (self, other), '+')\n        def _backward():\n            self.grad += 1.0 * out.grad\n            other.grad += 1.0 * out.grad\n        out._backward = _backward\n        return out\n\n    def backward(self):\n        self.grad = 1.0\n        # Topological sort\n        topo, visited = [], set()\n        def build_topo(v):\n            if v not in visited:\n                visited.add(v)\n                for child in v._prev:\n                    build_topo(child)\n                topo.append(v)\n        build_topo(self)\n        for node in reversed(topo):\n            node._backward()\n```"
+      ]
+    },
+    {
+      "tag": "neural_networks",
+      "patterns": [
+        "what is a neural network",
+        "how do neural networks work",
+        "explain multilayer perceptron",
+        "what are neurons and layers",
+        "neural network explanation"
+      ],
+      "responses": [
+        "An **Artificial Neural Network** computes parameterized mapping functions `f: X -> Y`:\n- **Linear Layer**: `Z = X · W^T + b` performs affine projection.\n- **Normalization (`RMSNorm`)**: Stabilizes variance across hidden dimensions by scaling by `1 / sqrt(mean(x^2) + ε)`.\n- **Causal Self-Attention**: Computes query-key compatibility `Softmax((Q · K^T) / sqrt(d_k) + M) · V`, where `M` is a causal lower-triangular mask enforcing autoregressive factorization.\n- **Loss Function**: Measures divergence between predictions and ground truth (e.g. cross-entropy `-log p(x_t | x_<t)`).",
+        "In ARIA's neural brain, the network is built in `src/aria/brain`: an `Embedding` layer gathers token vectors, `TransformerBlock` applies causal attention and feed-forward MLP projections, and `lm_head` outputs unnormalized logits across the vocabulary."
+      ]
+    },
+    {
+      "tag": "model_architecture",
+      "patterns": [
+        "how does this chatbot work",
+        "architecture of this bot",
+        "how do you work",
+        "how is this model trained",
+        "under the hood"
+      ],
+      "responses": [
+        "ARIA System Architecture:\n1. **Core Runtime**: Orchestrates inference lifecycles, memory tracking, and execution parameters.\n2. **Dual-Path Engine**:\n   - **Primary**: Local Transformer SLM with causal attention and RMSNorm executed across virtual compute devices.\n   - **Classification**: High-precision TF-IDF + MLP classifier for instant intent resolution.\n3. **Local RAG**: Substring chunker + BM25 statistical term ranking for document context injection.\n4. **Tool Execution**: Strict argument validation and isolated execution boundary."
+      ]
+    },
+    {
+      "tag": "learning_path",
+      "patterns": [
+        "how to learn ai",
+        "roadmap to learn artificial intelligence",
+        "where to start with machine learning",
+        "ai roadmap",
+        "how do i start learning"
+      ],
+      "responses": [
+        "Recommended systems-engineering roadmap for AI:\n1. **Linear Algebra & Calculus**: Matrix decompositions (SVD, QR), eigenvalues, vector spaces, and multivariable chain rule.\n2. **Autodiff & Tensor Engines**: Build a scalar and matrix reverse-mode gradient engine from scratch.\n3. **Transformer Mechanics**: Implement causal attention, multi-head projections, RoPE/positional embeddings, and KV caches.\n4. **Compute Systems**: Study memory hierarchies, matrix multiplication cache-blocking, quantization (int8/int4), and CUDA/SIMD kernel optimization."
+      ]
+    },
+    {
+      "tag": "deep_learning",
+      "patterns": [
+        "what is deep learning",
+        "deep learning vs machine learning",
+        "difference between ml and deep learning",
+        "tell me about deep learning"
+      ],
+      "responses": [
+        "**Deep Learning** denotes neural architectures with multiple parameterized hidden representations (`depth > 2`).\n\n- **Classical ML**: Relies on handcrafted feature engineering (e.g., TF-IDF, edge detectors, SIFT).\n- **Deep Architectures**: Learn hierarchical feature extractors directly from raw high-dimensional tokens, pixels, or audio spectra via continuous end-to-end gradient backpropagation."
+      ]
+    },
+    {
+      "tag": "data_science_libraries",
+      "patterns": [
+        "what libraries are used in ai",
+        "best python libraries for ai",
+        "numpy pandas scikit learn",
+        "top ai tools"
+      ],
+      "responses": [
+        "Key components of the standard scientific Python stack:\n- **NumPy**: N-dimensional contiguous array storage and BLAS/LAPACK bindings.\n- **SciPy**: Sparse linear solvers, numerical integration, and optimization routines.\n- **PyTorch / JAX**: Automatic differentiation systems with JIT compilation (XLA) and GPU acceleration.\n- **Scikit-Learn**: Comprehensive benchmark implementations of classical statistical learners."
+      ]
+    },
+    {
+      "tag": "jokes",
+      "patterns": [
+        "tell me a joke",
+        "make me laugh",
+        "do you know any jokes",
+        "funny",
+        "tech joke"
+      ],
+      "responses": [
+        "Why do programmers prefer dark mode? Because light attracts bugs.",
+        "There are 10 types of people in the world: those who understand binary, and those who don't.",
+        "A SQL query walks into a bar, approaches two tables and asks: 'Can I join you?'",
+        "Why was the JavaScript developer sad? Because they didn't know how to 'null' their feelings.",
+        "Floating point arithmetic walks into a bar. The bartender says: 'That will be $3.00'. The float pays: '$3.0000000000000004'."
+      ]
+    }
+  ]
+}

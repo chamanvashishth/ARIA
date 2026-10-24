@@ -1,0 +1,364 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" width="100%" height="100%" style="background:#0a0c10; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="bgGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0c10" />
+      <stop offset="50%" stop-color="#0e131f" />
+      <stop offset="100%" stop-color="#0a0c10" />
+    </linearGradient>
+
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00f2fe" />
+      <stop offset="100%" stop-color="#4facfe" />
+    </linearGradient>
+
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7928ca" />
+      <stop offset="100%" stop-color="#ff0080" />
+    </linearGradient>
+
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#d97706" />
+      <stop offset="100%" stop-color="#fbbf24" />
+    </linearGradient>
+
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#161b26" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#0d1117" stop-opacity="0.9" />
+    </linearGradient>
+
+    <!-- Drop Shadows & Glow Filters -->
+    <filter id="glowCyan" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <filter id="glowPurple" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Markers -->
+    <marker id="arrowCyan" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M 1 1 L 7 4 L 1 7 Z" fill="#00f2fe" />
+    </marker>
+    <marker id="arrowPurple" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M 1 1 L 7 4 L 1 7 Z" fill="#c084fc" />
+    </marker>
+    <marker id="arrowGreen" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M 1 1 L 7 4 L 1 7 Z" fill="#10b981" />
+    </marker>
+
+    <!-- CSS Keyframe Animations -->
+    <style>
+      .flowing-dash-cyan {
+        stroke-dasharray: 8 8;
+        animation: flowDash 1.2s linear infinite;
+      }
+      .flowing-dash-purple {
+        stroke-dasharray: 8 8;
+        animation: flowDash 1.6s linear infinite;
+      }
+      .flowing-dash-green {
+        stroke-dasharray: 8 8;
+        animation: flowDash 1.4s linear infinite;
+      }
+      @keyframes flowDash {
+        to {
+          stroke-dashoffset: -16;
+        }
+      }
+
+      .pulse-node {
+        animation: pulseLight 3s ease-in-out infinite;
+      }
+      @keyframes pulseLight {
+        0%, 100% { opacity: 0.95; filter: drop-shadow(0 0 2px rgba(0, 242, 254, 0.4)); }
+        50% { opacity: 1; filter: drop-shadow(0 0 10px rgba(0, 242, 254, 0.8)); }
+      }
+
+      .pulse-purple {
+        animation: pulsePurple 3.5s ease-in-out infinite;
+      }
+      @keyframes pulsePurple {
+        0%, 100% { opacity: 0.95; filter: drop-shadow(0 0 2px rgba(121, 40, 202, 0.4)); }
+        50% { opacity: 1; filter: drop-shadow(0 0 10px rgba(121, 40, 202, 0.8)); }
+      }
+
+      .pulse-green {
+        animation: pulseGreen 3s ease-in-out infinite;
+      }
+      @keyframes pulseGreen {
+        0%, 100% { opacity: 0.95; filter: drop-shadow(0 0 2px rgba(16, 185, 129, 0.4)); }
+        50% { opacity: 1; filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.7)); }
+      }
+
+      .signal-dot {
+        animation: signalMove 3s infinite linear;
+      }
+      @keyframes signalMove {
+        0% { transform: translateY(0); opacity: 1; }
+        50% { opacity: 0.8; }
+        100% { transform: translateY(60px); opacity: 0; }
+      }
+
+      .chip-badge {
+        font-size: 10px;
+        letter-spacing: 0.05em;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+    </style>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="1200" height="680" fill="url(#bgGlow)" rx="16" stroke="#1f2937" stroke-width="1.5" />
+
+  <!-- Grid overlay for technical blueprint aesthetics -->
+  <g opacity="0.07" stroke="#ffffff" stroke-width="0.5">
+    <line x1="100" y1="0" x2="100" y2="680" />
+    <line x1="250" y1="0" x2="250" y2="680" />
+    <line x1="450" y1="0" x2="450" y2="680" />
+    <line x1="750" y1="0" x2="750" y2="680" />
+    <line x1="950" y1="0" x2="950" y2="680" />
+    <line x1="1100" y1="0" x2="1100" y2="680" />
+    <line x1="0" y1="80" x2="1200" y2="80" />
+    <line x1="0" y1="200" x2="1200" y2="200" />
+    <line x1="0" y1="340" x2="1200" y2="340" />
+    <line x1="0" y1="480" x2="1200" y2="480" />
+    <line x1="0" y1="600" x2="1200" y2="600" />
+  </g>
+
+  <!-- Header Title & Telemetry Status -->
+  <g transform="translate(40, 45)">
+    <text x="0" y="0" fill="#f8fafc" font-size="20" font-weight="700" letter-spacing="0.08em">ARIA SYSTEM ARCHITECTURE</text>
+    <text x="0" y="20" fill="#94a3b8" font-size="12" letter-spacing="0.03em">Autonomous Research &amp; Intelligence Architecture | First-Principles Neural Execution</text>
+    
+    <!-- Top-Right Status Badges -->
+    <g transform="translate(780, -10)">
+      <rect x="0" y="0" width="130" height="26" rx="13" fill="#111827" stroke="#10b981" stroke-width="1.2" />
+      <circle cx="12" cy="13" r="4" fill="#10b981" class="pulse-green" />
+      <text x="24" y="17" fill="#10b981" font-size="10" font-weight="700" letter-spacing="0.05em">ZERO CLOUD CALLS</text>
+
+      <rect x="145" y="0" width="135" height="26" rx="13" fill="#111827" stroke="#00f2fe" stroke-width="1.2" />
+      <circle cx="157" cy="13" r="4" fill="#00f2fe" class="pulse-node" />
+      <text x="169" y="17" fill="#00f2fe" font-size="10" font-weight="700" letter-spacing="0.05em">AUTOGRAD NATIVE</text>
+    </g>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- COLUMN 1: CLIENT & INGESTION (X: 40 - 240)                                 -->
+  <!-- ========================================================================= -->
+  <g transform="translate(40, 100)">
+    <!-- Container Box -->
+    <rect width="200" height="540" rx="12" fill="url(#cardGrad)" stroke="#374151" stroke-width="1.2" />
+    <rect x="0" y="0" width="200" height="36" rx="12" fill="#1f2937" fill-opacity="0.5" />
+    <text x="14" y="23" fill="#e2e8f0" font-size="12" font-weight="700" letter-spacing="0.05em">1. CLIENT &amp; INGESTION</text>
+
+    <!-- Client Layer Card -->
+    <g transform="translate(15, 55)">
+      <rect width="170" height="110" rx="8" fill="#111827" stroke="#4b5563" stroke-width="1" />
+      <text x="12" y="24" fill="#00f2fe" font-size="11" font-weight="700">Client Entrypoints</text>
+      <text x="12" y="46" fill="#cbd5e1" font-size="10">Web Studio (Obsidian UI)</text>
+      <text x="12" y="66" fill="#cbd5e1" font-size="10">Local REST API (server.py)</text>
+      <text x="12" y="86" fill="#cbd5e1" font-size="10">Deterministic CLI (cli.py)</text>
+      <rect x="12" y="93" width="70" height="4" rx="2" fill="#00f2fe" opacity="0.6" />
+    </g>
+
+    <!-- Tokenizer Card -->
+    <g transform="translate(15, 200)">
+      <rect width="170" height="130" rx="8" fill="#111827" stroke="#00f2fe" stroke-width="1.2" class="pulse-node" />
+      <text x="12" y="24" fill="#00f2fe" font-size="11" font-weight="700">ByteTokenizer Core</text>
+      <text x="12" y="46" fill="#cbd5e1" font-size="10">Deterministic Mapping</text>
+      <text x="12" y="66" fill="#94a3b8" font-size="9">Vocab Size: 256 (0-255)</text>
+      <text x="12" y="84" fill="#94a3b8" font-size="9">+ Special Tokens (PAD, EOS)</text>
+      <text x="12" y="104" fill="#94a3b8" font-size="9">Zero Out-Of-Vocab OOV</text>
+      <rect x="12" y="116" width="146" height="4" rx="2" fill="#00f2fe" />
+    </g>
+
+    <!-- Ingestion Safety Card -->
+    <g transform="translate(15, 365)">
+      <rect width="170" height="150" rx="8" fill="#111827" stroke="#4b5563" stroke-width="1" />
+      <text x="12" y="24" fill="#fbbf24" font-size="11" font-weight="700">Structural Contracts</text>
+      <text x="12" y="46" fill="#cbd5e1" font-size="10">Length &amp; Encoding Gates</text>
+      <text x="12" y="68" fill="#94a3b8" font-size="9">Max Sequence: 128 / 512</text>
+      <text x="12" y="88" fill="#94a3b8" font-size="9">Strict JSON Parse Check</text>
+      <text x="12" y="108" fill="#94a3b8" font-size="9">Non-Standard Constant Filter</text>
+      <text x="12" y="128" fill="#94a3b8" font-size="9">Denial-of-Service Defense</text>
+    </g>
+  </g>
+
+  <!-- Connectors Col 1 -> Col 2 -->
+  <path d="M 240 210 L 290 210" stroke="#00f2fe" stroke-width="2" fill="none" class="flowing-dash-cyan" />
+  <path d="M 240 330 L 290 330" stroke="#00f2fe" stroke-width="2" fill="none" class="flowing-dash-cyan" marker-end="url(#arrowCyan)" />
+
+  <!-- ========================================================================= -->
+  <!-- COLUMN 2: COMPUTE & AUTOGRAD ENGINE (X: 290 - 540)                        -->
+  <!-- ========================================================================= -->
+  <g transform="translate(290, 100)">
+    <rect width="250" height="540" rx="12" fill="url(#cardGrad)" stroke="#374151" stroke-width="1.2" />
+    <rect x="0" y="0" width="250" height="36" rx="12" fill="#1f2937" fill-opacity="0.5" />
+    <text x="14" y="23" fill="#e2e8f0" font-size="12" font-weight="700" letter-spacing="0.05em">2. TENSOR BRAIN &amp; COMPUTE</text>
+
+    <!-- First-Principles Tensor Autodiff -->
+    <g transform="translate(15, 50)">
+      <rect width="220" height="135" rx="8" fill="#111827" stroke="#3b82f6" stroke-width="1.2" />
+      <text x="12" y="24" fill="#60a5fa" font-size="11" font-weight="700">Tensor Autograd Graph</text>
+      <text x="12" y="46" fill="#cbd5e1" font-size="10">Reverse-Mode Automatic Diff</text>
+      <text x="12" y="66" fill="#94a3b8" font-size="9">Dynamic Computation DAG</text>
+      <text x="12" y="84" fill="#94a3b8" font-size="9">Rank-2 Matmul Backward Pass</text>
+      <text x="12" y="102" fill="#94a3b8" font-size="9">dC = dA x B^T  |  dB = A^T x dC</text>
+      <text x="12" y="120" fill="#94a3b8" font-size="9">Zero PyTorch / C++ Dependencies</text>
+    </g>
+
+    <!-- Virtual Compute Scheduler -->
+    <g transform="translate(15, 200)">
+      <rect width="220" height="120" rx="8" fill="#111827" stroke="#8b5cf6" stroke-width="1.2" class="pulse-purple" />
+      <text x="12" y="24" fill="#c084fc" font-size="11" font-weight="700">Virtual Compute Scheduler</text>
+      <text x="12" y="44" fill="#cbd5e1" font-size="10">FIFO Multi-Worker Dispatcher</text>
+      <text x="12" y="64" fill="#94a3b8" font-size="9">Dependency Hazard Resolution</text>
+      <text x="12" y="82" fill="#94a3b8" font-size="9">Logical Workgroup Tile Slicing</text>
+      <text x="12" y="100" fill="#94a3b8" font-size="9">Estimated-Memory Pre-Allocation</text>
+    </g>
+
+    <!-- Software Virtual Devices -->
+    <g transform="translate(15, 335)">
+      <rect width="220" height="185" rx="8" fill="#111827" stroke="#4b5563" stroke-width="1" />
+      <text x="12" y="22" fill="#f8fafc" font-size="11" font-weight="700">Virtual Devices (Software)</text>
+
+      <!-- VCPU -->
+      <g transform="translate(10, 32)">
+        <rect width="200" height="42" rx="4" fill="#0f172a" stroke="#10b981" stroke-width="1" />
+        <text x="8" y="17" fill="#10b981" font-size="10" font-weight="700">VCPU</text>
+        <text x="44" y="17" fill="#cbd5e1" font-size="9">IEEE FP32 Reference Core</text>
+        <text x="8" y="32" fill="#94a3b8" font-size="8">Full autodiff / training &amp; inference</text>
+      </g>
+
+      <!-- VGPU -->
+      <g transform="translate(10, 80)">
+        <rect width="200" height="42" rx="4" fill="#0f172a" stroke="#00f2fe" stroke-width="1" />
+        <text x="8" y="17" fill="#00f2fe" font-size="10" font-weight="700">VGPU</text>
+        <text x="44" y="17" fill="#cbd5e1" font-size="9">Tiled Block Matrix Core</text>
+        <text x="8" y="32" fill="#94a3b8" font-size="8">L1/L2 cache simulation + autodiff</text>
+      </g>
+
+      <!-- VNPU -->
+      <g transform="translate(10, 128)">
+        <rect width="200" height="44" rx="4" fill="#0f172a" stroke="#f59e0b" stroke-width="1" />
+        <text x="8" y="17" fill="#f59e0b" font-size="10" font-weight="700">VNPU</text>
+        <text x="44" y="17" fill="#cbd5e1" font-size="9">Symmetric INT8 Quantized</text>
+        <text x="8" y="32" fill="#94a3b8" font-size="8">Zero-grad frozen forward passes</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Connectors Col 2 -> Col 3 -->
+  <path d="M 540 180 L 590 180" stroke="#00f2fe" stroke-width="2" fill="none" class="flowing-dash-cyan" marker-end="url(#arrowCyan)" />
+  <path d="M 540 330 L 590 330" stroke="#c084fc" stroke-width="2" fill="none" class="flowing-dash-purple" marker-end="url(#arrowPurple)" />
+  <path d="M 540 480 L 590 480" stroke="#10b981" stroke-width="2" fill="none" class="flowing-dash-green" marker-end="url(#arrowGreen)" />
+
+  <!-- ========================================================================= -->
+  <!-- COLUMN 3: TRI-ENGINE INFERENCE PIPELINE (X: 590 - 870)                    -->
+  <!-- ========================================================================= -->
+  <g transform="translate(590, 100)">
+    <rect width="280" height="540" rx="12" fill="url(#cardGrad)" stroke="#374151" stroke-width="1.2" />
+    <rect x="0" y="0" width="280" height="36" rx="12" fill="#1f2937" fill-opacity="0.5" />
+    <text x="14" y="23" fill="#e2e8f0" font-size="12" font-weight="700" letter-spacing="0.05em">3. TRI-ENGINE HYBRID ROUTING</text>
+
+    <!-- Engine 1: Intent Classifier -->
+    <g transform="translate(15, 50)">
+      <rect width="250" height="135" rx="8" fill="#111827" stroke="#10b981" stroke-width="1.2" class="pulse-green" />
+      <text x="12" y="22" fill="#10b981" font-size="11" font-weight="700">ENGINE 1: MLP INTENT CLASSIFIER</text>
+      <text x="12" y="42" fill="#cbd5e1" font-size="10">TF-IDF Vectorizer + Multi-Layer Perceptron</text>
+      <text x="12" y="62" fill="#94a3b8" font-size="9">Sub-millisecond pattern matching</text>
+      <text x="12" y="80" fill="#94a3b8" font-size="9">Deterministic responses for domain tags</text>
+      <text x="12" y="98" fill="#94a3b8" font-size="9">Confidence Threshold: 0.35 Gate</text>
+      <text x="12" y="118" fill="#10b981" font-size="9" font-weight="700">Ultra-fast / Deterministic routing</text>
+    </g>
+
+    <!-- Engine 2: BM25 Lexical RAG -->
+    <g transform="translate(15, 200)">
+      <rect width="250" height="140" rx="8" fill="#111827" stroke="#3b82f6" stroke-width="1.2" />
+      <text x="12" y="22" fill="#60a5fa" font-size="11" font-weight="700">ENGINE 2: BM25 LEXICAL RAG</text>
+      <text x="12" y="42" fill="#cbd5e1" font-size="10">Local Document Retrieval &amp; Ranking</text>
+      <text x="12" y="62" fill="#94a3b8" font-size="9">Sliding window chunking (size=128, step=64)</text>
+      <text x="12" y="80" fill="#94a3b8" font-size="9">BM25 scoring: k1=1.5, b=0.75 calibration</text>
+      <text x="12" y="98" fill="#94a3b8" font-size="9">Zero vector-database external dependencies</text>
+      <text x="12" y="118" fill="#60a5fa" font-size="9" font-weight="700">Grounded local corpus synthesis</text>
+    </g>
+
+    <!-- Engine 3: Transformer SLM -->
+    <g transform="translate(15, 355)">
+      <rect width="250" height="165" rx="8" fill="#111827" stroke="#00f2fe" stroke-width="1.2" class="pulse-node" />
+      <text x="12" y="22" fill="#00f2fe" font-size="11" font-weight="700">ENGINE 3: TRANSFORMER SLM</text>
+      <text x="12" y="42" fill="#cbd5e1" font-size="10">Autoregressive Causal Decoder</text>
+      <text x="12" y="62" fill="#94a3b8" font-size="9">Single/Multi-head Causal Self-Attention</text>
+      <text x="12" y="80" fill="#94a3b8" font-size="9">RMSNorm pre-normalization layers</text>
+      <text x="12" y="98" fill="#94a3b8" font-size="9">Temperature + Top-K + Seed control</text>
+      <text x="12" y="116" fill="#94a3b8" font-size="9">Next-token Cross-Entropy autograd</text>
+      <text x="12" y="138" fill="#00f2fe" font-size="9" font-weight="700">First-principles generative reasoning</text>
+    </g>
+  </g>
+
+  <!-- Connectors Col 3 -> Col 4 -->
+  <path d="M 870 210 L 920 210" stroke="#10b981" stroke-width="2" fill="none" class="flowing-dash-green" marker-end="url(#arrowGreen)" />
+  <path d="M 870 430 L 920 430" stroke="#00f2fe" stroke-width="2" fill="none" class="flowing-dash-cyan" marker-end="url(#arrowCyan)" />
+
+  <!-- ========================================================================= -->
+  <!-- COLUMN 4: GOVERNANCE & ORCHESTRATION (X: 920 - 1160)                      -->
+  <!-- ========================================================================= -->
+  <g transform="translate(920, 100)">
+    <rect width="240" height="540" rx="12" fill="url(#cardGrad)" stroke="#374151" stroke-width="1.2" />
+    <rect x="0" y="0" width="240" height="36" rx="12" fill="#1f2937" fill-opacity="0.5" />
+    <text x="14" y="23" fill="#e2e8f0" font-size="12" font-weight="700" letter-spacing="0.05em">4. GOVERNANCE &amp; MEMORY</text>
+
+    <!-- Agent Tool Registry -->
+    <g transform="translate(15, 50)">
+      <rect width="210" height="125" rx="8" fill="#111827" stroke="#f59e0b" stroke-width="1.2" />
+      <text x="12" y="22" fill="#fbbf24" font-size="11" font-weight="700">ToolRegistry &amp; AST Engine</text>
+      <text x="12" y="42" fill="#cbd5e1" font-size="10">Sandboxed Expression Eval</text>
+      <text x="12" y="62" fill="#94a3b8" font-size="9">Safe AST arithmetic (no eval)</text>
+      <text x="12" y="80" fill="#94a3b8" font-size="9">Registered callable verification</text>
+      <text x="12" y="98" fill="#94a3b8" font-size="9">JSON Schema parameter validation</text>
+    </g>
+
+    <!-- Human-in-the-Loop Approval Gate -->
+    <g transform="translate(15, 190)">
+      <rect width="210" height="130" rx="8" fill="#111827" stroke="#ef4444" stroke-width="1.2" />
+      <text x="12" y="22" fill="#f87171" font-size="11" font-weight="700">Mandatory Approval Gate</text>
+      <text x="12" y="42" fill="#cbd5e1" font-size="10">Zero Unsupervised Execution</text>
+      <text x="12" y="62" fill="#94a3b8" font-size="9">Step-by-step orchestrator policy</text>
+      <text x="12" y="80" fill="#94a3b8" font-size="9">Deterministic execution graphs</text>
+      <text x="12" y="98" fill="#94a3b8" font-size="9">Human verification barrier</text>
+    </g>
+
+    <!-- Memory & Checkpoint State -->
+    <g transform="translate(15, 335)">
+      <rect width="210" height="185" rx="8" fill="#111827" stroke="#6b7280" stroke-width="1" />
+      <text x="12" y="22" fill="#e2e8f0" font-size="11" font-weight="700">Persistence &amp; Recovery</text>
+
+      <g transform="translate(10, 32)">
+        <rect width="190" height="40" rx="4" fill="#0f172a" stroke="#374151" stroke-width="1" />
+        <text x="8" y="16" fill="#cbd5e1" font-size="9" font-weight="700">Conversation Store</text>
+        <text x="8" y="30" fill="#94a3b8" font-size="8">JSONL structured local history</text>
+      </g>
+
+      <g transform="translate(10, 80)">
+        <rect width="190" height="40" rx="4" fill="#0f172a" stroke="#374151" stroke-width="1" />
+        <text x="8" y="16" fill="#cbd5e1" font-size="9" font-weight="700">Trainer Checkpointing</text>
+        <text x="8" y="30" fill="#94a3b8" font-size="8">Mid-epoch cursor &amp; fingerprint</text>
+      </g>
+
+      <g transform="translate(10, 128)">
+        <rect width="190" height="42" rx="4" fill="#0f172a" stroke="#10b981" stroke-width="1" />
+        <text x="8" y="16" fill="#10b981" font-size="9" font-weight="700">100% Data Sovereignty</text>
+        <text x="8" y="30" fill="#94a3b8" font-size="8">Zero telemetry / Offline verified</text>
+      </g>
+    </g>
+  </g>
+</svg>
