@@ -30,10 +30,10 @@ HF_DIALOGUE_DATASET = "3nesdeniz/english-daily-dialogues-10k"
 
 def normalize_text(text: str) -> str:
     """Remove obvious identifiers before local training, preserving conversational cues."""
-    text = re.sub(r"https?://\\S+", "[link]", text)
-    text = re.sub(r"\\b[\\w.+-]+@[\\w.-]+\\.[A-Za-z]{2,}\\b", "[email]", text)
-    text = re.sub(r"(?<!\\w)@[A-Za-z0-9_]{2,}", "[user]", text)
-    text = re.sub(r"\\s+", " ", text).strip()
+    text = re.sub(r"https?://\S+", "[link]", text)
+    text = re.sub(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b", "[email]", text)
+    text = re.sub(r"(?<!\w)@[A-Za-z0-9_]{2,}", "[user]", text)
+    text = re.sub(r"\s+", " ", text).strip()
     return text[:4000]
 
 
