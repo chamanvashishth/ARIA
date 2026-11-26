@@ -244,6 +244,27 @@ python scripts/benchmark_compute_batch.py
 
 ---
 
+## Social Conversation Training with the Virtual GPU
+
+ARIA includes an experimental Transformer training script for original greeting,
+emotion, emoji and text-gesture examples. You can also opt in to a 2026
+CC BY 4.0 synthetic dialogue dataset. Training operations use ARIA's
+**VirtualGPUBackend**, which is software running on your host CPU, not a
+physical GPU. This is separate from the original `chatbot.py` intent classifier.
+
+```bash
+python scripts/train_social_vgpu.py --source seed --steps 6
+pip install datasets
+python scripts/train_social_vgpu.py --source hf --max-dialogues 200 --steps 160
+```
+
+See [training instructions, dataset attribution and limitations](docs/TRAINING_SOCIAL_VGPU.md).
+The script produces ARIA checkpoints and validation metrics in
+`data/training_runs/`. Trained weights are not automatically connected to
+the web chatbot. X/Twitter posts are not scraped or used for model training.
+
+---
+
 ## Engineering Notes & Trade-offs
 
 A realistic look at what ARIA is and what it is not:
