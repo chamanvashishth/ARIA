@@ -54,7 +54,7 @@ The experiment trains a small 1-layer `TransformerLanguageModel` with
 `ByteTokenizer`, `LanguageModelTrainer`, and `SGD`. Defaults: hidden size 8,
 intermediate size 16, context length 12 bytes, batch size 1, six updates.
 
-Training is next-byte prediction. It is **not** instruction fine-tuning and
+Training alternates randomly dispersed windows from the original social examples and the optional 2026 dialogues, so even short runs actually use both sources. The report counts windows sampled from each source. Training is next-byte prediction. It is **not** instruction fine-tuning and
 does not teach robust conversational skills by itself. Outputs:
 - `social_transformer_vgpu.json`: ARIA-native model checkpoint
 - `training_report.json`: device, sources, counts and held-out loss
