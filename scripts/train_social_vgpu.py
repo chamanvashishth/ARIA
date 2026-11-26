@@ -84,6 +84,30 @@ def make_datasets(train: list[str], validation: list[str], sequence_length: int)
     )
 
 
+def select_training_batches(total_windows: int, seed_windows: int, steps: int,
+                            batch_size: int, seed: int):
+    """Choose deterministic dispersed windows and alternate sources when available."""
+    if total_windows < 1 or steps < 1 or batch_size < 1:
+        raise ValueError("invalid batch selection arguments")
+    if not 0 <= seed_windows <= total_windows:
+        raise ValueError("seed window boundary out of range")
+    original = list(range(seed_windows))
+    external = list(range(seed_windows, total_windows))
+    rng = random.Random(seed)
+    rng.shuffle(original)
+    rng.shuffle(external)
+    if not original:
+        raise ValueError("original ARIA dataset must have usable windows")
+    pools = ([("2026-dialogues", external), ("ARIA-social", original)]
+             if external else [("ARIA-social", original)])
+    for step in range(steps):
+        label, indices = pools[step % len(pools)]
+        offset = (step // len(pools)) * batch_size
+        batch = [indices[(offset + pos) % len(indices)]
+                 for pos in range(min(batch_size, len(indices)))]
+        yield label, batch
+
+
 def validation_loss(model: TransformerLanguageModel, dataset: TokenWindowDataset,
                     max_windows: int) -> float:
     if max_windows < 1:
@@ -105,6 +129,7 @@ def train(args: argparse.Namespace) -> dict:
         raise ValueError("steps, batch size and sequence length must be positive")
     source = ROOT / "data" / "social_seed.txt"
     training, validation = split_records(seed_records(source), seed=args.seed)
+    seed_token_count = len(ByteTokenizer().encode("\\n\\n".join(training)))
     sources = ["ARIA original social and gesture examples"]
     if args.source == "hf":
         extra_train, extra_val = load_hf_dialogues(args.max_dialogues)
@@ -133,7 +158,17 @@ def train(args: argparse.Namespace) -> dict:
     trainer = LanguageModelTrainer(model, optimizer, train_dataset,
                                    batch_size=args.batch_size)
     before = validation_loss(model, validation_dataset, args.validation_windows)
-    history = trainer.train(args.steps)
+    seed_windows = (len(train_dataset) if args.source == "seed" else
+                    min(len(train_dataset),
+                        (seed_token_count + 2 + args.sequence_length - 1) //
+                        args.sequence_length))
+    history = []
+    trained_window_sources = {"ARIA-social": 0, "2026-dialogues": 0}
+    for label, batch in select_training_batches(
+        len(train_dataset), seed_windows, args.steps, args.batch_size, args.seed
+    ):
+        history.append(trainer.train_batch(batch))
+        trained_window_sources[label] += len(batch)
     after = validation_loss(model, validation_dataset, args.validation_windows)
 
     output = Path(args.output_dir)
@@ -162,6 +197,7 @@ def train(args: argparse.Namespace) -> dict:
         "training_windows": len(train_dataset),
         "validation_windows": len(validation_dataset),
         "steps": len(history),
+        "trained_windows_by_source": trained_window_sources,
         "initial_validation_loss": before,
         "final_validation_loss": after,
         "initial_training_loss": history[0].loss,
