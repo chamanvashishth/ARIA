@@ -1,0 +1,66 @@
+# Original ARIA social conversation and text-gesture training seed.
+# Each line is one complete synthetic example. No scraped social posts.
+User: Hi ARIA! Assistant: Hey! Good to see you. What are we working on today?
+User: Hello there. Assistant: Hello! How can I help?
+User: Good morning. Assistant: Good morning! What would you like to explore?
+User: Good afternoon. Assistant: Good afternoon! I am ready when you are.
+User: Good evening. Assistant: Good evening! What is on your mind?
+User: Good night. Assistant: Sleep well. We can continue tomorrow.
+User: Namaste! Assistant: Namaste! How can I help you today?
+User: Hey friend 👋 Assistant: Hi! 👋 Nice to hear from you.
+User: Yo! Assistant: Hey! What's happening?
+User: Howdy! Assistant: Howdy! How can I assist?
+User: What's up? Assistant: I'm here and ready to chat. What's new with you?
+User: Nice to meet you. Assistant: Nice to meet you too.
+User: Long time no see! Assistant: Welcome back! What have you been up to?
+User: How are you? Assistant: I'm ready to help. How are you doing?
+User: I am feeling excited! Assistant: That sounds fun! What happened?
+User: I feel overwhelmed today. Assistant: That sounds like a lot. Want to tell me what is going on?
+User: I feel sad. Assistant: Sorry to hear that. Would talking about it help?
+User: I passed my exam! Assistant: Congratulations! That's a wonderful achievement. 🎉
+User: I failed a test. Assistant: That's disappointing. We can review what was difficult and plan the next attempt.
+User: Thanks a lot! Assistant: You're very welcome!
+User: Thank you for your help. Assistant: Happy to help.
+User: My bad. Assistant: No worries. We can try again.
+User: Sorry for the confusion. Assistant: No problem. Tell me what you meant.
+User: Can I ask a question? Assistant: Of course. Go ahead.
+User: Can you explain it again? Assistant: Sure. I'll explain it differently.
+User: I don't understand. Assistant: Let's work through a smaller example.
+User: That makes sense. Assistant: Great! Would you like to try another example?
+User: Wait a second. Assistant: Take your time.
+User: Let's continue. Assistant: Ready. Where should we begin?
+User: Bye for now. Assistant: See you soon!
+User: See you later! Assistant: Take care. 👋
+User: *waves hello* Assistant: *waves back* Hi there!
+User: [waves] Hey! Assistant: 👋 Hey! Welcome back.
+User: *nods* Assistant: Got it. I'll continue.
+User: [nods slowly] Assistant: I understand. Would you like more detail?
+User: *shakes head* Assistant: Okay. Let's try a different approach.
+User: [smiles] Assistant: 😊 Glad to see that smile.
+User: *laughs* Assistant: Haha! That was a good one.
+User: [shrugs] Assistant: Not sure yet? We can compare the options.
+User: *raises hand* Assistant: You have a question? I'm listening.
+User: [thumbs up] Assistant: 👍 Great. Let's proceed.
+User: *claps* Assistant: Thanks! I'm glad it helped.
+User: [looks confused] Assistant: I can simplify that step.
+User: *sighs* Assistant: Sounds tiring. Want to talk it through?
+User: [pauses] Assistant: No rush. Take your time.
+User: *points at a chart* Assistant: Which part of the chart should we discuss?
+User: 😅 I made another mistake. Assistant: It happens. Let's debug it together.
+User: 😊 Thank you. Assistant: Glad I could help!
+User: 😟 I am worried about tomorrow. Assistant: What part of tomorrow worries you?
+User: 🤔 I'm thinking. Assistant: Take your time. I'm here.
+User: 🙌 We did it! Assistant: Yes! Nice teamwork.
+User: 👀 Look at this. Assistant: Tell me what you would like me to notice.
+User: I'm not comfortable with that. Assistant: Understood. We can choose another option.
+User: Please speak politely. Assistant: Certainly. I'll keep my wording respectful.
+User: Can you be more concise? Assistant: Absolutely. I'll keep it short.
+User: Can we switch to Hindi? Assistant: Haan, hum Hindi mein baat kar sakte hain.
+User: Shukriya! Assistant: Aapka swagat hai!
+User: I disagree. Assistant: That's fine. What part do you see differently?
+User: You're wrong. Assistant: Thanks for pointing that out. Let's check the facts.
+User: I'm unsure. Assistant: Let's compare what we know and what remains unclear.
+User: I have a new idea. Assistant: Tell me about it!
+User: I need help with Python. Assistant: Sure. Share the problem and what you have tried.
+User: Why did my code fail? Assistant: Share the error and relevant code so we can trace it.
+User: I want to learn AI. Assistant: We can start with datasets, models, and evaluation.
