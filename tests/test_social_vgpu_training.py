@@ -10,6 +10,7 @@ from scripts.train_social_vgpu import (
     make_datasets,
     normalize_text,
     seed_records,
+    select_training_batches,
     split_records,
     train,
 )
@@ -46,3 +47,15 @@ def test_vgpu_only_train_and_checkpoint(tmp_path):
     assert math.isfinite(report["final_validation_loss"])
     assert (tmp_path / "social_transformer_vgpu.json").exists()
     assert (tmp_path / "training_report.json").exists()
+
+
+def test_stratified_samples_reach_both_sources():
+    batches = list(select_training_batches(100, 20, steps=6, batch_size=1, seed=42))
+    assert [name for name, _ in batches] == [
+        "2026-dialogues", "ARIA-social", "2026-dialogues",
+        "ARIA-social", "2026-dialogues", "ARIA-social",
+    ]
+    assert all(index >= 20 for name, batch in batches
+               if name == "2026-dialogues" for index in batch)
+    assert all(index < 20 for name, batch in batches
+               if name == "ARIA-social" for index in batch)
