@@ -39,3 +39,7 @@ tmp/
 temp/
 extracted_new_zip/
 *.tmp
+
+# Local neural training data and generated model checkpoints
+data/training_runs/
+data/hf_cache/

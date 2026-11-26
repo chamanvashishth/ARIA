@@ -1,0 +1,43 @@
+name: ARIA social VGPU training smoke
+
+on:
+  push:
+    branches:
+      - aria-vgpu-social-training-20261126
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  social-vgpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install core and test tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install pytest
+      - name: Run focused tests including real VGPU training step
+        run: python -m pytest -q tests/test_social_vgpu_training.py
+      - name: Train social model with VGPU emulation
+        run: |
+          python scripts/train_social_vgpu.py --source seed --steps 4 --sequence-length 8 --hidden-size 8 --intermediate-size 16 --validation-windows 2
+      - name: Install external dialogue dataset loader
+        run: python -m pip install "datasets>=3.0,<5"
+      - name: Train VGPU on licensed 2026 conversations
+        run: |
+          python scripts/train_social_vgpu.py --source hf --max-dialogues 200 --steps 160 --sequence-length 8 --hidden-size 8 --intermediate-size 16 --validation-windows 10 --output-dir data/training_runs/social-vgpu-2026
+      - name: Publish research checkpoint and metrics
+        uses: actions/upload-artifact@v4
+        with:
+          name: aria-social-vgpu-training
+          path: data/training_runs/
+          retention-days: 7
