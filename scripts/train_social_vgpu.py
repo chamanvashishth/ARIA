@@ -109,15 +109,16 @@ def select_training_batches(total_windows: int, seed_windows: int, steps: int,
 
 
 def validation_loss(model: TransformerLanguageModel, dataset: TokenWindowDataset,
-                    max_windows: int) -> float:
+                    max_windows: int, seed_windows: int) -> float:
+    """Evaluate dispersed held-out token windows from both source groups."""
     if max_windows < 1:
         raise ValueError("max_windows must be positive")
     losses = []
-    for index in range(min(max_windows, len(dataset))):
-        inputs, targets = dataset[index]
+    for _, indices in select_training_batches(
+        len(dataset), seed_windows, max_windows, batch_size=1, seed=2026
+    ):
+        inputs, targets = dataset[indices[0]]
         losses.append(model.loss_batch([inputs], [targets]).item())
-    if not losses:
-        raise ValueError("validation dataset has no windows")
     result = math.fsum(losses) / len(losses)
     if not math.isfinite(result):
         raise ValueError("non-finite validation loss")
@@ -130,6 +131,7 @@ def train(args: argparse.Namespace) -> dict:
     source = ROOT / "data" / "social_seed.txt"
     training, validation = split_records(seed_records(source), seed=args.seed)
     seed_token_count = len(ByteTokenizer().encode("\n\n".join(training)))
+    seed_val_token_count = len(ByteTokenizer().encode("\n\n".join(validation)))
     sources = ["ARIA original social and gesture examples"]
     if args.source == "hf":
         extra_train, extra_val = load_hf_dialogues(args.max_dialogues)
@@ -157,11 +159,16 @@ def train(args: argparse.Namespace) -> dict:
     optimizer = SGD(model.parameters(), learning_rate=args.learning_rate)
     trainer = LanguageModelTrainer(model, optimizer, train_dataset,
                                    batch_size=args.batch_size)
-    before = validation_loss(model, validation_dataset, args.validation_windows)
     seed_windows = (len(train_dataset) if args.source == "seed" else
                     min(len(train_dataset),
                         (seed_token_count + 2 + args.sequence_length - 1) //
                         args.sequence_length))
+    seed_validation_windows = (len(validation_dataset) if args.source == "seed" else
+                               min(len(validation_dataset),
+                                   (seed_val_token_count + 2 + args.sequence_length - 1) //
+                                   args.sequence_length))
+    before = validation_loss(model, validation_dataset, args.validation_windows,
+                             seed_validation_windows)
     history = []
     trained_window_sources = {"ARIA-social": 0, "2026-dialogues": 0}
     for label, batch in select_training_batches(
@@ -169,7 +176,8 @@ def train(args: argparse.Namespace) -> dict:
     ):
         history.append(trainer.train_batch(batch))
         trained_window_sources[label] += len(batch)
-    after = validation_loss(model, validation_dataset, args.validation_windows)
+    after = validation_loss(model, validation_dataset, args.validation_windows,
+                            seed_validation_windows)
 
     output = Path(args.output_dir)
     output.mkdir(parents=True, exist_ok=True)
@@ -198,6 +206,13 @@ def train(args: argparse.Namespace) -> dict:
         "validation_windows": len(validation_dataset),
         "steps": len(history),
         "trained_windows_by_source": trained_window_sources,
+        "validation_windows_per_source": {
+            label: sum(1 for src, _ in select_training_batches(
+                len(validation_dataset), seed_validation_windows,
+                args.validation_windows, 1, seed=2026
+            ) if src == label)
+            for label in ("ARIA-social", "2026-dialogues")
+        },
         "initial_validation_loss": before,
         "final_validation_loss": after,
         "initial_training_loss": history[0].loss,
