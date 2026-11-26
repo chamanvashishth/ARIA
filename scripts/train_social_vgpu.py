@@ -129,7 +129,7 @@ def train(args: argparse.Namespace) -> dict:
         raise ValueError("steps, batch size and sequence length must be positive")
     source = ROOT / "data" / "social_seed.txt"
     training, validation = split_records(seed_records(source), seed=args.seed)
-    seed_token_count = len(ByteTokenizer().encode("\\n\\n".join(training)))
+    seed_token_count = len(ByteTokenizer().encode("\n\n".join(training)))
     sources = ["ARIA original social and gesture examples"]
     if args.source == "hf":
         extra_train, extra_val = load_hf_dialogues(args.max_dialogues)
